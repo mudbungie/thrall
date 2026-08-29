@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# thrall pre-commit hook. Two jobs, split deliberately:
+#
+#   1. The COMMIT-CONTEXT guard, which only a hook can do: no direct commits to
+#      mainline. Squash-merges from task delivery are permitted, detected by
+#      the presence of MERGE_MSG or SQUASH_MSG.
+#   2. The BUILD GATE — delegated whole to scripts/pre-commit, where it is
+#      content-addressable and can be run by anything that has no commit
+#      context at all (a speculative builder, a CI job). Nothing but the guard
+#      may live here, or those callers silently run a different gate.
+#
+# Seat it with `make install-hooks`. Bypass is intentionally not supported.
+
+set -euo pipefail
+
+branch="$(git symbolic-ref --short HEAD 2>/dev/null || echo DETACHED)"
+git_dir="$(git rev-parse --git-dir)"
+
+case "$branch" in
+  main|master)
+    if [ ! -f "$git_dir/MERGE_MSG" ] && [ ! -f "$git_dir/SQUASH_MSG" ]; then
+      echo "error: direct commits to '$branch' are not permitted." >&2
+      echo "       use 'bl claim <task>' to work in a worktree, then 'bl close'." >&2
+      exit 1
+    fi
+    ;;
+esac
+
+exec "$(git rev-parse --show-toplevel)/scripts/pre-commit"

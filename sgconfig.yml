@@ -1,0 +1,13 @@
+# ast-grep project config. Rules live in ./rules and are applied by
+# `ast-grep scan` (see the `rules-audit` Makefile target).
+#
+# Pinned ast-grep: 0.44.1 — the version these rules were authored and verified
+# against, via `--debug-query=ast` for every node kind they name. A newer
+# ast-grep is generally fine, but re-verify the node kinds if a rule ever stops
+# matching after an upgrade: a rule that silently matches nothing passes as
+# green forever, which is why `rules-audit` also checks the fixtures still fire.
+#
+# Enforcement scans `src` only (`ast-grep scan src`); rules/fixtures holds
+# deliberate violations that a whole-tree scan would — correctly — flag.
+ruleDirs:
+  - rules

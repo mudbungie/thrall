@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# thrall gate — the complete build gate, factored out of .githooks/pre-commit
+# so it is content-addressable: a verdict cache keyed on (tree, gate) can
+# fingerprint the gate as the content of THIS file and the Makefile, plus
+# `rustc -V`. Change any of them and every stored verdict silently stops
+# matching, which is exactly the invalidation a gate upgrade must cause.
+#
+# Steps, cheap first, one make-target home each so the hook and a hand-run
+# `make check` cannot drift:
+#   1. make fmt-check
+#   2. make lint      — line-cap, clippy -D warnings, rules-audit, cargo-deny
+#   3. make coverage  — tarpaulin --fail-under 100
+#
+# Bypass is intentionally not supported. If something is broken, fix it.
+
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+# When git invokes a hook it exports GIT_DIR, GIT_INDEX_FILE and friends. Those
+# OUTRANK `-C <repo>` and `current_dir`, so they leak into every git subprocess
+# the gate spawns and silently retarget it at THIS repo — a test that `git
+# init`s a tempdir included. Scrub, so the tools run as from a clean shell.
+unset $(git rev-parse --local-env-vars)
+
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "error: cargo not installed; cannot run the gate." >&2
+  exit 1
+fi
+
+echo "gate: fmt (make fmt-check)..." >&2
+make fmt-check >&2
+
+echo "gate: lint (make lint)..." >&2
+make lint >&2
+
+echo "gate: coverage (make coverage)..." >&2
+make coverage >&2
+
+echo "gate: OK." >&2

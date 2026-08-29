@@ -1,0 +1,15 @@
+# Clippy configuration. Pairs with the restriction lints denied in
+# Cargo.toml's `[lints.clippy]` (unwrap_used, expect_used, panic, todo,
+# unimplemented, dbg_macro, indexing_slicing, string_slice).
+#
+# Test code is exempt from the panic-family and indexing restrictions: a test
+# asserts by panicking, and `vec[0]` / `s[..n]` on known-shaped fixture data is
+# clearer than a `.get()` dance that can never fail. These knobs relax the
+# matching lints for code clippy classifies as a test — anything under a
+# `#[cfg(test)]` module, inline or sibling-file, and the `tests/` integration
+# binaries. Prod code gets no relief.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-dbg-in-tests = true
+allow-indexing-slicing-in-tests = true

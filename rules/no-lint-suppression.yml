@@ -1,0 +1,45 @@
+# House rule 5: prod code never suppresses a lint. An inline `#[allow(…)]`, a
+# file-level `#![allow(…)]`, or a `#[cfg_attr(…, allow(…))]` hides a warning at
+# the one place it fires instead of fixing the cause — and once the gate is
+# `-D warnings`, a stray allow is the one hole through it.
+#
+# Policy lives in the manifest (`Cargo.toml [lints]`) where it is reviewable in
+# one place and every entry carries a justification. THAT MANIFEST IS THE ONLY
+# HOME FOR A SUPPRESSION; the code carries none.
+#
+# The test carve-out mirrors `no-assert-outside-tests.yml` exactly — test code
+# may relax a lint, because the `allow-*-in-tests` knobs in `clippy.toml`
+# cannot reach an integration crate's own fixture helpers:
+#   - INLINE `#[cfg(test)] mod tests { … }` is exempted structurally: the
+#     attribute is `inside` a `mod_item` that `follows` a `#[cfg(test)]`
+#     attribute (a *preceding sibling* in tree-sitter-rust — so `follows`, not
+#     `has`).
+#   - SIBLING test files are exempted by `ignores` globs, since their AST has
+#     no `#[cfg(test)] mod` ancestor to match.
+#
+# Node kinds verified against ast-grep 0.44.1 (`--debug-query`): `#[allow(…)]`
+# and `#[cfg_attr(…, allow(…))]` are `attribute_item`; `#![allow(…)]` is
+# `inner_attribute_item`. The `allow\(` regex matches all three spellings and
+# leaves `#[cfg(test)]`, `#[test]` and doc attributes clear.
+id: no-lint-suppression
+language: rust
+severity: error
+message: "no lint suppression in prod; fix the cause or move policy to Cargo.toml [lints] (see rules/no-lint-suppression.yml)"
+ignores:
+  - "**/test_support.rs"
+  - "**/test_support/**"
+  - "**/tests/**"
+  - "**/tests.rs"
+  - "**/*tests.rs"
+rule:
+  any:
+    - kind: attribute_item
+    - kind: inner_attribute_item
+  regex: "allow\\("
+  not:
+    inside:
+      kind: mod_item
+      stopBy: end
+      follows:
+        kind: attribute_item
+        regex: "cfg\\(test\\)"

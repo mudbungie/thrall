@@ -1,0 +1,25 @@
+# House rule 7 (second half): no `Rc`/`RefCell` anywhere in the tree — tests
+# included. There is deliberately no test carve-out. `Rc` is a
+# single-thread-only shared pointer and `RefCell` a runtime-checked borrow;
+# both are dissolved in favour of `Arc`/`Mutex`, and the lock half of the rule
+# then confines those to one chokepoint. Contained Rust keeps shared mutability
+# at one auditable place, never scattered behind interior-mutability cells.
+#
+# This is the half of rule 7 that needs no chokepoint to exist, which is why it
+# is here at the founding while the lock confinement waits for thrall to hold
+# cross-thread state at all (bl-1827). A bare `Cell` counter is a scalar tally,
+# not shared state, and is not matched.
+#
+# Node kinds verified against ast-grep 0.44.1 (`--debug-query`): matches the
+# `type_identifier` in type position and the `identifier` in path/`use`
+# position; the anchored regex leaves `Arc` and any user `*Cell` type clear.
+id: no-rc-refcell
+language: rust
+severity: error
+message: "no Rc/RefCell anywhere — use Arc/Mutex (see rules/no-rc-refcell.yml)"
+rule:
+  any:
+    - kind: type_identifier
+      regex: '^(Rc|RefCell)$'
+    - kind: identifier
+      regex: '^(Rc|RefCell)$'

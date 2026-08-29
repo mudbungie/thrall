@@ -1,0 +1,11 @@
+# Pinned toolchain for every cargo invocation in this repo. The gate is only
+# reproducible if the local run and any future CI run resolve the same rustc:
+# `warnings = "deny"` in Cargo.toml makes a new lint in a newer toolchain a
+# build failure rather than a nag, which is the point — but only if the version
+# moves as a deliberate, isolated change.
+#
+# No `targets` key. thrall is a plain synchronous binary; when a static-linked
+# build path is wanted it is a decision, not a default.
+[toolchain]
+channel = "1.95.0"
+components = ["clippy", "rustfmt"]

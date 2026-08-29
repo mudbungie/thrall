@@ -1,0 +1,55 @@
+# Bootstrap rule 9: a `pub` item must not carry a bounded type parameter — no
+# `pub struct S<C: Clock>`, `pub fn f<T: Into<String>>(…)`, nor a `where`
+# predicate with a trait bound. A generic bound on the public surface forces
+# monomorphization (or an ergonomic `IntoIterator`/`Into` on the boundary) onto
+# every consumer and pins the crate's public shape to a type parameter. It is
+# dissolved by a trait object on a cold path (`Arc<dyn Clock>` / `Box<dyn …>`
+# fields) or a concrete parameter (`Vec<T>` instead of `impl IntoIterator`);
+# an internal bounded helper is demoted to `pub(crate)` instead (the rule scans
+# only bare `pub`, so a demotion — or a `pub(super)` item inside a private
+# module — takes it out of view, which is preferred over de-generifying a
+# purely internal type). An UNbounded `pub fn f<T>(x: T)` is fine — this bans
+# bounds, not generics.
+#
+# The rule matches a pub item (function / struct / enum / union / trait / type
+# alias) that carries a `trait_bounds` node either in its own `type_parameters`
+# field or in a `where_clause` child. Scoping the descent to the
+# `type_parameters` field (not a bare tree-wide `has`) is deliberate: it keeps
+# a bound on a *nested private* item (a closure or inner `fn` in the body, which
+# lives under `block`, never under `type_parameters`) from falsely implicating
+# its pub encloser.
+#
+# Node kinds verified against ast-grep 0.44.1's Rust tree-sitter parser
+# (`--debug-query=ast`): `<C: Clock>` parses as a `type_parameter` with a
+# `bounds: trait_bounds` child (NOT a `constrained_type_parameter`); a `where`
+# clause is a `where_clause` child holding `where_predicate > bounds:
+# trait_bounds`. `type_parameters` is a field; `visibility_modifier` text
+# `^pub$` excludes `pub(crate)`. The kind `any` anchors the relational `has`
+# clauses (a bare relational rule matches nothing on its own).
+id: no-pub-generic-bounds
+language: rust
+severity: error
+message: "pub item must not carry a generic bound; use a trait object (Arc/Box dyn) or concrete param, or demote to pub(crate) (see rules/no-pub-generic-bounds.yml)"
+rule:
+  all:
+    - any:
+        - kind: function_item
+        - kind: struct_item
+        - kind: enum_item
+        - kind: union_item
+        - kind: trait_item
+        - kind: type_item
+    - has:
+        kind: visibility_modifier
+        regex: "^pub$"
+    - any:
+        - has:
+            field: type_parameters
+            has:
+              stopBy: end
+              kind: trait_bounds
+        - has:
+            kind: where_clause
+            has:
+              stopBy: end
+              kind: trait_bounds

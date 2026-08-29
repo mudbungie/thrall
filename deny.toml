@@ -1,0 +1,54 @@
+# cargo-deny supply-chain policy for thrall.
+#
+# Verified against cargo-deny 0.20.2 (pin any CI to this exact version). The
+# allow-list is exhaustive over the committed Cargo.lock — every license that
+# actually appears in the tree, nothing speculative. thrall has no dependencies
+# today, so the graph is thrall itself; re-run `cargo deny check` after any
+# dependency change and fix drift here by config, never by patching a
+# dependency.
+
+[advisories]
+# Reject crates whose published version has been yanked from the registry.
+yanked = "deny"
+# No acknowledged advisories. An entry here would need a reason recorded beside
+# it, and an entry that stops matching any crate makes every gate run warn
+# `advisory-not-detected` — which is the signal to drop it, so this list stays
+# exactly as long as the tree justifies.
+ignore = []
+
+[licenses]
+# thrall itself is MIT. Additions belong here only when a dependency approval
+# (bl-e5ba) actually lands one; a speculative allow-list is an allow-list
+# nobody read.
+allow = ["MIT"]
+
+[bans]
+# Duplicate versions are informational; a bare "*" version requirement is a
+# hard error — an unpinned dependency is a build that means something different
+# tomorrow.
+multiple-versions = "warn"
+wildcards = "deny"
+
+# TLS stack ban, rustls-only, and it is armed BEFORE any TLS arrives. thrall's
+# wire is mTLS (bl-a4a5), so exactly one stack will ever be approved. OpenSSL
+# (`openssl-sys`) and the system TLS bridge (`native-tls`) are a C toolchain
+# dependency and a non-portable one; either breaks the single-binary story that
+# is most of why a foot is easy to install on a box nobody administers for you.
+#
+# `aws-lc-sys` is here for a subtler reason: rustls' DEFAULT features select
+# `aws-lc-rs`, whose sys crate builds C. The approved manifest line takes
+# `default-features = false` with `ring` for exactly that reason — but a later
+# manifest edit that dropped the flag would pull the C toolchain back in
+# silently, and no other gate would say so. Banning the sys crate makes that
+# edit fail here instead. All three match nothing today, by design.
+deny = [
+    { crate = "openssl-sys" },
+    { crate = "native-tls" },
+    { crate = "aws-lc-sys" },
+]
+
+[sources]
+# Every crate must come from a known registry — no unvetted registries and no
+# ad-hoc git sources. There is no `allow-git` list and none is wanted: a git
+# pin blocks publication outright and re-exposes the tree to a rewritten
+# upstream history orphaning the rev. A registry pin has neither failure mode.

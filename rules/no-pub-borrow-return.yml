@@ -1,0 +1,40 @@
+# Bootstrap rule 2: a `pub fn` must return an owned, concrete type — never a
+# borrow (`&T` / `&mut T` / `&[T]`) nor an opaque `impl Trait`. A borrow return
+# couples the caller to the callee's storage (and, when the lifetime is elided,
+# hides that coupling); an `impl Trait` return hides the concrete type and its
+# lifetimes. Both are dissolved at the public boundary in favour of owned
+# values (`String`, `Vec<T>`, a named struct) — or, when the accessor is
+# internal, demoted to `pub(crate)` (the rule scans only `pub`, so an honest
+# demotion removes it from view — prefer that over an owning clone for a
+# shell-only getter). A `&'static` return is caught too: it is still a borrow
+# on the public surface, so it demotes or returns owned like any other.
+#
+# The rule matches a `function_item` that has a bare-`pub` visibility modifier
+# AND a `return_type` field that is a reference or an opaque type. It does not
+# match `pub(crate)` / `pub(super)` (their `visibility_modifier` text is not
+# `pub`), and it does not match a borrow nested inside an owned return
+# (`Option<&T>` is a `generic_type`, not a `reference_type`) — direct borrow
+# returns are the coupling this bans.
+#
+# Node kinds verified against ast-grep 0.44.1's Rust tree-sitter parser
+# (`--debug-query=ast`): a `pub fn` is a `function_item` whose `pub` keyword is
+# a `visibility_modifier` (text `pub`; `pub(crate)` carries a `crate` child, so
+# `^pub$` excludes it); the declared return is the `return_type` field, a
+# `reference_type` for `&T` and an `abstract_type` for `impl Trait`. A
+# relational rule needs an atomic anchor, so the `has` clauses hang off the
+# `kind: function_item` selector.
+id: no-pub-borrow-return
+language: rust
+severity: error
+message: "pub fn must return an owned/concrete type, not a borrow or impl Trait (demote to pub(crate) or return owned — see rules/no-pub-borrow-return.yml)"
+rule:
+  kind: function_item
+  all:
+    - has:
+        kind: visibility_modifier
+        regex: "^pub$"
+    - has:
+        field: return_type
+        any:
+          - kind: reference_type
+          - kind: abstract_type

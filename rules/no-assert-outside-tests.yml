@@ -1,0 +1,57 @@
+# House rule 4: `assert!`/`assert_eq!`/`assert_ne!` — and their `debug_`
+# variants — are a test vocabulary. Each is a runtime `panic!` dressed as a
+# check. Prod code states its invariants in the type system or handles the
+# failure; it never asserts. So an assert anywhere outside test code is an
+# error.
+#
+# THE `debug_` VARIANTS ARE NOT AN ESCAPE HATCH, and the rule matches all six
+# macros for that reason. The strong case for `debug_assert!` is guarding an
+# `unsafe` precondition; thrall has no `unsafe`, and under a 100% coverage
+# floor any invariant one would check is test-reachable anyway — where it dies
+# as an unstructured panic instead of a named assertion.
+#
+# "Test code" takes TWO physical shapes and the carve-out covers both (verified
+# against ast-grep 0.44.1):
+#
+#   1. INLINE `#[cfg(test)] mod tests { … }` in a prod source file — which is
+#      the shape this crate uses. The assert IS in a scanned `src` file, so no
+#      glob can exempt it; it is exempted structurally: the assert is `inside`
+#      a `mod_item` that `follows` a `#[cfg(test)]` attribute. NOTE the
+#      attribute is a *preceding sibling* of the `mod_item`, not a child
+#      (tree-sitter-rust) — so the carve-out is `inside … follows`, never
+#      `inside … has`. `has` does not match.
+#
+#   2. SIBLING test files declared `#[cfg(test)] mod NAME;`, whose own AST has
+#      no `#[cfg(test)] mod` ancestor because the attribute sits in the parent
+#      file. The `follows` carve-out cannot reach across a file split, so these
+#      are exempted by `ignores` globs on the conventional names. (A top-level
+#      `tests/` integration crate is out of scope already: the audit scans
+#      `src` only — see the `rules-audit` Makefile target.)
+#
+# Node kinds verified against ast-grep 0.44.1 (`--debug-query=ast`):
+# `assert!(…)` is a `macro_invocation` whose `macro` field is an `identifier`;
+# `#[cfg(test)]` is an `attribute_item`. `stopBy: end` walks every ancestor so
+# a nested inner `mod` inside the test mod is covered too.
+id: no-assert-outside-tests
+language: rust
+severity: error
+message: "assert! is a test vocabulary; prod states invariants in types or handles the failure (see rules/no-assert-outside-tests.yml)"
+ignores:
+  - "**/test_support.rs"
+  - "**/test_support/**"
+  - "**/tests/**"
+  - "**/tests.rs"
+  - "**/*tests.rs"
+rule:
+  kind: macro_invocation
+  all:
+    - has:
+        field: macro
+        regex: "^(assert|assert_eq|assert_ne|debug_assert|debug_assert_eq|debug_assert_ne)$"
+    - not:
+        inside:
+          kind: mod_item
+          stopBy: end
+          follows:
+            kind: attribute_item
+            regex: "cfg\\(test\\)"

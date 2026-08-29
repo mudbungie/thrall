@@ -1,0 +1,21 @@
+# Repo-wide tarpaulin defaults: applied by every `cargo tarpaulin` run,
+# including the pre-commit hook.
+#
+# Pinned tarpaulin version: 0.35.2, the same pin the sibling repos carry.
+# 0.35.3 was yanked, and 0.35.4+ silently excludes inline `#[cfg(test)] mod
+# tests` files from the coverable denominator. A 100% floor only means the same
+# thing on every machine if everyone is on the same tarpaulin — upgrade in
+# lockstep (this file plus the Makefile preflight) or the floor gets quietly
+# weaker on whichever side moves first.
+#
+# `src/main.rs` is the only exclusion: it is the thin process entry — argv in,
+# exit code out — and everything it calls lives in the library and is tested
+# directly. Excluding it keeps the 100% floor meaningful without a contrived
+# subprocess test. It is the ONE exclusion; adding a second is a decision, not
+# a convenience, and the reason belongs here beside it.
+#
+# `ignore-panics` excludes branches that only fire on programmer-error panics.
+[default]
+exclude-files = ["src/main.rs"]
+ignore-panics = true
+timeout = "300s"

@@ -1,0 +1,69 @@
+[package]
+name = "thrall"
+version = "0.0.1"
+edition = "2024"
+description = "thrall: the foot — a tool-execution client for a yog server"
+license = "MIT"
+readme = "README.md"
+# NOT PUBLISHED, and the flag is the enforcement rather than a note (bl-006e).
+# The registry name is held by a placeholder at 0.0.0 and must not be touched;
+# whether, when and as what thrall first ships is an operator decision that has
+# not been made. `cargo publish` is irreversible — a yanked version stays
+# downloadable — so the default is the one that cannot cost anything.
+#
+# Flipping this to `true` is not a one-line change: it also needs an `include`
+# ALLOWLIST here (never an `exclude` — a missing `include` entry costs a build,
+# which is loud and reversible, while a missing `exclude` entry costs a
+# publication that cannot be recalled) and a guard test over the real packaged
+# file list. See bl-006e.
+publish = false
+
+# NO DEPENDENCIES, deliberately (bl-e5ba). The skeleton is a version-capable
+# binary; nothing it does needs a crate. The real client's list — rustls with
+# `ring` and no default features, serde_json, thiserror — is filed for approval
+# rather than added in advance, because a dependency added "for later" is one
+# nobody ever reviewed. `deny.toml` already bans the TLS stacks that must never
+# arrive (openssl-sys, native-tls, aws-lc-sys) so the approval cannot be
+# quietly widened at the manifest.
+[dependencies]
+
+[[bin]]
+name = "thrall"
+path = "src/main.rs"
+
+# rustc lint gate: the toolchain is pinned (rust-toolchain.toml), so any warning
+# is a deliberate event, not toolchain drift — deny the lot.
+[lints.rust]
+warnings = "deny"
+
+# Clippy gate. `pedantic` runs at deny with priority -1 so the specific
+# allows/denies below (default priority 0) override the group. THIS MANIFEST IS
+# THE ONLY HOME FOR A SUPPRESSION — never inline an `#[allow]` to dodge it
+# (rules/no-lint-suppression.yml forbids it). Every entry carries its reason.
+[lints.clippy]
+pedantic = { level = "deny", priority = -1 }
+
+# The bootstrap five: owned signatures and self-describing errors are house
+# style, and the doc/must_use nags are advisory only.
+needless_pass_by_value = "allow"   # owned params are a deliberate rule, not an oversight
+module_name_repetitions = "allow"  # module-qualified type names read clearer than terse ones
+missing_errors_doc = "allow"       # error enums are self-descriptive; no prose to duplicate
+missing_panics_doc = "allow"       # prod is panic-free (restriction lints below) — nothing to note
+must_use_candidate = "allow"       # advisory; not decorating every getter with #[must_use]
+
+# Empirically warranted here: the prose is proper-noun dominated (thrall, yog,
+# lernie, mTLS, MCP) and the nag is noise on every doc comment in the crate.
+doc_markdown = "allow"
+
+# Restriction lints: prod code is panic-free and bounds-checked. These deny the
+# panic family, leftover `dbg!`, and unchecked indexing/string slicing.
+# `clippy --all-targets -- -D warnings` (the gate) picks them up; the test
+# carve-outs live in clippy.toml (allow-*-in-tests).
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"
+indexing_slicing = "deny"
+string_slice = "deny"

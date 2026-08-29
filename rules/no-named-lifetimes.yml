@@ -1,0 +1,29 @@
+# Bootstrap rule 1: no named lifetimes. A named lifetime (`'a`, `'ctx`, …) on a
+# signature, struct, or impl is a leak of internal storage into the interface:
+# it forces the consumer to reason about how long the callee holds a borrow.
+# The elegant boundary borrows on the way IN (elided — one input ref threads to
+# the output with no name) and hands back OWNED values on the way OUT
+# (`String`, `Vec<T>`, a named owned struct, or an index the caller resolves
+# against a slice it already holds). With that discipline no signature ever
+# needs to *name* a lifetime, so any named lifetime token is a design smell the
+# rule bans outright.
+#
+# `'static` and `'_` are NOT named lifetimes — `'static` is the whole-program
+# lifetime and `'_` is the elision placeholder (it names nothing). Both are
+# permitted, so both are excluded.
+#
+# Node kinds verified against ast-grep 0.44.1's Rust tree-sitter parser
+# (`--debug-query=ast`): every lifetime token — `'a`, `'static`, and `'_`
+# alike — is a `lifetime` node whose text includes the leading tick. The
+# regex crate ast-grep uses has NO lookahead, so `'static`/`'_` cannot be
+# excluded inline; they are removed with a sibling `not` + `regex` under the
+# `kind: lifetime` anchor (a bare relational/`not` rule matches nothing without
+# an atomic anchor — the `kind` is that anchor).
+id: no-named-lifetimes
+language: rust
+severity: error
+message: "no named lifetimes; take borrowed args (elided) and return owned (see rules/no-named-lifetimes.yml)"
+rule:
+  kind: lifetime
+  not:
+    regex: "^'(static|_)$"
