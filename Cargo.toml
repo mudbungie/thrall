@@ -18,13 +18,50 @@ readme = "README.md"
 # file list. See bl-006e.
 publish = false
 
-# NO DEPENDENCIES, deliberately (bl-e5ba). The skeleton is a version-capable
-# binary; nothing it does needs a crate. The real client's list — rustls with
-# `ring` and no default features, serde_json, thiserror — is filed for approval
-# rather than added in advance, because a dependency added "for later" is one
-# nobody ever reviewed. `deny.toml` already bans the TLS stacks that must never
-# arrive (openssl-sys, native-tls, aws-lc-sys) so the approval cannot be
-# quietly widened at the manifest.
+# NO DEPENDENCIES TODAY, and the table is empty on purpose. The skeleton is a
+# version-capable binary; nothing it does needs a crate, and a dependency added
+# "for later" is one nobody ever reviewed — it is linked by no code, so no gate
+# and no reviewer ever reads it.
+#
+# THIS COMMENT IS THE APPROVED SET (bl-e5ba, operator ruling 2026-08-29). The
+# house rule is "zero new dependencies without explicit approval"; the
+# adjudication has now happened, so what follows is the authority for what may
+# be added and on exactly what terms. A crate not on this list still needs a
+# fresh approval. Each approved crate lands in this table with the ball that
+# first LINKS it, never before:
+#
+#   rustls — `default-features = false`, features `ring`, `std`, `tls12`,
+#     `logging`. The wire is mTLS (bl-a4a5) and nothing else may provide it.
+#     `default-features = false` is load-bearing, not tidiness: rustls' default
+#     features select `aws-lc-rs`, whose `aws-lc-sys` builds C and breaks the
+#     single-binary story that is most of why a foot is easy to install on a
+#     box nobody administers for you. `ring` is the approved provider and the
+#     one substitution that is NOT at the linking ball's discretion.
+#   serde_json — the wire is JSON, and a tool's `input_schema` is JSON Schema
+#     carried verbatim (bl-05fe). Hand-rolling a parser for a security boundary
+#     is worse than a dependency.
+#   thiserror — the error enums, house standard rule 10. Its companion half,
+#     `anyhow`, is NOT approved: thrall's `main.rs` is a thin entry with no
+#     error-plumbing layer that would justify one.
+#
+# DEFERRED, which is not the same as refused:
+#   clap — only if the verb surface outgrows a hand-rolled argv match. The
+#     skeleton's `src/cli.rs` does not, and the client's may not either. It is
+#     re-adjudicated by whichever ball first wants it, and the question that
+#     ball must answer is whether the match arms actually stopped fitting.
+#
+# REFUSED, and both are refusals of a whole direction rather than of a crate:
+#   tokio — the wire is synchronous. House rule 8 (async is tokio-only) stays
+#     VACUOUS here; do not add tokio to satisfy a rule that matches nothing.
+#   rcgen — certificates arrive out of channel by the operator's hand
+#     (REMOTE §1.4, DESIGN §3.3). thrall mints nothing, so a certificate
+#     library is a capability the design says this component must not have.
+#
+# `deny.toml` bans the TLS stacks that must never arrive (openssl-sys,
+# native-tls, aws-lc-sys), so a manifest edit that quietly widened this
+# approval — dropping `default-features = false`, most of all — fails the gate
+# instead of silently re-acquiring a C toolchain. The bans are armed now,
+# before any of the above exists.
 [dependencies]
 
 [[bin]]

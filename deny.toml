@@ -17,9 +17,17 @@ yanked = "deny"
 ignore = []
 
 [licenses]
-# thrall itself is MIT. Additions belong here only when a dependency approval
-# (bl-e5ba) actually lands one; a speculative allow-list is an allow-list
-# nobody read.
+# thrall itself is MIT, and the graph is thrall alone, so MIT is the whole
+# exhaustive list.
+#
+# The dependency approval (bl-e5ba) has LANDED — rustls with `ring` and no
+# default features, serde_json, thiserror — and this list still says MIT,
+# which is the point: an approval is permission to link a crate, not a crate
+# in the lockfile. Nothing here widens until a ball actually links one, and
+# the ball that does re-derives this list from the resulting `Cargo.lock`
+# rather than guessing at it. A speculative allow-list is an allow-list
+# nobody read, and it is worst on the day it silently covers a crate the
+# approval never named.
 allow = ["MIT"]
 
 [bans]

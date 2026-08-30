@@ -79,4 +79,10 @@ leave out the identity, the chronology and the machine state:
 - Never credit AI or tooling in commit messages, code, or docs.
 - Never `cargo publish`. `publish = false` is the enforcement; the registry
   name is held by a placeholder and is not to be touched (bl-006e).
-- Never add a dependency without explicit approval (bl-e5ba).
+- Never add a dependency that is not on the approved set. **`Cargo.toml`'s
+  `[dependencies]` comment is that set** (bl-e5ba, approved 2026-08-29): rustls
+  with `ring` and no default features, `serde_json`, `thiserror` — each landing
+  in the manifest with the ball that first LINKS it, never in advance. `clap`
+  is deferred pending a verb surface that needs it; `tokio` and `rcgen` are
+  refused outright. Anything else needs a fresh approval, and the reasons live
+  beside the list rather than here.
