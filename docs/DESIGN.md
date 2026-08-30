@@ -220,6 +220,20 @@ operator-configured argv, so a layer that could confine anything interesting
 would be a layer that could run nothing useful. `README.md` states the choice
 and its reasoning.
 
+**What the image DOES have to prove is that it carries nothing it should not.**
+§3.2 and §3.3 put the leaf and its key outside every channel thrall has; the
+image is a channel, and a certificate baked into a layer is a certificate
+published to everyone who can pull it. Until bl-7075 that was a sentence in a
+comment. `make image-scan` (yog DESIGN §10.1's condition on the registry
+ruling, operator ruling 2026-08-30) reads the built image's authored layers and
+its config through the same `scripts/leak-rules.sh` table the commit gate uses,
+and runs as the last step of `make image` — the same placement, and the same
+reasoning, as the pre-commit hook. It answers the question no source gate can:
+`make leak-scan` reads the git index, and an image is built from inputs no
+commit has. What it does not reach is stated where the rest of the disclosure
+posture is (§5.2): it is prevention, local and bypassable, and thrall has no
+published artifact for anything late to check.
+
 ### 3.6 Version skew is real now
 
 Separately installed ends make version skew possible for the first time. The

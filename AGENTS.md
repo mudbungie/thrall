@@ -67,6 +67,20 @@ change. `--commit REV` scans what one commit publishes: the blobs it adds or
 rewrites plus its message, which is the store gate's question and the only
 scope that can read a `-m` note.
 
+**A second artifact needs a second gate: `make image-scan`** (bl-7075, under
+yog DESIGN §10.1). The scan above reads the git INDEX, and an OCI image is
+built from inputs no commit has — the build context as the engine actually
+receives it, the base layers, the package index, and the image CONFIG. The
+image gate reads all three surfaces through **this same rule table**, is a step
+of `make image` rather than a target beside it, and runs both directions (a
+scratch image with a planted secret in a layer, another in an `ENV`, and an
+undeclared binary, all of which must be caught, before the real image is
+scanned). `README.md` §"The image-side disclosure gate" states its mechanism.
+**The build context is the image's `exclude` list** — `Containerfile` `COPY`s
+by name and `.containerignore` keeps the rest from being sent at all — so the
+one question a publication checklist asks is now asked once per channel, and
+`make image-scan` is the container half's answer to `cargo package --list`.
+
 **What no hook can promise.** This scans one tree. Old commits, other refs,
 and anything published elsewhere are outside it — and thrall has no published
 ref at all yet, so the late half (a scan of what is actually public) does not

@@ -116,9 +116,68 @@ system CA roots for the ones that speak HTTPS. **The floor is provided; what
 can run on it is still the operator's problem.** A tool document naming a
 binary this layer does not have is a tool this box does not have.
 
-`make image` **pushes nothing**, and there is no `push` target. Where these
-images publish is unanswered (yog bl-223f); a push is not undoable, and a
-convenience target for an irreversible act is how the act happens by accident.
+`make image` **pushes nothing**, and there is no `push` target. The registry is
+named — `ghcr.io/mudbungie/thrall`, one package per repo, pushed only from that
+repo's release workflow at tag time, and what publishes is the version tag and
+the manifest digest, both immutable, never a moving `latest` (yog
+`docs/DESIGN.md` §10.1, operator ruling 2026-08-30). The push still does not
+live in this Makefile: it is not undoable, and a convenience target for an
+irreversible act is how the act happens by accident. thrall has no remote and
+no release workflow yet either (bl-006e), so nothing here can push today
+whatever the ruling says.
+
+### The image-side disclosure gate
+
+That registry ruling is **conditional**, and `make image-scan` is the
+condition. It runs as the last step of `make image`, so no image exists on this
+box that has not been read.
+
+**It is a second gate and not a reuse of the first.** `make leak-scan` reads
+the git INDEX; an image is built from inputs no commit has — the build context
+as the engine actually receives it, the base image's layers, the package index,
+and the image CONFIG. The list just below says the image carries no
+certificate and no tool document; until this target, nothing had read a layer
+to check that claim.
+
+It reads three surfaces with the **same rule table** the commit gate uses
+(`scripts/leak-rules.sh`, sourced and never copied):
+
+- **The authored filesystem** — every file or symlink whose bytes differ from
+  the pinned base image at that path. Both filesystems are exported and
+  compared here rather than diffing layer digests: it needs no JSON parser,
+  it works on docker as well as podman, and it is the finer answer, since a
+  file the build rewrote to identical bytes is not authored content.
+- **The distro floor is accounted for, not exempted.** The runtime layer runs
+  `apk add`, which adds hundreds of files this repo did not write. apk's own
+  ownership ledger says which package owns each one; a symlink resolving into
+  that set is aliased distro content; everything else above the base is this
+  repo's and is scanned. A path exemption would be an allowlist, and an
+  allowlist is where a leak hides.
+- **The image config** — every `Env`, `Label` and history entry. An `ENV` ships
+  to everyone who pulls whether or not a file holds it, and build arguments
+  echo into history.
+
+The posture the commit gate already holds carries over unchanged. Findings
+**locate** and never reprint (truncated to twelve characters). **Unreadable is
+rejected, not skipped**: the one binary this build authors is `thrall`, and the
+expected set is DERIVED from the Containerfile's `COPY --from=` destination
+rather than typed into the scanner — any *other* authored file the rules cannot
+read is a refusal. And **both directions**, because a scan that has stopped
+matching passes everything forever: `make image-scan` first builds a scratch
+image that layers a fabricated secret into a file, another into an `ENV`, and
+an undeclared binary beside them, and requires all three findings, before
+scanning the real image.
+
+It is not part of `make check`, deliberately: `check` runs on boxes with no
+container engine and must not depend on an artifact a build step produced.
+It is the image's gate and it runs where the image is made.
+
+What it cannot promise, stated rather than implied: it scans one image, on the
+box that built it, before the push. It does not read what is already in a
+registry, it cannot un-publish a digest, and whoever runs the build can bypass
+it exactly as `--no-verify` bypasses the commit hook. That is the same
+prevention-is-local split *The rules* records for the source gate, one artifact
+over.
 
 ### What mounts where
 
@@ -163,6 +222,9 @@ $ echo $?
 - **No bootstrap of any kind.** thrall mints nothing (REMOTE §1.4, DESIGN
   §3.3); an image that could provision itself would be exactly the flow that
   must never exist.
+
+Every line of that list is a claim about bytes, and `make image-scan` is what
+turns it from a promise into a check.
 
 ## The rules
 
