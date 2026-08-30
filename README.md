@@ -69,8 +69,8 @@ make test      # cargo test
 make install   # release build, then the binary into ~/.local/bin
 ```
 
-`make lint` is `line-cap`, then `cargo clippy --all-targets -- -D warnings`,
-then `rules-audit`, then `cargo deny check`.
+`make lint` is `line-cap`, then `leak-scan`, then `cargo clippy --all-targets
+-- -D warnings`, then `rules-audit`, then `cargo deny check`.
 
 Every tool is pinned, or the gate is not reproducible: rustc 1.95.0
 (`rust-toolchain.toml`), ast-grep 0.44.1 (`sgconfig.yml`), cargo-deny 0.20.2
@@ -86,6 +86,17 @@ Two are hard and machine-enforced:
   are exempt. `make line-cap` is the one definition of both. 300 is a wall, not
   a target; `make line-cap LINE_CAP=199` lists the pre-split band.
 - **100% test coverage.** If it can't be tested, it mustn't be built.
+
+A third is hard and machine-enforced but is not about the code:
+
+- **Nothing discloses.** `make leak-scan` reads the index this commit would
+  publish — not the worktree — for credentials, routable addresses, home
+  paths, pasted dialogue, session artifacts and content no rule can read.
+  `scripts/leak-rules.sh` is the one definition of what counts, and
+  `--self-test` proves every rule still bites in both directions before the
+  tree is scanned at all. `.githooks/commit-msg` runs it over the commit
+  message, which no pre-commit step can see. It scans one tree and promises
+  nothing about anything already published.
 
 Beyond those, thrall follows the house **contained Rust** standard from birth:
 complexity lives in function bodies, where the compiler catches it, not in type

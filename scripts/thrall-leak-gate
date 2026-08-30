@@ -1,0 +1,140 @@
+#!/bin/sh
+# thrall-leak-gate — balls plugin: run thrall's leak rules over the TASK STORE,
+# and abort the op that would publish a finding. Ported from yog with the
+# scanner (bl-e878); ball ids in the commentary are yog's.
+#
+# WHY THE STORE NEEDS ITS OWN GATE. `bl` keeps this project's balls in a
+# SEPARATE git repo (`<state>/balls/clones/<encoded-project>/tasks`, branch
+# `balls/tasks`) that it pushes to the SAME remote as the source. So the ball
+# bodies publish beside the crate, and `.githooks/pre-commit` has never seen a
+# byte of them: it gates thrall's index, and the store is not in it. Ball
+# bodies are unguarded prose, and prose is what leaks — other people's names,
+# pasted transcript, live machine state, provider auth state, session ids.
+#
+# thrall's store is founded STEALTH today: `task-remote` is the "no remote, on
+# purpose" sentinel, so no op pushes anything anywhere. That does not make this
+# gate premature — it makes it cheap. A body written now is a body the store
+# carries when a remote is set (bl-006e), and the whole history goes up in that
+# one act; a gate installed afterwards would be a gate that never read most of
+# what it publishes.
+#
+# WHY THIS PHASE. A `pre` plugin runs BEFORE `bl` writes the task file, so it
+# would scan the previous state and wave through the very body being added. At
+# `post` the store commit is sealed but nothing has left the box: `bl-tracker`
+# is the only plugin that talks to a remote and it runs LATER in the same list,
+# and a non-zero exit here aborts the op and rolls the prior plugins back in
+# reverse — un-sealing the commit before it can be pushed. That is the ONE
+# window between "the ball is written" and "the ball is published", which is
+# why the gate hangs here rather than in a hook inside the store clone (a
+# clone is disposable state `bl prime` re-founds — a gate there is absent on
+# every other checkout and silently absent after the next re-clone).
+#
+# WHAT IT SCANS: the op's OWN commit — the blobs it adds or rewrites plus its
+# message — never the whole store (bl-1007). A store checkout is shared and
+# long-lived, so a tree scan judges every agent for every other agent's text:
+# one polluted body refused every `bl` op in the checkout, `create` included,
+# so the defect about the wedge could not be filed. It also read a checkout
+# other ops write concurrently, and reported an in-flight body no commit ever
+# carried. The `commit` field of the §7 post payload is the op's own text and
+# nothing else, and that is what the author can fix. The whole-ref question —
+# what the store carries in total, including whatever predates this gate —
+# belongs to a scan of the PUBLISHED ref, and thrall has no published ref yet
+# (bl-006e). It lands with the remote, and until then the standing state is
+# answered by hand: `scripts/leak-scan.sh` run in the store checkout.
+#
+# WHAT IT CANNOT DO. It does not stop a determined author: the same agent can
+# `bl conf remove <op>.post thrall-leak-gate`, or commit in the store clone by
+# hand. Nothing local can stop that, exactly as `--no-verify` defeats the
+# source hook. This gate is for the accident, which is the whole of the
+# observed problem. There is no unbypassable placement to move it to, and
+# upstream's answer — a workflow over the published ref, which DETECTS rather
+# than prevents because it runs after the push — needs a remote thrall does not
+# have. So: prevention only, local and bypassable, and this comment is the
+# statement of that rather than a gate implying otherwise.
+#
+# Contract (balls plugin protocol §6/§7):
+#   argv    `protocol` for the handshake, else `<op> <phase>`
+#   stdin   the §7 payload; `binding.store` names the store checkout
+#   stdout  forwarded verbatim to the user — kept empty, findings go to stderr
+#   exit    0 = ok, non-zero = abort the op + roll prior plugins back
+#
+# Wiring is one act per checkout, and it is NOT this repo's to perform — see
+# AGENTS.md, "The task store gate".
+
+# Handshake: the ops this plugin serves are exactly the ops `bl-tracker`
+# publishes on. A gate belongs immediately before the publisher, everywhere the
+# publisher runs.
+if [ "${1-}" = protocol ]; then
+  printf '{"protocol":[1],"ops":["create","update","claim","unclaim","close","drop"]}\n'
+  exit 0
+fi
+
+op="${1-op}"
+phase="${2-}"
+
+# Drain stdin whether or not we need it: never block on a terminal, never leave
+# a piped payload unread.
+payload=''
+[ -t 0 ] || payload="$(cat)"
+
+# Only `post` can see what the op wrote. Every other phase abstains.
+[ "$phase" = post ] || exit 0
+
+# `git` exports GIT_DIR/GIT_INDEX_FILE into its children and they OUTRANK
+# `cd`, so an inherited one would silently re-aim the scan at another
+# repository — the same hazard AGENTS.md pins for every spawn.
+unset $(git rev-parse --local-env-vars) 2>/dev/null || true
+
+# One §7 field, by name. `"commit"` cannot match inside `"previous_commit"` —
+# the pattern's leading quote is the anchor — and the paths `bl` writes carry
+# no escaped quote.
+field() {
+  printf '%s' "$payload" | tr -d '\n' |
+    sed -n "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p"
+}
+
+# The store checkout and the op's own commit, off the §7 payload. Fail CLOSED
+# on either: a payload this plugin cannot read is not a clean store, and a gate
+# that shrugs is not a gate. Both messages name the unwire, so a wire change
+# can never wedge a box with no way out.
+store="$(field store)"
+if [ -z "$store" ] || [ ! -d "$store" ]; then
+  echo "thrall-leak-gate: the $op payload named no readable store checkout, so the" >&2
+  echo "  task store went unscanned and this op is refused. If the plugin wire" >&2
+  echo "  changed, unwire it (bl conf remove $op.$phase thrall-leak-gate) and file it." >&2
+  exit 1
+fi
+commit="$(field commit)"
+if [ -z "$commit" ]; then
+  echo "thrall-leak-gate: the $op payload named no store commit, so what this op" >&2
+  echo "  publishes cannot be told from what the store already carried, and the" >&2
+  echo "  op is refused. If the plugin wire changed, unwire it (bl conf remove" >&2
+  echo "  $op.$phase thrall-leak-gate) and file it." >&2
+  exit 1
+fi
+
+# The scanner is this plugin's neighbour in the thrall checkout, reached through
+# the plugin's own on-disk home so the answer is right whatever `bl` set as the
+# working directory (the binary beside `bl` is a symlink to this file).
+self="$(readlink -f "$0" 2>/dev/null || echo "$0")"
+scan="$(dirname "$self")/leak-scan.sh"
+if [ ! -x "$scan" ]; then
+  echo "thrall-leak-gate: no leak scanner at $scan — refusing the $op rather than" >&2
+  echo "  passing an unscanned task store." >&2
+  exit 1
+fi
+
+cd "$store" || exit 1
+# Findings and the clean line both go to stderr: stdout is the user-facing
+# channel and this plugin has nothing to say there.
+if "$scan" --commit "$commit" >&2; then
+  exit 0
+fi
+
+echo "thrall-leak-gate: the $op is REFUSED and the store commit rolled back — the" >&2
+echo "  text above is THIS op's own, and it would have published that material" >&2
+echo "  to the task ref." >&2
+echo "  Rewrite the text (cite the shape, not the instance: /home/u, not a real" >&2
+echo "  account path) and run the same command again. AGENTS.md, 'What may" >&2
+echo "  never enter a ball body', is the full list." >&2
+exit 1

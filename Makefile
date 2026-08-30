@@ -1,5 +1,5 @@
 .PHONY: all build release test coverage lint fmt fmt-check check ci \
-        line-cap rules-audit deny install-hooks install uninstall clean
+        line-cap leak-scan rules-audit deny install-hooks install uninstall clean
 
 # The build authority. Every gate step has ONE home here, and the pre-commit
 # hook calls the same targets — so the hook, a hand-run `make check` and any
@@ -47,15 +47,12 @@ coverage:
 # pinned so the gate is reproducible — ast-grep 0.44.1 (sgconfig.yml),
 # cargo-deny 0.20.2 (deny.toml), toolchain 1.95.0 (rust-toolchain.toml).
 #
-# `line-cap` goes first because it is milliseconds: a structural violation
-# should fail before the minute-scale tools start.
-#
-# NOT YET IN THIS LADDER, and named so the absence is a decision rather than an
-# oversight: the disclosure gate (bl-e878). thrall ships no `scripts/leak-scan.sh`,
-# which is exactly the signal the machine-level store gate keys opt-in on — so
-# thrall is currently NOT gated on what its task bodies publish.
+# `line-cap` goes first because it is milliseconds, and `leak-scan` second
+# because it is seconds: a structural violation and a disclosure should both
+# fail before the minute-scale tools start.
 lint:
 	$(MAKE) line-cap
+	$(MAKE) leak-scan
 	cargo clippy --all-targets -- -D warnings
 	$(MAKE) rules-audit
 	$(MAKE) deny
@@ -106,6 +103,34 @@ line-cap:
 	  exit 1; \
 	fi; \
 	echo "line-cap: $$n source files, all within $(LINE_CAP) lines"
+
+# The disclosure gate (bl-e878, ported from yog): no credential, routable
+# address, MAC, home path, email, pasted dialogue, agent-session artifact,
+# credential-shaped path or unreadable blob in the tree.
+# `scripts/leak-rules.sh` is the ONE definition of what counts,
+# `scripts/leak-scan.sh` runs it, and this target is the door — neither
+# restates the other.
+#
+# BOTH DIRECTIONS in one target, the same discipline `rules-audit` holds: the
+# self-test runs FIRST, and it is the stronger of the two checks. Every rule
+# owns a fixture in which every non-comment line must be flagged BY THAT RULE
+# and must carry the `notreal` marker, plus `clean.txt`/`clean-paths.txt` of
+# near-misses that must NOT be flagged. A leak gate does not die by being
+# wrong; it dies by silently matching nothing after a pattern is edited, and
+# then passing everything forever — and a gate that cries wolf gets bypassed,
+# which is the same death by the other road.
+#
+# It reads INDEX BLOBS, not the worktree: `git checkout-index` materializes the
+# index into a scratch tree and the scan reads that, so the bytes scanned are
+# the bytes committed. A leak that is `git add`ed and then overwritten with a
+# clean copy on disk is still caught.
+#
+# The COMMIT MESSAGE is not in any tree, so no pre-commit step can see it;
+# `.githooks/commit-msg` runs this same scanner over it. `make install-hooks`
+# seats both.
+leak-scan:
+	@scripts/leak-scan.sh --self-test
+	@scripts/leak-scan.sh
 
 # Static audit of every ast-grep rule (rules/, pinned ast-grep 0.44.1 — see
 # sgconfig.yml). BOTH DIRECTIONS: `src` must be clean, AND every deliberate

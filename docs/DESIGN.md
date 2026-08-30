@@ -204,10 +204,14 @@ work that has not started.
 
 ### 5.2 What is deliberately absent from the gate
 
-- **The disclosure gate (bl-e878).** thrall ships no leak scanner, so it is not
-  opted in to the machine-level store gate — which keys opt-in on the project
-  shipping one and silently passes a project that does not. Task bodies are
-  published text; until that ball lands, nothing mechanical is reading them.
+- **The late half of the disclosure gate.** The scanner landed (bl-e878): the
+  tree, the commit message and the task store are all read by one rule table
+  before anything is written. What does not exist is the check that runs
+  *after* publication — a scan of the published ref, which is the only one an
+  author cannot switch off. It needs a remote, and thrall has none (bl-006e).
+  Until then thrall's disclosure posture is prevention only: local, and
+  bypassable by whoever runs it. That is worth stating plainly rather than
+  implying a gate that reaches further than it does.
 - **Three confinement rules (bl-1827).** `unsafe` confinement, the lock
   chokepoint, and the spawn boundary are installed with the surfaces they
   govern, each with its own fixture. A rule with nothing to measure is a rule

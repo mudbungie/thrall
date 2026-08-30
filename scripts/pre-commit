@@ -8,8 +8,25 @@
 # Steps, cheap first, one make-target home each so the hook and a hand-run
 # `make check` cannot drift:
 #   1. make fmt-check
-#   2. make lint      — line-cap, clippy -D warnings, rules-audit, cargo-deny
+#   2. make lint      — line-cap, leak-scan, clippy -D warnings, rules-audit,
+#                       cargo-deny
 #   3. make coverage  — tarpaulin --fail-under 100
+#
+# THE DISCLOSURE SCAN AND A FUTURE VERDICT CACHE (bl-e878). `leak-scan` is
+# inside `lint` because `lint` is the whole static gate, and there is nothing
+# here for it to run ahead of: thrall consults no cache. The moment one is
+# added, that stops being true and this file must change with it — the scan
+# lifts OUT of the cached region and runs before the lookup, every time, never
+# skipped. Two reasons, and neither is speed. A stored verdict is a claim about
+# a tree, and it can be imported from another machine; every other step
+# re-derives a build, while this one decides whether something leaves the
+# building. And a cache fingerprint over this file plus the Makefile cannot see
+# `scripts/leak-rules.sh`, so an edited rule table would not invalidate a
+# single stored verdict. Not being cacheable dissolves that; widening the
+# fingerprint only postpones it.
+#
+# The commit MESSAGE is in no tree and no pre-commit step can reach it —
+# `.githooks/commit-msg` runs the same scanner over it.
 #
 # Bypass is intentionally not supported. If something is broken, fix it.
 
