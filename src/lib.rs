@@ -14,13 +14,18 @@
 //! dial, the version preface, the framing, the foot-grade check on this box's
 //! own leaf, and the entries an operator filed (bl-a4a5); and the [`config`]
 //! this box offers from, with [`tools`] the element it advertises and
-//! [`json`] the strict reads both spend (bl-05fe). The gestures that ride the
-//! channel, and the executor behind them, are the balls after it.
+//! [`json`] the strict reads both spend (bl-05fe); and the [`gestures`] a foot
+//! may send with the [`run`] loop that spends them, over the
+//! [`invocation`](crate::invocation) nouns the routing leg carries (bl-a2ea).
+//! The executor behind the loop's hand-off is the ball after it.
 
 pub mod channel;
 pub mod cli;
 pub mod config;
+pub mod gestures;
+pub mod invocation;
 pub mod json;
+pub mod run;
 pub mod tools;
 
 /// **The spawn boundary** — every child process is built and forked here.

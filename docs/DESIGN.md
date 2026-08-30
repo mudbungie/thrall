@@ -1,10 +1,12 @@
 # thrall — DESIGN
 
-**Status: the channel and the config are built; nothing spends them yet.**
-bl-a4a5 landed the transport — the mTLS dial, the version preface, the framing,
-the foot-grade check on this box's own leaf, and the entries an operator files.
-bl-05fe landed the operator's tool document and the advertisement derived from
-it. No gesture, no loop and no executor exist. This document states what thrall is, what it
+**Status: the loop runs; nothing executes yet.** bl-a4a5 landed the transport —
+the mTLS dial, the version preface, the framing, the foot-grade check on this
+box's own leaf, and the entries an operator files. bl-05fe landed the operator's
+tool document and the advertisement derived from it. bl-a2ea landed the three
+gestures a foot may send and the loop that spends them, with **execution left as
+a hand-off** (`run::Handoff`). What does not exist is the executor behind that
+seam, and the verb that wires the whole thing to a command line (bl-4cda). This document states what thrall is, what it
 may never become, and which invariants it inherits rather than owns. It is a
 living document: amend it when reality diverges, and never code around a stale
 section.
@@ -71,9 +73,14 @@ to add and would dissolve the reason thrall exists.
   the failure. Restart policy belongs to the supervision the operator's machine
   already has, and inventing one here would be thrall deciding how a box it
   does not administer runs a program.
-- **It runs one invocation at a time.** Serial, which is what makes a busy foot
-  *absent* at the far end — and why presence is not the routing predicate
-  there.
+- **It runs one invocation at a time, per channel.** Serial, which is what
+  makes a busy foot *absent* at the far end — and why presence is not the
+  routing predicate there. **Per channel** is the whole of the qualification and
+  it is not a loosening: a box holding two entries is two trust relationships
+  with two engines, and queueing one behind the other would make this foot
+  absent from one of them for reasons that engine's operator cannot see. Each
+  channel is a thread with its own connection, its own identity and its own
+  serial loop; they share no state (`run::fan`).
 
 ## 3. Inherited invariants
 
@@ -205,9 +212,11 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/config.rs` | **The operator's document** (bl-05fe): what this box offers, and the projection that drops the local half. The gate on what is enabled. |
 | `src/tools.rs` | The advertised element — the three facts REMOTE §5.1 fixes, in one spelling spent by the wire and by the document alike, and the check that a set is addressable. |
 | `src/json.rs` | The strict field reads every decoder here shares: a missing field, a mistyped one and a wrong-shaped one each refuse with the key an operator typed. |
+| `src/gestures.rs` | **The foot set** (bl-a2ea): `advertise`, `invocations`, `complete`, and the answers they can earn. The enumeration is the enforcement thrall can keep — there is no spelling here for a fourth verb. |
+| `src/invocation.rs` | What crosses the routing leg: the invocation a foot is handed and the capture it hands back, each in one strict spelling. |
+| `src/run.rs` | **The loop**: present, wait, hand off, answer — and the fan that serves every channel at once. Execution is a parameter (`Handoff`), which is what lets the whole conversation be tested against a real engine and a one-line executor. |
 | — | — |
-| *loop* | advertise, the mailbox wait, the hand-off (bl-a2ea). |
-| *executor* | The two deadlines, the one transcode, the capture (bl-4cda). |
+| *executor* | The two deadlines, the one transcode, the capture; and the verb that spends the loop (bl-4cda). |
 | `src/spawn.rs` | **The spawn boundary.** Every child process is built AND forked here — nowhere else builds a `Command`, and nowhere else spends one. **Founded by bl-a4a5** and `cfg(test)` until bl-4cda: its only tenant so far is the suite's stand-in for the operator's certificate mint, because thrall itself mints nothing (§3.3). The boundary existing before the executor is the whole point of the row. |
 | `src/sys.rs` | **The confined `unsafe` file.** Raw process effects with no safe std spelling; the expected tenant is the child-termination cascade (bl-4cda). Unbuilt. |
 | `src/state.rs` | **The lock chokepoint.** Every `Mutex`/`RwLock` in the crate. Unbuilt, and may stay so: thrall runs one invocation at a time (§2), so it may never hold cross-thread state at all. The suite's fork lock is **not** a tenant — a test's serialization lock is scaffolding, and the rule's own text sends it to `src/test_support.rs`. |

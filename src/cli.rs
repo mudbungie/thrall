@@ -67,10 +67,11 @@ usage: thrall [--version | --help]
   -h, --help      print this
 
 No verb runs yet. What is built is the channel — mTLS, the version preface, the
-framing, and the foot-grade check on this box's own leaf — and the operator's
-tool document, from which the advertisement is derived. The loop that spends
-them is the next ball. See docs/DESIGN.md for the role and the module map, and
-yog's docs/REMOTE.md for the protocol thrall implements against.",
+framing, and the foot-grade check on this box's own leaf — the operator's tool
+document, and the loop that presents it, waits for work and posts the captures
+back. What is missing is the executor behind the loop's hand-off, and the verb
+that starts it. See docs/DESIGN.md for the role and the module map, and yog's
+docs/REMOTE.md for the protocol thrall implements against.",
         version()
     )
 }
@@ -82,7 +83,7 @@ pub fn run(args: Vec<String>) -> Verdict {
     match words.as_slice() {
         ["--version" | "-V"] => Verdict::ok(version()),
         ["--help" | "-h"] => Verdict::ok(usage()),
-        [] => Verdict::refused("nothing to do — no verb spends the channel yet".to_string()),
+        [] => Verdict::refused("nothing to do — no verb starts the loop yet".to_string()),
         other => Verdict::refused(format!("unrecognised argument: {}", other.join(" "))),
     }
 }
@@ -156,11 +157,7 @@ mod tests {
     fn a_bare_invocation_refuses_and_says_why() {
         let v = run(argv(&[]));
         assert_eq!(v.code, REFUSED);
-        assert!(
-            v.text.contains("no verb spends the channel yet"),
-            "{}",
-            v.text
-        );
+        assert!(v.text.contains("no verb starts the loop yet"), "{}", v.text);
         assert!(
             v.text.contains("usage: thrall"),
             "a refusal must still teach: {}",
