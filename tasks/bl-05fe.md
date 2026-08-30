@@ -1,7 +1,8 @@
 +++
 title = "the tool config surface: one document, two readings"
 created = 1787977355
-updated = 1787977355
+updated = 1788060703
+claimant = "OrderWright"
 priority = 2
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
 
