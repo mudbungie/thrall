@@ -1,7 +1,8 @@
 +++
 title = "dependency approval: what the real client links"
 created = 1787977350
-updated = 1787977350
+updated = 1788059990
+claimant = "OrderSmith"
 priority = 3
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
 
