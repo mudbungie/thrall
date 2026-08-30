@@ -1,12 +1,16 @@
 # thrall — DESIGN
 
-**Status: the loop runs; nothing executes yet.** bl-a4a5 landed the transport —
-the mTLS dial, the version preface, the framing, the foot-grade check on this
-box's own leaf, and the entries an operator files. bl-05fe landed the operator's
-tool document and the advertisement derived from it. bl-a2ea landed the three
-gestures a foot may send and the loop that spends them, with **execution left as
-a hand-off** (`run::Handoff`). What does not exist is the executor behind that
-seam, and the verb that wires the whole thing to a command line (bl-4cda). This document states what thrall is, what it
+**Status: thrall is a working foot.** `thrall run` reads this box's tool
+document, opens every channel the operator provisioned, presents what the box
+offers, waits on its mailbox, runs what comes back and posts each capture — over
+a real mTLS channel with a real version preface and a real child process. The
+four balls that built it: the transport and the foot-grade check (bl-a4a5), the
+operator's document and the advertisement derived from it (bl-05fe), the three
+gestures and the loop that spends them (bl-a2ea), the executor and the capture
+(bl-4cda).
+
+What remains is deliberately absent: §2's list of what thrall may never become,
+§5.1's MCP bridge, and the publication question (bl-006e). This document states what thrall is, what it
 may never become, and which invariants it inherits rather than owns. It is a
 living document: amend it when reality diverges, and never code around a stale
 section.
@@ -183,6 +187,25 @@ it provides none, it says none. A foot that implied more isolation than it has
 would be worse than one that offered none, because the far end would act on the
 implication.
 
+**As built (bl-4cda), here is the whole of it.** thrall enforces exactly three
+things locally, and it is not a sandbox:
+
+- **The name**, from the operator's document: a tool absent from it cannot be
+  invoked, and what runs is that entry's argv, spawned directly — no shell, and
+  no interpolation of the invocation's input into it.
+- **The directory**, when the operator named a `cwd`.
+- **The deadline**: the child is asked to stop with `SIGTERM`, given a grace,
+  and then killed.
+
+Everything else is the box's. The child runs as this process's user, with this
+process's environment less the git scrub the spawn boundary performs — no
+namespace, no rlimit, no filesystem restriction. And **the cascade signals the
+child, not its process group**, so a tool that starts something and returns
+leaves that something running past its own deadline. Closing that needs the
+child to be a process-group leader and the signal to be sent to the group, which
+is a change to how thrall spawns rather than a knob (bl-a78e). Until then the
+sentence above is the claim, and it is the whole claim.
+
 ### 3.6 Version skew is real now
 
 Separately installed ends make version skew possible for the first time. The
@@ -215,11 +238,12 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/gestures.rs` | **The foot set** (bl-a2ea): `advertise`, `invocations`, `complete`, and the answers they can earn. The enumeration is the enforcement thrall can keep — there is no spelling here for a fourth verb. |
 | `src/invocation.rs` | What crosses the routing leg: the invocation a foot is handed and the capture it hands back, each in one strict spelling. |
 | `src/run.rs` | **The loop**: present, wait, hand off, answer — and the fan that serves every channel at once. Execution is a parameter (`Handoff`), which is what lets the whole conversation be tested against a real engine and a one-line executor. |
-| — | — |
-| *executor* | The two deadlines, the one transcode, the capture; and the verb that spends the loop (bl-4cda). |
-| `src/spawn.rs` | **The spawn boundary.** Every child process is built AND forked here — nowhere else builds a `Command`, and nowhere else spends one. **Founded by bl-a4a5** and `cfg(test)` until bl-4cda: its only tenant so far is the suite's stand-in for the operator's certificate mint, because thrall itself mints nothing (§3.3). The boundary existing before the executor is the whole point of the row. |
-| `src/sys.rs` | **The confined `unsafe` file.** Raw process effects with no safe std spelling; the expected tenant is the child-termination cascade (bl-4cda). Unbuilt. |
-| `src/state.rs` | **The lock chokepoint.** Every `Mutex`/`RwLock` in the crate. Unbuilt, and may stay so: thrall runs one invocation at a time (§2), so it may never hold cross-thread state at all. The suite's fork lock is **not** a tenant — a test's serialization lock is scaffolding, and the rule's own text sends it to `src/test_support.rs`. |
+| `src/exec.rs` | **The executor** (bl-4cda): the tool contract, the deadline and its cascade, the one transcode. Every outcome is a capture — a tool that ran, one that overran, a name this box does not carry, a command that would not start. |
+| `src/serve.rs` | What `thrall run` does: read the document, read the channels, serve until they stop. There is no success exit, so none is spelled. |
+| `src/paths.rs` | The one data root, named by `$XDG_DATA_HOME` or `$HOME` and by nothing of thrall's own. Neither set is a refusal, never a relative guess. |
+| `src/spawn.rs` | **The spawn boundary.** Every child process is built AND forked here — nowhere else builds a `Command`, and nowhere else spends one. **Founded by bl-a4a5**, before it had a production tenant, which is the point of the row: a boundary rule that arrives after the first spawn site is a rule that has to be argued with. |
+| `src/sys.rs` | **The confined `unsafe` file**, and it holds exactly one thing: `SIGTERM`, which `std` has no spelling for (`Child::kill` is `SIGKILL`). Declared rather than depended on — `kill(2)` is in the libc `std` already links. |
+| `src/state.rs` | **The lock chokepoint.** Every `Mutex`/`RwLock` in the crate. Unbuilt, and it stayed that way: the only cross-thread hand-offs thrall has are a `JoinHandle`'s own answer (the pipes a child writes, the sentence a channel ends with), which need no lock. The suite's fork lock is **not** a tenant — a test's serialization lock is scaffolding, and the rule's own text sends it to `src/test_support.rs`. |
 | `src/test_support.rs` | `cfg(test)` only. The scratch directory, the fork lock, the stand-in engine, and the certificate mint the suite performs on the operator's behalf. |
 
 **There is no flat material root, and its absence is a simplification rather
@@ -241,11 +265,11 @@ the named file, never a path to the list, because a second confined file is two
 inventories, which is no inventory.
 
 **A rule with nothing in `src` to match cannot be measured by scanning `src`.**
-All four confinement rules (`unsafe`, locks, and the spawn boundary's two) are
-in exactly that state today, which is how a rule passes as green forever. They
-are proved from the other direction instead: `make rules-audit` runs every rule
-ALONE, by the id in its own file, against `rules/fixtures/violations.rs`, and
-fails the rule that flags nothing.
+All four confinement rules are still in that state and always will be — their
+one lawful site is inside the file each `ignores` — which is how a rule passes
+as green forever. They are proved from the other direction instead: `make
+rules-audit` runs every rule ALONE, by the id in its own file, against
+`rules/fixtures/violations.rs`, and fails the rule that flags nothing.
 
 ---
 

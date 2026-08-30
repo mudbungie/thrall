@@ -14,25 +14,33 @@
 //! dial, the version preface, the framing, the foot-grade check on this box's
 //! own leaf, and the entries an operator filed (bl-a4a5); and the [`config`]
 //! this box offers from, with [`tools`] the element it advertises and
-//! [`json`] the strict reads both spend (bl-05fe); and the [`gestures`] a foot
-//! may send with the [`run`] loop that spends them, over the
-//! [`invocation`](crate::invocation) nouns the routing leg carries (bl-a2ea).
-//! The executor behind the loop's hand-off is the ball after it.
+//! [`json`] the strict reads both spend (bl-05fe); the [`gestures`] a foot may
+//! send with the [`run`] loop that spends them, over the
+//! [`invocation`](crate::invocation) nouns the routing leg carries (bl-a2ea);
+//! and the [`exec`]utor behind the loop's hand-off, with the [`serve`] read
+//! that starts the whole thing from a data root [`paths`] names (bl-4cda).
+//!
+//! **thrall is complete as a foot at that point** — advertise, wait, execute,
+//! answer — and what remains is what it deliberately is not: it holds no world,
+//! it never listens, it never asks and it never acts.
 
 pub mod channel;
 pub mod cli;
 pub mod config;
+pub mod exec;
 pub mod gestures;
 pub mod invocation;
 pub mod json;
+pub mod paths;
 pub mod run;
+pub mod serve;
 pub mod tools;
 
 /// **The spawn boundary** — every child process is built and forked here.
-/// `cfg(test)` while its only tenant is the suite's stand-in for the operator's
-/// certificate mint; bl-4cda drops the attribute when the executor lands.
-#[cfg(test)]
 pub(crate) mod spawn;
+
+/// **The confined `unsafe` file** — every raw process effect in the crate.
+pub(crate) mod sys;
 
 /// Scaffolding the suite shares. Never compiled into a released binary.
 #[cfg(test)]

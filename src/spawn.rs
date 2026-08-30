@@ -19,16 +19,15 @@
 //!   the discipline belongs at the fork, and under `cfg(test)` the boundary
 //!   takes one binary-wide lock across it.
 //!
-//! **The module is `cfg(test)` today and that is a statement about tenants, not
-//! about the boundary.** Its one caller is the suite's stand-in for the
-//! operator's own certificate mint ([`test_support::mint`](crate::test_support::mint)),
-//! because thrall itself mints nothing (REMOTE §1.4). The executor is what
-//! spends it in production, and bl-4cda drops the attribute when it lands. The
-//! boundary existing first is the point of DESIGN §4: a rule that arrives after
-//! the first spawn site is a rule that has to be argued with.
+//! **It was founded before it had a production tenant** (bl-a4a5, for the
+//! suite's stand-in certificate mint) and gained one with the executor
+//! (bl-4cda). That order is the point of DESIGN §4: a boundary rule that
+//! arrives after the first spawn site is a rule that has to be argued with.
 
 use std::io;
-use std::process::{Command, Output};
+#[cfg(test)]
+use std::process::Output;
+use std::process::{Child, Command};
 
 /// Every environment variable a child must not inherit from this process.
 ///
@@ -55,12 +54,30 @@ pub(crate) fn command(program: &str) -> Command {
     cmd
 }
 
-/// Run `cmd` to completion and collect what it said — **the crate's one fork**,
-/// and the only lawful way to spend a [`Command`] here.
+/// Run `cmd` to completion and collect what it said.
+///
+/// `cfg(test)`, because its one tenant is the suite's stand-in for the
+/// operator's certificate mint — thrall itself mints nothing (REMOTE §1.4) and
+/// the executor cannot use this shape at all (see [`spawn`]). It stays here
+/// rather than in the suite because the boundary is a location, not a
+/// convenience: a fork written anywhere else would be a second inventory.
+#[cfg(test)]
 pub(crate) fn output(cmd: &mut Command) -> io::Result<Output> {
     #[cfg(test)]
     let _fork = crate::test_support::fork_lock();
     cmd.output()
+}
+
+/// Start `cmd` and hand back the child — **the fork the executor spends**, and
+/// the only other lawful way to start a process here.
+///
+/// It is separate from [`output`] because a foot cannot collect and then
+/// decide: a tool that outruns its deadline has to be *reachable* while it
+/// runs, which is exactly what `output` does not give you.
+pub(crate) fn spawn(cmd: &mut Command) -> io::Result<Child> {
+    #[cfg(test)]
+    let _fork = crate::test_support::fork_lock();
+    cmd.spawn()
 }
 
 #[cfg(test)]
