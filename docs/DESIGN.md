@@ -206,6 +206,20 @@ child to be a process-group leader and the signal to be sent to the group, which
 is a change to how thrall spawns rather than a knob (bl-a78e). Until then the
 sentence above is the claim, and it is the whole claim.
 
+**A container image does not change that sentence** (bl-3586, under yog
+bl-223f). thrall ships an OCI image because an image is a convenient unit of
+install, and for no other reason: nothing in thrall uses the container
+filesystem as a feature, no state lives in a layer, and running the foot in a
+container is not containment thrall enforces and must never be described as
+such. Whatever a runtime happens to confine is the operator's arrangement of
+their own machine — it is invisible to this code, unstated on the wire, and
+outside every claim above. The one thing the image DOES decide is which
+binaries a tool entry can name at all, and that is a floor, not a fence: the
+runtime layer is a base with a shell precisely because a foot execs
+operator-configured argv, so a layer that could confine anything interesting
+would be a layer that could run nothing useful. `README.md` states the choice
+and its reasoning.
+
 ### 3.6 Version skew is real now
 
 Separately installed ends make version skew possible for the first time. The

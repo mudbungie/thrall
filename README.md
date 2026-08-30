@@ -80,6 +80,7 @@ make check     # fmt-check -> lint -> coverage
 make build     # debug build
 make test      # cargo test
 make install   # release build, then the binary into ~/.local/bin
+make image     # the OCI image (podman or docker), tagged from the crate version
 ```
 
 `make lint` is `line-cap`, then `leak-scan`, then `cargo clippy --all-targets
@@ -90,6 +91,78 @@ Every tool is pinned, or the gate is not reproducible: rustc 1.95.0
 (`deny.toml`), cargo-tarpaulin 0.35.2 (`tarpaulin.toml`).
 
 Run `make install-hooks` once per clone to seat the pre-commit hook.
+
+## The image
+
+`make image` builds an OCI image from `Containerfile`. **The image is the unit
+of install and nothing more** — no part of thrall uses the container filesystem
+as a feature, and the container is not a containment boundary. A foot runs what
+its operator's tool document says to run; the server still cannot see into this
+box, and what stops a tool doing something is whatever this machine enforces
+locally, exactly as *Foot-grade trust* above says.
+
+It builds under the pinned toolchain (`rust:1.95.0-alpine`, checked against
+`rust-toolchain.toml` during the build so the two pins cannot drift) and copies
+one static-pie musl binary into an `alpine` runtime layer. About 12 MB.
+
+**The runtime base is a decision.** A binary that execs nothing can ship `FROM
+scratch`, and a statically linked thrall is that binary — until it does the one
+thing it exists for. A foot execs operator-configured argv: what it runs is
+named in `tools.json` on the box, is not knowable from this repo, and is
+routinely a shell line. `scratch` would ship a foot that answers `--version`
+and then fails every invocation it was installed to serve. So the layer is
+alpine — a shell, a package manager the operator can add their tools with, and
+system CA roots for the ones that speak HTTPS. **The floor is provided; what
+can run on it is still the operator's problem.** A tool document naming a
+binary this layer does not have is a tool this box does not have.
+
+`make image` **pushes nothing**, and there is no `push` target. Where these
+images publish is unanswered (yog bl-223f); a push is not undoable, and a
+convenience target for an irreversible act is how the act happens by accident.
+
+### What mounts where
+
+The XDG contract is the runtime contract and **the image carries no state**.
+`XDG_DATA_HOME` is set to `/state`, which puts thrall's data root — the same
+`$XDG_DATA_HOME/thrall` the usage text names — at `/state/thrall`. The extra
+level is XDG's and not the image's: `XDG_DATA_HOME` is a parent of
+per-application roots by definition.
+
+```
+podman run --rm -v /path/to/provisioned/root:/state/thrall:Z thrall:0.0.1
+```
+
+That directory is the operator's provisioned data root: `tools.json`, and one
+directory per channel under `wire/workspaces/`. Both are put there by hand,
+neither is ever written by thrall, and **neither is in the image** — a
+certificate baked into a layer is a certificate published to everyone who can
+pull it.
+
+There is no `VOLUME` instruction on purpose. A `VOLUME` would let an unmounted
+run succeed against an empty anonymous volume; without one, the run refuses and
+names the file it could not find, which is the answer an operator can act on:
+
+```
+$ podman run --rm -v "$(mktemp -d)":/state/thrall:Z thrall:0.0.1
+thrall: /state/thrall/tools.json: No such file or directory (os error 2) — this box has no tool config
+$ echo $?
+1
+```
+
+### What the image deliberately does not contain
+
+- **No certificates and no tool document.** Both are operator-provisioned, and
+  both are the reason there is a mount instead of a layer.
+- **No `cargo`, no compiler, no source, no `target/`.** The build stage is
+  discarded whole; only the binary crosses.
+- **No supervisor, no restart wrapper, and no entrypoint script.** `thrall run`
+  never reconnects — a channel that fails is an exit naming it, because restart
+  policy belongs to this machine's own supervision, and putting a retry loop in
+  the image would take that decision away from the operator who has to live
+  with it.
+- **No bootstrap of any kind.** thrall mints nothing (REMOTE §1.4, DESIGN
+  §3.3); an image that could provision itself would be exactly the flow that
+  must never exist.
 
 ## The rules
 

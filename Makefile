@@ -1,5 +1,6 @@
 .PHONY: all build release test coverage lint fmt fmt-check check ci \
-        line-cap leak-scan rules-audit deny install-hooks install uninstall clean
+        line-cap leak-scan rules-audit deny install-hooks install uninstall \
+        image clean
 
 # The build authority. Every gate step has ONE home here, and the pre-commit
 # hook calls the same targets — so the hook, a hand-run `make check` and any
@@ -227,6 +228,36 @@ install: release
 uninstall:
 	@rm -f "$(INSTALL_BIN)/thrall"
 	@echo "removed $(INSTALL_BIN)/thrall"
+
+# The OCI image — the unit of install for a box that takes containers rather
+# than binaries. `Containerfile` is the whole of what it builds and states why
+# each layer is what it is.
+#
+# The version is READ FROM Cargo.toml and never typed here: the crate version
+# has one home, and a tag typed into a Makefile is that fact stored twice. Both
+# `:<version>` and `:latest` are applied to the same build.
+#
+# Podman or docker, whichever the box has, podman first — it needs no daemon
+# and no group membership, which is the difference between "the operator can
+# build this" and "the operator can build this after an admin says yes".
+# Override with `make image ENGINE=docker`.
+#
+# IT PUSHES NOTHING, and there is no `push` target to forget to guard. Where
+# these images publish is unanswered (yog bl-223f) and a push is not undoable:
+# a tag can move, but the bytes anyone pulled are theirs. When the registry is
+# decided, the push is `$(ENGINE) push` typed by a hand that meant it.
+IMAGE_NAME ?= thrall
+ENGINE ?= $(shell command -v podman 2>/dev/null || command -v docker 2>/dev/null)
+
+image:
+	@test -n "$(ENGINE)" || { echo "image: no podman and no docker on PATH" >&2; exit 1; }
+	@version=$$(sed -n '/^\[package\]/,/^\[/{s/^version *= *"\([^"]*\)".*/\1/p;}' Cargo.toml); \
+	test -n "$$version" || { echo "image: no version in Cargo.toml" >&2; exit 1; }; \
+	echo "image: $(notdir $(ENGINE)) build -> $(IMAGE_NAME):$$version"; \
+	$(ENGINE) build -f Containerfile \
+	  -t "$(IMAGE_NAME):$$version" -t "$(IMAGE_NAME):latest" . && \
+	$(ENGINE) image inspect "$(IMAGE_NAME):$$version" \
+	  --format 'image: {{.Id}} {{.Size}} bytes'
 
 # There is deliberately NO `publish` target. `Cargo.toml` carries
 # `publish = false`, the registry name is held by a placeholder, and whether
