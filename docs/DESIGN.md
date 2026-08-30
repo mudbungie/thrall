@@ -1,9 +1,12 @@
 # thrall — DESIGN
 
-**Status: founding skeleton.** No wire surface exists yet. This document
-states what thrall is, what it may never become, and which invariants it
-inherits rather than owns. It is a living document: amend it when reality
-diverges, and never code around a stale section.
+**Status: the channel is built; nothing spends it yet.** bl-a4a5 landed the
+transport — the mTLS dial, the version preface, the framing, the foot-grade
+check on this box's own leaf, and the entries an operator files. No gesture,
+no loop and no executor exist. This document states what thrall is, what it
+may never become, and which invariants it inherits rather than owns. It is a
+living document: amend it when reality diverges, and never code around a stale
+section.
 
 ---
 
@@ -106,6 +109,17 @@ Enforcement is the server's — it is the party that can be trusted to enforce
 it. thrall's obligations are the two it can keep: carry a leaf of that grade,
 and refuse to be configured with anything else.
 
+**As built (bl-a4a5), thrall fails closed where the engine fails open, and the
+asymmetry is deliberate.** yog reads a subject with no `OU=foot` as operator
+grade — *default-operator*, so a certificate minted before the grade existed
+keeps working. `channel::leaf::foot` refuses that same certificate, and refuses
+bytes that are not a certificate at all: an operator-grade leaf on a foot is a
+machine holding the whole boundary in order to run commands, which is the thing
+being a foot exists to give up. Neither end is defaulting; they are answering
+different questions. The check runs when the channel **opens**, before anything
+is dialled, so a mis-provisioned box learns it from its own configuration and
+never from a connection failure.
+
 ### 3.3 Certificates arrive out of channel
 
 REMOTE §1.4, and it does not expire: the certificate and key are carried to
@@ -170,14 +184,30 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/lib.rs` | Crate root. Module declarations and the crate's own statement of what it is. |
 | `src/cli.rs` | The command line as a pure function: arguments in, a `Verdict` (exit code + text) out. No process state is touched, which is what lets `main.rs` be the one coverage exclusion without excluding a decision. |
 | `src/main.rs` | The process entry and nothing else: argv in, stream selected by the code, exit. The single `tarpaulin.toml` exclusion. |
+| `src/channel.rs` | **The channel** (bl-a4a5): one wire to one engine. Dial per ask, hold only while waiting, never reconnect. There is an `ask` and there is nothing else — the shape of the file is the dial-in invariant. |
+| `src/channel/frame.rs` | The framing: a big-endian `u32` length, then that many bytes of JSON; a zero-length frame terminates an answer (REMOTE §3). |
+| `src/channel/hello.rs` | The version preface, and this end's half of it — state, confirm, refuse fail-closed naming both versions. A foot never *admits*, because a foot is never dialled. |
+| `src/channel/tls.rs` | The rustls client configuration: the operator CA as anchors, this box's leaf as its identity, `ring` named rather than defaulted. |
+| `src/channel/leaf.rs` | The foot grade, read off this box's own certificate — a DER walk, because thrall links no certificate library. |
+| `src/channel/material.rs` | What the operator carried here, and the three answers a directory can give: nothing, half, or a channel. |
+| `src/channel/entries.rs` | The entries this box holds, one per channel. A refusal is one entry's, never the set's. |
 | — | — |
-| *channel* | mTLS dial, leaf presentation, the protocol-version handshake, entry resolution (bl-a4a5). |
 | *config* | The operator's tool document; the advertisement is its projection (bl-05fe). |
 | *loop* | advertise, the mailbox wait, the hand-off (bl-a2ea). |
-| *executor* | Spawn, the two deadlines, the one transcode, the capture (bl-4cda). |
-| `src/spawn.rs` | **The spawn boundary.** Every child process is built AND forked here — nowhere else builds a `Command`, and nowhere else spends one. Filled by the executor (bl-4cda). |
-| `src/sys.rs` | **The confined `unsafe` file.** Raw process effects with no safe std spelling; the expected tenant is the child-termination cascade (bl-4cda). |
-| `src/state.rs` | **The lock chokepoint.** Every `Mutex`/`RwLock` in the crate. May stay empty: thrall runs one invocation at a time (§2), so it may never hold cross-thread state at all. |
+| *executor* | The two deadlines, the one transcode, the capture (bl-4cda). |
+| `src/spawn.rs` | **The spawn boundary.** Every child process is built AND forked here — nowhere else builds a `Command`, and nowhere else spends one. **Founded by bl-a4a5** and `cfg(test)` until bl-4cda: its only tenant so far is the suite's stand-in for the operator's certificate mint, because thrall itself mints nothing (§3.3). The boundary existing before the executor is the whole point of the row. |
+| `src/sys.rs` | **The confined `unsafe` file.** Raw process effects with no safe std spelling; the expected tenant is the child-termination cascade (bl-4cda). Unbuilt. |
+| `src/state.rs` | **The lock chokepoint.** Every `Mutex`/`RwLock` in the crate. Unbuilt, and may stay so: thrall runs one invocation at a time (§2), so it may never hold cross-thread state at all. The suite's fork lock is **not** a tenant — a test's serialization lock is scaffolding, and the rule's own text sends it to `src/test_support.rs`. |
+| `src/test_support.rs` | `cfg(test)` only. The scratch directory, the fork lock, the stand-in engine, and the certificate mint the suite performs on the operator's behalf. |
+
+**There is no flat material root, and its absence is a simplification rather
+than an omission** (bl-a4a5). Upstream a client box also holds material
+directly under `wire/`, because that same directory is where a *server* keeps
+the address it binds. A foot never binds anything (§2), so that second meaning
+does not exist here and one shape covers every case: every channel is an entry
+at `wire/workspaces/<leaf>/`, and a box with one engine has one entry. The four
+file names inside are REMOTE §8.2's, unchanged, so a pair the operator minted
+for a client box is filed the same way whichever program reads it.
 
 The last three rows are named by their **confinement rules** (bl-1827) rather
 than by the code that will fill them, and the naming is deliberately ahead of

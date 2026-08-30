@@ -47,9 +47,14 @@ Two honesty clauses ride with that, and neither is decoration:
 
 ## Status
 
-**Founding skeleton.** No wire surface is implemented. The binary answers
-`--version` and `--help`, and the repository stands up the gate that everything
-after it has to pass.
+**The channel is built; nothing spends it yet.** thrall dials: mTLS to an
+engine, the protocol version stated by both ends before either reads, the
+length-delimited framing, and a refusal to open at all on a certificate that is
+not foot-grade. What does not exist is a verb: no gesture, no loop, no
+executor. The binary answers `--version` and `--help`.
+
+Certificates arrive out of channel, by the operator's hand, and thrall mints
+nothing — there is no bootstrap flow and there must never be one.
 
 `Cargo.toml` carries `publish = false`. The registry name is held by a
 placeholder release and is not to be touched: whether, when, and as what thrall
@@ -105,9 +110,11 @@ concrete type; no generic bounds on a `pub` item; no panic paths outside tests;
 no `#[allow]` in prod — policy lives in `Cargo.toml [lints]`, justified in one
 place; no `Rc`/`RefCell`. Four more rules **confine** a kind of code to one
 file: `unsafe` to `src/sys.rs`, `Mutex`/`RwLock` to `src/state.rs`, and both
-building and forking a child process to `src/spawn.rs`. All three files are
-unbuilt — a confinement rule names its location before the first site is
-written, or the first site picks the location by being written.
+building and forking a child process to `src/spawn.rs`. Two of the three are
+still unbuilt, and that is the discipline working — a confinement rule names its
+location before the first site is written, or the first site picks the location
+by being written. `src/spawn.rs` was founded the moment the suite needed to run
+one program, which is the order the rule exists to force.
 
 The `rules/` directory enforces what it can, and `make rules-audit` checks both
 directions: the tree clean **and** every rule, run alone by its own id, still

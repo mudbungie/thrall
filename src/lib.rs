@@ -10,7 +10,21 @@
 //! `docs/REMOTE.md` is the protocol authority thrall implements against; where
 //! this crate and that document disagree, one of them is a bug.
 //!
-//! This is the founding skeleton (bl-349f): a version-capable binary and
-//! nothing else. No wire code exists yet.
+//! **What is built** (DESIGN §4): the command line, and the
+//! [`channel`] — the mTLS dial, the version preface, the framing, the
+//! foot-grade check on this box's own leaf, and the entries an operator filed
+//! (bl-a4a5). The gestures that ride it, and the executor behind them, are the
+//! balls after it.
 
+pub mod channel;
 pub mod cli;
+
+/// **The spawn boundary** — every child process is built and forked here.
+/// `cfg(test)` while its only tenant is the suite's stand-in for the operator's
+/// certificate mint; bl-4cda drops the attribute when the executor lands.
+#[cfg(test)]
+pub(crate) mod spawn;
+
+/// Scaffolding the suite shares. Never compiled into a released binary.
+#[cfg(test)]
+pub(crate) mod test_support;

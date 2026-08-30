@@ -17,18 +17,30 @@ yanked = "deny"
 ignore = []
 
 [licenses]
-# thrall itself is MIT, and the graph is thrall alone, so MIT is the whole
-# exhaustive list.
+# EXHAUSTIVE OVER THE COMMITTED `Cargo.lock`, and derived from it rather than
+# guessed at. The list was `["MIT"]` while the graph was thrall alone; bl-a4a5
+# linked `rustls` (with `ring`) and `serde_json`, and every entry below is a
+# licence some crate in the resulting lockfile actually carries. A speculative
+# allow-list is an allow-list nobody read, and it is worst on the day it
+# silently covers a crate no approval ever named — so widen this only with the
+# ball that links the crate, and re-derive it from the lockfile that ball
+# produces.
 #
-# The dependency approval (bl-e5ba) has LANDED — rustls with `ring` and no
-# default features, serde_json, thiserror — and this list still says MIT,
-# which is the point: an approval is permission to link a crate, not a crate
-# in the lockfile. Nothing here widens until a ball actually links one, and
-# the ball that does re-derives this list from the resulting `Cargo.lock`
-# rather than guessing at it. A speculative allow-list is an allow-list
-# nobody read, and it is worst on the day it silently covers a crate the
-# approval never named.
-allow = ["MIT"]
+#   MIT             thrall itself, and most of the graph under an OR.
+#   Apache-2.0      the other half of the ubiquitous dual licence, and half of
+#                   `ring`'s "Apache-2.0 AND ISC" — an AND, so both terms have
+#                   to be here or `ring` is rejected.
+#   ISC             `ring`'s other half, and `untrusted` and `rustls-webpki`
+#                   outright. These are the certificate-verification path.
+#   BSD-3-Clause    `subtle`, the constant-time primitives under `ring`.
+#   Unlicense       `memchr`, under `serde_json`.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "ISC",
+    "BSD-3-Clause",
+    "Unlicense",
+]
 
 [bans]
 # Duplicate versions are informational; a bare "*" version requirement is a

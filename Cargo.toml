@@ -18,10 +18,13 @@ readme = "README.md"
 # file list. See bl-006e.
 publish = false
 
-# NO DEPENDENCIES TODAY, and the table is empty on purpose. The skeleton is a
-# version-capable binary; nothing it does needs a crate, and a dependency added
-# "for later" is one nobody ever reviewed — it is linked by no code, so no gate
-# and no reviewer ever reads it.
+# A dependency lands here with the ball that first LINKS it, never before: a
+# dependency added "for later" is one nobody ever reviewed, because it is
+# linked by no code and so no gate and no reviewer ever reads it.
+#
+# LINKED SO FAR: `rustls` and `serde_json`, both by bl-a4a5 (the mTLS channel).
+# `thiserror` is approved and still absent — every refusal on this surface is
+# one `String` a caller prints, so there is no error enum for it to derive yet.
 #
 # THIS COMMENT IS THE APPROVED SET (bl-e5ba, operator ruling 2026-08-29). The
 # house rule is "zero new dependencies without explicit approval"; the
@@ -63,6 +66,25 @@ publish = false
 # instead of silently re-acquiring a C toolchain. The bans are armed now,
 # before any of the above exists.
 [dependencies]
+# The wire is mTLS and nothing else may provide it (bl-a4a5). The three feature
+# terms are the approval's, not this ball's: `default-features = false` because
+# rustls' defaults select `aws-lc-rs`, whose sys crate builds C and breaks the
+# single-binary story; `ring` because it is the approved provider and the one
+# substitution that is not at a linking ball's discretion; `std` and `tls12`
+# because the channel is synchronous `std::net` and the engine's safe default
+# protocol versions include TLS 1.2. `deny.toml` bans `aws-lc-sys` outright, so
+# an edit that dropped the flag fails the gate rather than quietly re-acquiring
+# a C toolchain.
+rustls = { version = "0.23", default-features = false, features = [
+    "ring",
+    "std",
+    "tls12",
+    "logging",
+] }
+# The wire is JSON: a frame is a JSON value, a capture is a JSON object, and a
+# tool's `input_schema` is JSON Schema carried verbatim. Hand-rolling a parser
+# for a security boundary is worse than a dependency.
+serde_json = "1"
 
 [[bin]]
 name = "thrall"
