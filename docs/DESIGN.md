@@ -175,6 +175,25 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | *config* | The operator's tool document; the advertisement is its projection (bl-05fe). |
 | *loop* | advertise, the mailbox wait, the hand-off (bl-a2ea). |
 | *executor* | Spawn, the two deadlines, the one transcode, the capture (bl-4cda). |
+| `src/spawn.rs` | **The spawn boundary.** Every child process is built AND forked here — nowhere else builds a `Command`, and nowhere else spends one. Filled by the executor (bl-4cda). |
+| `src/sys.rs` | **The confined `unsafe` file.** Raw process effects with no safe std spelling; the expected tenant is the child-termination cascade (bl-4cda). |
+| `src/state.rs` | **The lock chokepoint.** Every `Mutex`/`RwLock` in the crate. May stay empty: thrall runs one invocation at a time (§2), so it may never hold cross-thread state at all. |
+
+The last three rows are named by their **confinement rules** (bl-1827) rather
+than by the code that will fill them, and the naming is deliberately ahead of
+the code. A confinement rule has to name one location before the first site is
+written, or the first site picks the location by being written — and a rule
+that arrives afterwards is a rule that has to be argued with. Each rule's
+`ignores` list is the one location authority for its kind: a site is added to
+the named file, never a path to the list, because a second confined file is two
+inventories, which is no inventory.
+
+**A rule with nothing in `src` to match cannot be measured by scanning `src`.**
+All four confinement rules (`unsafe`, locks, and the spawn boundary's two) are
+in exactly that state today, which is how a rule passes as green forever. They
+are proved from the other direction instead: `make rules-audit` runs every rule
+ALONE, by the id in its own file, against `rules/fixtures/violations.rs`, and
+fails the rule that flags nothing.
 
 ---
 
@@ -212,8 +231,10 @@ work that has not started.
   Until then thrall's disclosure posture is prevention only: local, and
   bypassable by whoever runs it. That is worth stating plainly rather than
   implying a gate that reaches further than it does.
-- **Three confinement rules (bl-1827).** `unsafe` confinement, the lock
-  chokepoint, and the spawn boundary are installed with the surfaces they
-  govern, each with its own fixture. A rule with nothing to measure is a rule
-  that passes as green forever, and installing it early buys a false signal
-  rather than an early one.
+Nothing else. The confinement rules that stood here — `unsafe`, the lock
+chokepoint, the spawn boundary — landed in bl-1827, ahead of the surfaces they
+govern, and §4 says where each one points and why that order is the right one.
+The founding's objection was real and is answered rather than waived: a rule
+with nothing to measure passes as green forever, so `rules-audit` stopped
+measuring rules by scanning `src` and now measures every one of them,
+individually, against its own deliberate violation.

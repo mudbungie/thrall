@@ -1,0 +1,59 @@
+# The spawn boundary, first half: every child process is BUILT by
+# `crate::spawn::command`, never by a bare `Command::new`. The second half is
+# `no-bare-fork.yml`, which makes the same module fork it; the two together are
+# what let `src/spawn.rs` hold an invariant rather than a convention.
+#
+# thrall is the component that runs commands on somebody else's machine
+# (DESIGN §3.4: `command` is an argv, spawned directly, with no shell and no
+# interpolation of the invocation's input). So "what exactly is handed to a
+# child" is not an implementation detail here, it is the product — and it has
+# to be decided in one place. Three things are that decision, and each is
+# invisibly wrong at a spawn site that forgot it:
+#
+#   - THE ENVIRONMENT. A foot inherits whatever the operator's supervisor gave
+#     it, which may include this box's credentials for other things entirely.
+#     A tool child gets what the boundary decides it gets, and a site that
+#     "remembers" to scrub is the defect this rule exists to prevent.
+#   - THE INHERITED GIT ENVIRONMENT, which is the same hazard with a name.
+#     `git` exports `GIT_DIR` and `GIT_INDEX_FILE` into every process it
+#     starts, and those OUTRANK `-C <repo>` and `current_dir` — so a child
+#     spawned while one is set forks its own `git` against the WRONG
+#     repository. Learned upstream the expensive way: a pre-commit hook runs
+#     the suite, the suite spawns a child, the child commits into the repo
+#     being committed. `scripts/pre-commit` scrubs at the hook; the boundary is
+#     where a spawn from anywhere else gets the same treatment.
+#   - THE DEADLINES AND THE CAPTURE. A foot answers with what came back, once,
+#     transcoded once (bl-4cda). A spawn that bypassed the boundary would
+#     answer some other way.
+#
+# `src/spawn.rs` does not exist yet, and the rule names it anyway: a boundary
+# rule installed after the first spawn site is a rule that has to be argued
+# with, and there is no version of this that is worth arguing with. The row is
+# in docs/DESIGN.md §4.
+#
+# NO TEST CARVE-OUT. See `no-bare-fork.yml` — for the fork half, the tests are
+# where the discipline matters MOST, and a boundary with a hole in it under
+# `#[cfg(test)]` is not a boundary. (`make rules-audit` scans `src` only, so a
+# bare `Command::new` written under a future `tests/` integration crate is on
+# the author; that is a limit of the audit's scope, not a permission.)
+#
+# Node kinds verified against ast-grep 0.44.1's Rust tree-sitter parser
+# (`--debug-query=ast`): a call `Command::new(x)` / `std::process::Command::new(x)`
+# is a `call_expression` whose `function` field is a `scoped_identifier` whose
+# text ends in `Command::new` — so the anchored regex catches every path
+# spelling at once, including one reached through a `use` alias's full path.
+#
+# NOTHING IN `src` MATCHES THIS RULE TODAY. It is proved live from the other
+# direction — `rules/fixtures/violations.rs` carries a deliberate violation and
+# `make rules-audit` fails unless THIS rule, by id, still flags it.
+id: no-bare-command
+language: rust
+severity: error
+message: "build children through crate::spawn::command, never a bare Command::new (see rules/no-bare-command.yml)"
+ignores:
+  - "**/spawn.rs"
+rule:
+  kind: call_expression
+  has:
+    field: function
+    regex: 'Command::new$'

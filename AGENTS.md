@@ -73,12 +73,34 @@ ref at all yet, so the late half (a scan of what is actually public) does not
 exist and lands with the remote (bl-006e). Today thrall has prevention only:
 local, and bypassable by whoever runs it.
 
-### Still absent from the gate
+### The confinement rules, and the three files they name
 
-- **Three confinement rules** (bl-1827): `unsafe`, the lock chokepoint, the
-  spawn boundary. Each lands with the surface it governs. Do not install one
-  vacuous to look thorough — a rule with nothing to measure passes as green
-  forever.
+`make rules-audit` runs the `rules/` table (bl-1827 completed it). Four rules
+confine a kind of code to one file, and all four name a file that **does not
+exist yet** — which is the point: a confinement rule installed after the first
+site is a rule that has to be argued with.
+
+| Kind | Confined to | Rule |
+|---|---|---|
+| `unsafe` block or `unsafe fn` | `src/sys.rs` | `unsafe-outside-sys.yml` |
+| `Mutex` / `RwLock` | `src/state.rs` | `locks-outside-state.yml` |
+| Building a child (`Command::new`) | `src/spawn.rs` | `no-bare-command.yml` |
+| Forking one (`.spawn/.output/.status/.exec`) | `src/spawn.rs` | `no-bare-fork.yml` |
+
+**Each rule's `ignores` list is the one location authority.** Add a site to the
+named file; never add a path to the list. A second confined file is two
+inventories, which is no inventory. The three files are rows in DESIGN §4.
+
+The spawn boundary is two rules because building and forking are two contracts:
+one decides what environment a child inherits, the other holds the ETXTBSY
+window a fork opens on every *other* thread's open write fd. Neither has a test
+carve-out — `#[cfg(test)]` is where the fork hazard actually lives.
+
+**The audit is per RULE, not per directory.** It runs each rule alone, by the
+id in its own file, against `rules/fixtures/violations.rs`, and fails the one
+that flags nothing. That is what makes a rule with nothing in `src` to match
+measurable at all: scanning `src` is silent about the four above whether they
+work or not. A new rule with no fixture fails on the run that adds it.
 
 ## Task tracking
 

@@ -133,16 +133,46 @@ leak-scan:
 	@scripts/leak-scan.sh
 
 # Static audit of every ast-grep rule (rules/, pinned ast-grep 0.44.1 — see
-# sgconfig.yml). BOTH DIRECTIONS: `src` must be clean, AND every deliberate
-# violation in rules/fixtures must fire, so a rule whose pattern silently
-# stopped matching anything cannot pass as green forever.
+# sgconfig.yml). BOTH DIRECTIONS: `src` must be clean, AND every rule must
+# still flag its deliberate violation in rules/fixtures, so a rule whose
+# pattern silently stopped matching anything cannot pass as green forever.
+#
+# PER RULE, NOT PER DIRECTORY (bl-1827). This used to ask only whether
+# `rules/fixtures` was flagged by SOMETHING, which nine live rules answer for a
+# tenth dead one forever. It now runs each rule ALONE — `--filter` on the `id`
+# read out of the rule's own file — and fails the rule that flags nothing. Two
+# things follow, and the second is why the change was worth making:
+#
+#   - a rule that stops matching is named, individually, on the run it breaks;
+#   - a rule with NOTHING TO MATCH IN `src` is measurable at all. The four
+#     confinement rules are exactly that: thrall has no `unsafe`, no lock and
+#     no child process, so `ast-grep scan src` is silent about them whether
+#     they work or not, and this loop is the only thing that says they do.
+#
+# The id is read from the file rather than kept in a list here, so a new rule
+# cannot be added to a stale list — and a new rule with no fixture fails on the
+# run that adds it. The empty-set guard is the same discipline `line-cap`
+# holds: enumerating no rules at all is a broken audit, not a clean tree.
 rules-audit:
 	ast-grep scan src
-	@if ast-grep scan rules/fixtures >/dev/null 2>&1; then \
-	  echo "rules-audit: rules/fixtures was NOT flagged — a rule has regressed" >&2; \
+	@n=0; for r in rules/*.yml; do \
+	  id=$$(sed -n 's/^id:[[:space:]]*//p' "$$r" | head -1); \
+	  if [ -z "$$id" ]; then \
+	    echo "rules-audit: $$r declares no id" >&2; exit 1; \
+	  fi; \
+	  n=$$((n + 1)); \
+	  if ast-grep scan --filter "^$$id$$" rules/fixtures >/dev/null 2>&1; then \
+	    echo "rules-audit: [$$id] flagged NOTHING in rules/fixtures — the rule has" >&2; \
+	    echo "             regressed, or it was added without a fixture. Fix the rule" >&2; \
+	    echo "             or write the violation; never delete the check." >&2; \
+	    exit 1; \
+	  fi; \
+	done; \
+	if [ "$$n" -eq 0 ]; then \
+	  echo "rules-audit: enumerated 0 rules — the audit is broken, not the tree" >&2; \
 	  exit 1; \
-	fi
-	@echo "rules-audit: src clean; fixtures flagged (all rules live)"
+	fi; \
+	echo "rules-audit: src clean; all $$n rules flagged their fixture"
 
 # Supply-chain audit (cargo-deny 0.20.2 — see deny.toml): licenses, advisories,
 # the TLS-stack bans, and registry-only sources.

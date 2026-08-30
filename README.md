@@ -103,10 +103,18 @@ complexity lives in function bodies, where the compiler catches it, not in type
 signatures, where it is viral. No named lifetimes; a `pub fn` returns an owned
 concrete type; no generic bounds on a `pub` item; no panic paths outside tests;
 no `#[allow]` in prod — policy lives in `Cargo.toml [lints]`, justified in one
-place; no `Rc`/`RefCell`. The `rules/` directory enforces what it can, and
-`make rules-audit` checks both directions — the tree clean **and** the fixtures
-still flagged, because a rule that silently matches nothing passes as green
-forever.
+place; no `Rc`/`RefCell`. Four more rules **confine** a kind of code to one
+file: `unsafe` to `src/sys.rs`, `Mutex`/`RwLock` to `src/state.rs`, and both
+building and forking a child process to `src/spawn.rs`. All three files are
+unbuilt — a confinement rule names its location before the first site is
+written, or the first site picks the location by being written.
+
+The `rules/` directory enforces what it can, and `make rules-audit` checks both
+directions: the tree clean **and** every rule, run alone by its own id, still
+flagging its deliberate violation in `rules/fixtures`. Per rule rather than per
+directory, because nine live rules would answer for a tenth dead one forever —
+and because the four confinement rules have nothing in `src` to match yet, so
+their fixture is the only thing proving they work at all.
 
 ## Authorities
 

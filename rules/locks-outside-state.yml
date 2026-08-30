@@ -1,0 +1,73 @@
+# House rule 7, first half: `Mutex`/`RwLock` live only in the crate's lock
+# chokepoint, `src/state.rs`. The second half — no `Rc`/`RefCell` anywhere —
+# needs no chokepoint to exist and landed at the founding
+# (`rules/no-rc-refcell.yml`); this is the half that had to wait for one.
+#
+# The chokepoint does not exist yet, and naming it now is the point: a rule
+# that waits for the first lock lets the first lock choose where locks live.
+# The row is in docs/DESIGN.md §4. thrall may end up holding very little — it
+# runs ONE invocation at a time (DESIGN §2), so the serial loop is not obviously
+# shared state — and a chokepoint that stays empty is a fine outcome. What it
+# must never be is many files.
+#
+# WHAT THE CONFINEMENT BUYS: shared mutable state is where a program's races
+# live, and the only cheap defence is that the whole inventory of it reads as
+# one file. `Arc` and the `Atomic*` types are not matched: a refcount and a
+# scalar tally are not shared *mutable* state in the sense that needs auditing.
+#
+# CARVE-OUTS: none, and the list below is not one. The two globs cover test
+# code, and they are the same two shapes `no-assert-outside-tests.yml`
+# documents at length:
+#   1. INLINE `#[cfg(test)] mod tests { … }` in a prod source file — the shape
+#      this crate uses. It is in a scanned `src` file, so no glob can reach it;
+#      it is exempted structurally, by the assert rule's idiom (the attribute is
+#      a preceding SIBLING of the `mod_item` in tree-sitter-rust, so `inside …
+#      follows`, never `inside … has`).
+#   2. SIBLING test files, whose own AST has no `#[cfg(test)] mod` ancestor
+#      because the attribute sits in the parent file — exempted by `ignores`.
+# A test's lock is scaffolding: the serialization lock a suite takes around a
+# fork or a process-env fold is not app state, and folding it into `state.rs`
+# would put test machinery in the file that inventories the program.
+#
+# A REAL CARVE-OUT, if one is ever needed, is named here WITH ITS MEASUREMENT.
+# Upstream carries four, and every one of them is a file that pays for itself
+# in the same currency: folding it into the chokepoint costs `state.rs` the
+# 100% coverage floor, because llvm-cov mis-attributes phantom uncovered
+# regions onto the `impl` headers and type aliases a new monomorphization adds.
+# That is a measured effect, not an argument — do not add a carve-out here on
+# the strength of expecting it.
+#
+# Node kinds verified against ast-grep 0.44.1's Rust tree-sitter parser
+# (`--debug-query=ast`): a bare `Mutex`/`RwLock` is a `type_identifier` in type
+# position (`Mutex<T>`, a field or return type) and an `identifier` in path or
+# `use` position (`Mutex::new`, `use std::sync::Mutex`). Matching both kinds
+# catches every spelling; the anchored regex leaves `Arc`/`Atomic*` clear.
+#
+# NOTHING IN `src` MATCHES THIS RULE TODAY. It is proved live from the other
+# direction — `rules/fixtures/violations.rs` carries a deliberate violation and
+# `make rules-audit` fails unless THIS rule, by id, still flags it.
+id: locks-outside-state
+language: rust
+severity: error
+message: "Mutex/RwLock live only in src/state.rs, the crate lock chokepoint (see rules/locks-outside-state.yml)"
+ignores:
+  - "**/state.rs"
+  - "**/test_support.rs"
+  - "**/test_support/**"
+  - "**/tests/**"
+  - "**/tests.rs"
+  - "**/*tests.rs"
+rule:
+  all:
+    - any:
+        - kind: type_identifier
+          regex: '^(Mutex|RwLock)$'
+        - kind: identifier
+          regex: '^(Mutex|RwLock)$'
+    - not:
+        inside:
+          kind: mod_item
+          stopBy: end
+          follows:
+            kind: attribute_item
+            regex: "cfg\\(test\\)"

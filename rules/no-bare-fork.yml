@@ -1,0 +1,67 @@
+# The spawn boundary, second half: every child is FORKED by
+# `crate::spawn::{spawn, output, status}`, never by a bare `Command::spawn` /
+# `.output()` / `.status()`. `no-bare-command.yml` makes the boundary BUILD
+# every child; this makes it SPEND every child. Building at the boundary and
+# letting each caller fork leaves a second per-call contract open, and the
+# contract nobody keeps is this one.
+#
+# WHY THE FORK AND NOT THE WRITE — the expensive lesson, learned upstream and
+# imported deliberately. `fs::write` on a file holds a write fd. A fork on ANY
+# other thread copies that fd into the child, and the child holds it until its
+# own exec completes. An exec of that same file inside that window fails with
+# ETXTBSY. A test that writes a fake binary and runs it is therefore reddened
+# by a spawn site in a module it has never heard of, at a rate that looks like
+# a flake — and the victim's own care CANNOT save it, because the fork is the
+# other party. So the discipline belongs at the fork, where under `cfg(test)`
+# the boundary takes one process-wide lock across it. Measured upstream: ~9,600
+# write-then-exec pairs against an 8-thread fork storm, 8.3% ETXTBSY with the
+# fork unguarded, zero with it guarded and the writes left entirely bare.
+#
+# That is also why THERE IS NO TEST CARVE-OUT here, unlike the assert and
+# lint-suppression rules. `#[cfg(test)]` is where the hazard lives: the suite is
+# the only thing in this crate that runs many threads that both write files and
+# start processes. A carve-out for tests would exempt the exact code the rule
+# exists for.
+#
+# `exec` is the fourth verb and the odd one: it forks nothing, it REPLACES this
+# process, and it is here because it leaves the caller holding a contract no
+# caller reliably remembers. `CommandExt::exec` runs std's exec path in THIS
+# process, which resets `SIGPIPE` to `SIG_DFL` before `execvp` — so an exec that
+# FAILS returns into a live process where the next write down a closed pipe is
+# a death and not an error. Under a test harness the corpse is the whole binary,
+# reported as a signal with no test failing. The boundary puts the disposition
+# back; a bare call does not.
+#
+# `src/spawn.rs` does not exist yet — see `no-bare-command.yml` for why the
+# rule names it first anyway. The row is in docs/DESIGN.md §4.
+#
+# Node kinds verified against ast-grep 0.44.1's Rust tree-sitter parser
+# (`--debug-query=ast`): a method call `cmd.spawn()` is a `call_expression`
+# whose `function` field is a `field_expression` (text `cmd.spawn`) and whose
+# `arguments` field is `()`. BOTH halves are load-bearing. The
+# `field_expression` requirement excludes `std::thread::spawn(…)`, which is a
+# path call and not a fork at all; the empty-`arguments` requirement excludes a
+# thread starter that takes one. What it leaves ambiguous is a crate type with
+# a zero-argument `spawn` method — so do not write one: in a crate whose one
+# fork lives at the boundary, `spawn` on anything else is a name asking to be
+# misread. Name a thread starter `start`.
+#
+# NOTHING IN `src` MATCHES THIS RULE TODAY. It is proved live from the other
+# direction — `rules/fixtures/violations.rs` carries a deliberate violation and
+# `make rules-audit` fails unless THIS rule, by id, still flags it.
+id: no-bare-fork
+language: rust
+severity: error
+message: "spend a Command through crate::spawn::{spawn,output,status,exec} (see rules/no-bare-fork.yml)"
+ignores:
+  - "**/spawn.rs"
+rule:
+  kind: call_expression
+  all:
+    - has:
+        field: function
+        kind: field_expression
+        regex: '\.(spawn|output|status|exec)$'
+    - has:
+        field: arguments
+        regex: '^\(\)$'

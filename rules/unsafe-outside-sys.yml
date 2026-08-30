@@ -1,0 +1,48 @@
+# House rule 3: `unsafe` is CONFINED, not forbidden — and the confinement is a
+# location, so the whole-crate unsafe inventory can be read in one file.
+#
+# thrall's confined file is `src/sys.rs`: the raw process effects the executor
+# needs and std does not wrap. It does not exist yet, and that is deliberate —
+# a confinement rule has to name its one location BEFORE the first site is
+# written, or the first site picks the location by being written. The row is
+# in docs/DESIGN.md §4 (bl-4cda builds it), and the expected tenant is the
+# child-termination cascade: a deadline expires, the child gets a signal, and
+# the process group it may have started has to go with it. `libc::kill` on a
+# process group has no safe std spelling.
+#
+# WHY NOT `unsafe_code = "forbid"` IN THE MANIFEST, which would be simpler and
+# needs no rule: `forbid` is unoverridable and reaches test code, so the day one
+# irreducible raw call is needed the only way out is to weaken the whole crate.
+# A location rule refuses everywhere and grants one auditable place instead.
+#
+# THIS RULE'S `ignores` LIST IS THE ONE LOCATION AUTHORITY. Add a site to
+# `src/sys.rs` — never a path to this list. A second confined file is two
+# inventories, which is no inventory.
+#
+# NO TEST CARVE-OUT, and none of the other confinement rules has one either.
+# `unsafe` in a test is `unsafe` in the address space the test runs in, and the
+# suite is the one place where a soundness bug is most likely to be written
+# quickly and read never.
+#
+# Node kinds verified against ast-grep 0.44.1's Rust tree-sitter parser
+# (`--debug-query=ast`):
+#   - `unsafe { … }`          -> node kind `unsafe_block`
+#   - `unsafe fn` / modifiers -> node kind `function_modifiers` containing the
+#                                `unsafe` keyword (regex `\bunsafe\b`)
+#
+# NOTHING IN `src` MATCHES THIS RULE TODAY, which is the failure mode a rule
+# dies of: it would pass as green forever whether or not it still worked. It is
+# proved live from the other direction instead — `rules/fixtures/violations.rs`
+# carries a deliberate violation of it, and `make rules-audit` fails unless
+# THIS rule, by id, still flags it.
+id: unsafe-outside-sys
+language: rust
+severity: error
+message: "unsafe is confined to src/sys.rs, the crate's one raw-effect file (see rules/unsafe-outside-sys.yml)"
+ignores:
+  - "**/sys.rs"
+rule:
+  any:
+    - kind: unsafe_block
+    - kind: function_modifiers
+      regex: '\bunsafe\b'
