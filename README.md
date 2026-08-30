@@ -47,11 +47,13 @@ Two honesty clauses ride with that, and neither is decoration:
 
 ## Status
 
-**The channel is built; nothing spends it yet.** thrall dials: mTLS to an
-engine, the protocol version stated by both ends before either reads, the
-length-delimited framing, and a refusal to open at all on a certificate that is
-not foot-grade. What does not exist is a verb: no gesture, no loop, no
-executor. The binary answers `--version` and `--help`.
+**The channel and the config are built; nothing spends them yet.** thrall
+dials: mTLS to an engine, the protocol version stated by both ends before either
+reads, the length-delimited framing, and a refusal to open at all on a
+certificate that is not foot-grade. It reads the operator's one tool document
+and derives its advertisement from it by dropping the local half, so what this
+box offers and what it can run cannot drift. What does not exist is a verb: no
+gesture, no loop, no executor. The binary answers `--version` and `--help`.
 
 Certificates arrive out of channel, by the operator's hand, and thrall mints
 nothing — there is no bootstrap flow and there must never be one.

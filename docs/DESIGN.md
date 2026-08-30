@@ -1,9 +1,10 @@
 # thrall — DESIGN
 
-**Status: the channel is built; nothing spends it yet.** bl-a4a5 landed the
-transport — the mTLS dial, the version preface, the framing, the foot-grade
-check on this box's own leaf, and the entries an operator files. No gesture,
-no loop and no executor exist. This document states what thrall is, what it
+**Status: the channel and the config are built; nothing spends them yet.**
+bl-a4a5 landed the transport — the mTLS dial, the version preface, the framing,
+the foot-grade check on this box's own leaf, and the entries an operator files.
+bl-05fe landed the operator's tool document and the advertisement derived from
+it. No gesture, no loop and no executor exist. This document states what thrall is, what it
 may never become, and which invariants it inherits rather than owns. It is a
 living document: amend it when reality diverges, and never code around a stale
 section.
@@ -144,6 +145,16 @@ config is not a second list beside the advertisement.
 A tool absent from that document is a tool this box does not have. Server-side
 adjudication is unchanged, stacks on top, and fails closed.
 
+**As built (bl-05fe), an absent document is a refusal and not the empty set.**
+A foot with nothing to offer has nothing to do, and starting one is an explicit
+act that deserves an explicit answer — the same posture absent channel material
+takes. An *empty* document is different and is honoured: `[]` is a box stating
+that it enables no tool, which is a statement rather than a mistake and is the
+shape a box takes while an operator is switching everything off. The set must
+also be **addressable**: a name that is not a single path component, or one name
+on two entries, refuses the whole file at the read rather than at the first
+invocation.
+
 `command` is an **argv, spawned directly**. No shell, and no interpolation of
 the invocation's input into it: a shell would make the declared `input_schema`
 advisory and turn an operator's config file into a command-injection surface
@@ -191,8 +202,10 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/channel/leaf.rs` | The foot grade, read off this box's own certificate — a DER walk, because thrall links no certificate library. |
 | `src/channel/material.rs` | What the operator carried here, and the three answers a directory can give: nothing, half, or a channel. |
 | `src/channel/entries.rs` | The entries this box holds, one per channel. A refusal is one entry's, never the set's. |
+| `src/config.rs` | **The operator's document** (bl-05fe): what this box offers, and the projection that drops the local half. The gate on what is enabled. |
+| `src/tools.rs` | The advertised element — the three facts REMOTE §5.1 fixes, in one spelling spent by the wire and by the document alike, and the check that a set is addressable. |
+| `src/json.rs` | The strict field reads every decoder here shares: a missing field, a mistyped one and a wrong-shaped one each refuse with the key an operator typed. |
 | — | — |
-| *config* | The operator's tool document; the advertisement is its projection (bl-05fe). |
 | *loop* | advertise, the mailbox wait, the hand-off (bl-a2ea). |
 | *executor* | The two deadlines, the one transcode, the capture (bl-4cda). |
 | `src/spawn.rs` | **The spawn boundary.** Every child process is built AND forked here — nowhere else builds a `Command`, and nowhere else spends one. **Founded by bl-a4a5** and `cfg(test)` until bl-4cda: its only tenant so far is the suite's stand-in for the operator's certificate mint, because thrall itself mints nothing (§3.3). The boundary existing before the executor is the whole point of the row. |

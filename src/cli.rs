@@ -66,10 +66,11 @@ usage: thrall [--version | --help]
   -V, --version   print the name and version
   -h, --help      print this
 
-No verb dials yet. The channel is built — mTLS, the version preface, the
-framing, and the foot-grade check on this box's own leaf — and the loop that
-spends it is the next ball. See docs/DESIGN.md for the role and the module map,
-and yog's docs/REMOTE.md for the protocol thrall implements against.",
+No verb runs yet. What is built is the channel — mTLS, the version preface, the
+framing, and the foot-grade check on this box's own leaf — and the operator's
+tool document, from which the advertisement is derived. The loop that spends
+them is the next ball. See docs/DESIGN.md for the role and the module map, and
+yog's docs/REMOTE.md for the protocol thrall implements against.",
         version()
     )
 }
@@ -81,7 +82,7 @@ pub fn run(args: Vec<String>) -> Verdict {
     match words.as_slice() {
         ["--version" | "-V"] => Verdict::ok(version()),
         ["--help" | "-h"] => Verdict::ok(usage()),
-        [] => Verdict::refused("nothing to do — no verb dials the channel yet".to_string()),
+        [] => Verdict::refused("nothing to do — no verb spends the channel yet".to_string()),
         other => Verdict::refused(format!("unrecognised argument: {}", other.join(" "))),
     }
 }
@@ -156,7 +157,7 @@ mod tests {
         let v = run(argv(&[]));
         assert_eq!(v.code, REFUSED);
         assert!(
-            v.text.contains("no verb dials the channel yet"),
+            v.text.contains("no verb spends the channel yet"),
             "{}",
             v.text
         );
