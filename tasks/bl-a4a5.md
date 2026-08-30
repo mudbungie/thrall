@@ -1,7 +1,8 @@
 +++
 title = "the mTLS channel and the foot-grade certificate"
 created = 1787977353
-updated = 1787977353
+updated = 1788060440
+claimant = "OrderWright"
 priority = 2
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
 
