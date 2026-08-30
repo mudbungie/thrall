@@ -1,7 +1,8 @@
 +++
 title = "the executor and the capture: run it, transcode once, answer"
 created = 1787977360
-updated = 1787977360
+updated = 1788060885
+claimant = "OrderWright"
 priority = 2
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
 
