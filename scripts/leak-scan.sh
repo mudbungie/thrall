@@ -49,11 +49,13 @@
 # THE LATE HALF DOES NOT EXIST HERE YET, and saying so is the point. Upstream
 # the standing-state question — what the store carries in TOTAL, including
 # whatever predates the gate — is asked daily by a workflow over the published
-# ref, where a hit's remedy (a history rewrite) belongs anyway. thrall has no
-# remote and no CI: the store is founded stealth, nothing is pushed, and there
-# is nothing published to scan. That workflow lands with the remote (bl-006e)
-# and not before. Until then thrall has PREVENTION only, which is local and
-# bypassable by whoever runs it; there is no enforcement behind it.
+# ref, where a hit's remedy (a history rewrite) belongs anyway. thrall now HAS
+# the published refs that check needs — bl-006e set the remote, and the trunk
+# and the task store both ride to it — and still has no CI to run it on and no
+# workflow to run: that is bl-e95a. Until it lands thrall has PREVENTION only,
+# which is local and bypassable by whoever runs it; there is no enforcement
+# behind it. Note what the gap now covers: a crate published to a registry is a
+# third public surface, and a published version cannot be rewritten at all.
 #
 # THE TREE MODE READS INDEX BLOBS, NOT THE WORKTREE. That is the whole of
 # bl-167d's headline: this scan used to enumerate `git ls-files` and then hand

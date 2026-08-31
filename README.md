@@ -64,18 +64,21 @@ which file is missing.
 Certificates arrive out of channel, by the operator's hand, and thrall mints
 nothing — there is no bootstrap flow and there must never be one.
 
-`Cargo.toml` carries `publish = false`. The registry name is held by a
-placeholder release and is not to be touched: whether, when, and as what thrall
-first ships is an operator decision that has not been made, and `cargo publish`
-is irreversible — a yanked version stays downloadable. The flag is the
-enforcement rather than a note, because a note is not a gate.
+thrall is published to crates.io. It was not, for as long as the decision of
+whether, when and as what it first ships was open: `Cargo.toml` carried
+`publish = false` and the flag was the enforcement rather than a note, because
+a note is not a gate. That decision has been made and 0.0.1 shipped, so what is
+left is the part the flag never covered — `cargo publish` is irreversible and a
+yanked version stays downloadable, so **a publication is a deliberate operator
+act every time**. The repository's release workflow still has no automatic
+trigger and a first job that refuses; nothing publishes on a push.
 
-What the flip would need is already built, and none of it publishes anything.
-`Cargo.toml` declares an anchored `include` **allowlist** — never an `exclude`,
-because a missing `include` entry costs a build, which is loud and reversible,
-while a missing `exclude` entry costs a publication that cannot be recalled —
-and `src/packaged_tests.rs` reads the real `cargo package --list` and fails on
-any path outside the ruled-in classes, in both directions. Without that list
+What guards a version's CONTENT was built before the first flip and stands
+unchanged. `Cargo.toml` declares an anchored `include` **allowlist** — never an
+`exclude`, because a missing `include` entry costs a build, which is loud and
+reversible, while a missing `exclude` entry costs a publication that cannot be
+recalled — and `src/packaged_tests.rs` reads the real `cargo package --list`
+and fails on any path outside the ruled-in classes, in both directions. Without that list
 the tree packages whole: the agent guide, the design document, every rule and
 hook, and a corpus of deliberately fabricated secrets, shipped beside the
 binary. The guard judges file CLASSES and never content; auditing the list
@@ -133,10 +136,11 @@ repo's release workflow at tag time, and what publishes is the version tag and
 the manifest digest, both immutable, never a moving `latest` (yog
 `docs/DESIGN.md` §10.1, operator ruling 2026-08-30). The push still does not
 live in this Makefile: it is not undoable, and a convenience target for an
-irreversible act is how the act happens by accident. thrall publishes nothing
-yet either (bl-006e): the release workflow carries the shape and not the
-trigger, and it has no image job, so nothing can push today whatever the ruling
-says.
+irreversible act is how the act happens by accident. **No image has ever been
+pushed**, and none can be today: the release workflow carries the shape and not
+the trigger, and it has no image job whatever the ruling says. The crate is a
+different channel and a decided one — bl-006e adjudicated it and 0.0.1 is on
+crates.io — so the two publications are no longer one question.
 
 ### The image-side disclosure gate
 

@@ -217,16 +217,21 @@ the remote that check needs and not yet the check itself (bl-e95a).
 ## Never
 
 - Never credit AI or tooling in commit messages, code, or docs.
-- Never `cargo publish`. `publish = false` is the enforcement; the registry
-  name is held by a placeholder and is not to be touched (bl-006e). What the
-  flip would need is already built and none of it publishes anything
-  (bl-d25a): `Cargo.toml` declares an anchored `include` **allowlist** — never
-  an `exclude`, because a missing `include` entry costs a build and a missing
-  `exclude` entry costs a publication that cannot be recalled — `src/packaged_tests.rs`
-  judges the real `cargo package --list` against it in both directions, and
-  `.github/workflows/release-plz.yml` carries the release shape with no
-  automatic trigger and a job that refuses. Arming it is an operator's edit and
-  its checklist is that file's header.
+- Never `cargo publish` **on your own initiative**. This is no longer a flag's
+  job: bl-006e was adjudicated and 0.0.1 was published by hand, so
+  `Cargo.toml` carries `publish = true` and the registry name is this crate
+  rather than a placeholder to protect. What that flip bought is a smaller
+  irreversibility, not none — a further version is one command away and a
+  yanked version stays downloadable — so **a publication is an operator's act,
+  every time, and the publication checklist in bl-006e is run in full before
+  it.** Two guards stand under that and neither is optional: `Cargo.toml`
+  declares an anchored `include` **allowlist** — never an `exclude`, because a
+  missing `include` entry costs a build and a missing `exclude` entry costs a
+  publication that cannot be recalled — and `src/packaged_tests.rs` judges the
+  real `cargo package --list` against it in both directions on every gate run.
+  `.github/workflows/release-plz.yml` still publishes nothing: it has no
+  automatic trigger and a first job that refuses, standing where its build gate
+  goes. Arming it is bl-bbb3 and its checklist is that file's header.
 - Never add a dependency that is not on the approved set. **`Cargo.toml`'s
   `[dependencies]` comment is that set** (bl-e5ba, approved 2026-08-29): rustls
   with `ring` and no default features, `serde_json`, `thiserror` — each landing

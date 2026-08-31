@@ -1,13 +1,16 @@
 name: Release-plz
 
-# THE RELEASE SHAPE, ON DISK AND DISARMED (bl-d25a, prep for bl-006e).
+# THE RELEASE SHAPE, ON DISK AND STILL DISARMED (bl-d25a; bl-006e adjudicated).
 #
-# thrall publishes NOTHING today: `Cargo.toml` carries `publish = false`, no
-# crates.io trusted publisher exists for this crate, and this workflow has no
-# automatic trigger — `workflow_dispatch` only, and the first job below refuses
-# outright. Whether, when and as what thrall first ships is an operator
-# decision that has not been made (bl-006e), and a convenience path to an
-# irreversible act is how the act happens by accident.
+# THIS WORKFLOW publishes nothing: it has no automatic trigger —
+# `workflow_dispatch` only — and the first job below refuses outright. That is
+# now the whole of the disarm, and it is deliberate that it stands alone. The
+# other three things that used to hold the door shut are gone: bl-006e was
+# adjudicated, `Cargo.toml` carries `publish = true`, and 0.0.1 was published
+# BY HAND with a registry token (bl-d2be) from a `main` that had passed the
+# publication checklist in full. A convenience path to an irreversible act is
+# how the act happens by accident, so the path stays closed until somebody
+# opens it on purpose — arming is bl-bbb3.
 #
 # It is written now, and not at the flip, for the same reason the confinement
 # rules landed before the code they govern (DESIGN §5.2): the shape of a
@@ -32,22 +35,26 @@ name: Release-plz
 # load-bearing: the workflow FILENAME is matched literally against the OIDC
 # claim, so renaming this file breaks publishing until the registry entry is
 # updated; and trusted publishing cannot CREATE a crate that does not exist, so
-# a first version has to be published by hand — which is precisely the
-# irreversible act bl-006e holds.
+# a first version has to be published by hand. That was bl-006e's irreversible
+# act and it has been performed, which is what makes the publisher registrable
+# at all — step 4 below was not skipped, it was BLOCKED until 0.0.1 existed.
 #
-# ARMING IT is an operator's edit, in this order, and each step is severable:
+# ARMING IT is an operator's edit, in this order, and each step is severable.
+# Steps 1 and 3 are done; the rest are bl-bbb3:
 #
-#   1. adjudicate bl-006e — the decision, not the mechanics;
+#   1. DONE (bl-006e) — adjudicate: the decision, not the mechanics;
 #   2. give this repository a CI workflow and replace the refusal job below
 #      with `uses: ./.github/workflows/ci.yml`, so `needs:` is a real build
 #      gate. It must be a CALLED workflow inside this run, never a
 #      `workflow_run` trigger: crates.io refuses OIDC tokens minted under one,
 #      so a `workflow_run` gate publishes nothing, quietly, forever;
-#   3. `publish = false` -> `true` in Cargo.toml, and read
-#      `src/packaged.rs`'s answer to what the tarball would carry;
+#   3. DONE (bl-d2be) — `publish = false` -> `true` in Cargo.toml, and read
+#      `src/packaged_tests.rs`'s answer to what the tarball would carry;
 #   4. register the trusted publisher on the registry side, and enable
 #      "Allow GitHub Actions to create and approve pull requests" in the
-#      repository settings — without it the release-PR job 403s;
+#      repository settings — without it the release-PR job 403s. Registering it
+#      is also what retires the token path 0.0.1 used: no long-lived registry
+#      credential is stored in this repository and none should be;
 #   5. add the automatic trigger:  push: branches: [main]
 #
 # TWO SLOTS ARE DELIBERATELY EMPTY, and each is somebody else's ball. There is
@@ -76,9 +83,11 @@ jobs:
     # neither can be done without the other.
     steps:
       - run: |
-          echo "thrall does not publish (bl-006e): publish = false, no trusted" >&2
-          echo "publisher, and no CI workflow to gate a release on. See the" >&2
-          echo "arming checklist in this file's header." >&2
+          echo "this pipeline does not publish: there is no trusted publisher" >&2
+          echo "for this crate and no CI workflow to gate a release on. thrall" >&2
+          echo "itself DOES publish — 0.0.1 shipped by hand (bl-d2be) — so a" >&2
+          echo "release is a deliberate act, not this workflow's. Arming it is" >&2
+          echo "bl-bbb3; the checklist is in this file's header." >&2
           exit 1
 
   release-plz-pr:

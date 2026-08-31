@@ -9,8 +9,10 @@ operator's document and the advertisement derived from it (bl-05fe), the three
 gestures and the loop that spends them (bl-a2ea), the executor and the capture
 (bl-4cda).
 
-What remains is deliberately absent: §2's list of what thrall may never become,
-§5.1's MCP bridge, and the publication question (bl-006e). This document states what thrall is, what it
+What remains is deliberately absent: §2's list of what thrall may never become
+and §5.1's MCP bridge. The publication question is no longer among them —
+bl-006e adjudicated both of its halves, the repository publishes and 0.0.1 is
+on the registry. This document states what thrall is, what it
 may never become, and which invariants it inherits rather than owns. It is a
 living document: amend it when reality diverges, and never code around a stale
 section.
@@ -356,10 +358,16 @@ work that has not started.
   *after* publication — a scan of the published ref, which is the only one an
   author cannot switch off. It needed a remote, and **that reason has expired**:
   bl-006e's remote half landed, so both the trunk and the task store now
-  publish, and the gap is now a gap rather than a wait (bl-e95a). Until it is
-  filled thrall's disclosure posture is prevention only: local, and bypassable
-  by whoever runs it. That is worth stating plainly rather than implying a gate
-  that reaches further than it does.
+  publish, and the gap is now a gap rather than a wait (bl-e95a). bl-006e's
+  publish half widened it: a crate on a registry is a **third** published
+  surface, and the only one where a hit has no remedy at all — a git ref can be
+  rewritten, a published version cannot, and yanking it leaves it downloadable.
+  What stands between a leak and that surface is the `include` allowlist and
+  `src/packaged_tests.rs`, which judge file CLASSES; the CONTENT of a shipped
+  `src` file is read by the tree scan before it is committed and by nothing
+  after. Until the late half is filled thrall's disclosure posture is prevention
+  only: local, and bypassable by whoever runs it. That is worth stating plainly
+  rather than implying a gate that reaches further than it does.
 Nothing else. The confinement rules that stood here — `unsafe`, the lock
 chokepoint, the spawn boundary — landed in bl-1827, ahead of the surfaces they
 govern, and §4 says where each one points and why that order is the right one.

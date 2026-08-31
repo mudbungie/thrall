@@ -341,10 +341,13 @@ mac-artifact:
 	@chmod +x "$(MAC_DIST)/$(IMAGE_NAME)"
 	@scripts/mac-verify.sh "$(MAC_DIST)/$(IMAGE_NAME)"
 
-# There is deliberately NO `publish` target. `Cargo.toml` carries
-# `publish = false`, the registry name is held by a placeholder, and whether
-# thrall ever ships is an operator decision (bl-006e). A convenience target for
-# an irreversible act is how the act happens by accident.
+# There is deliberately NO `publish` target, and the flip that made publishing
+# possible is the reason to keep it that way rather than a reason to add one.
+# thrall ships (bl-006e adjudicated, 0.0.1 published by hand in bl-d2be), so
+# `cargo publish --locked` now works from a clean `main` — and it is an
+# operator's act each time, run after the publication checklist, never a make
+# target somebody reaches for. A convenience path to an irreversible act is how
+# the act happens by accident.
 
 clean:
 	cargo clean
