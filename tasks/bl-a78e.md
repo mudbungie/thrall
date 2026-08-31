@@ -1,7 +1,8 @@
 +++
 title = "the deadline cascade signals the child, not its process group: a tool that starts something outlives its own deadline"
 created = 1788061013
-updated = 1788061013
+updated = 1788138439
+claimant = "OrderFerrier"
 priority = 3
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
 +++
