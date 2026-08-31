@@ -5,18 +5,33 @@ edition = "2024"
 description = "thrall: the foot — a tool-execution client for a yog server"
 license = "MIT"
 readme = "README.md"
-# NOT PUBLISHED, and the flag is the enforcement rather than a note (bl-006e).
-# The registry name is held by a placeholder at 0.0.0 and must not be touched;
-# whether, when and as what thrall first ships is an operator decision that has
-# not been made. `cargo publish` is irreversible — a yanked version stays
-# downloadable — so the default is the one that cannot cost anything.
+# The source of the published crate, and it is named here because a VERSION's
+# metadata is frozen at publication: 0.0.1 is the only chance the first
+# published thrall gets to carry a link back. `cargo package` warns when a
+# manifest names no documentation, homepage or repository, and that warning was
+# standing. The repository is public (bl-006e's remote half), so naming it
+# discloses nothing that is not already served from it.
+repository = "https://github.com/mudbungie/thrall"
+
+# PUBLISHED, as of bl-006e's second half (bl-d2be). The flag was `false` from
+# the founding and the flag WAS the enforcement — the decision of whether, when
+# and as what thrall first ships was an operator's and had not been made. It has
+# now been made and 0.0.1 was published by hand with a registry token, from a
+# `main` that had passed the publication checklist in full.
 #
-# Flipping this to `true` is not a one-line change. The two things it also
-# needed — the `include` allowlist below and a guard over the real packaged
-# file list — landed ahead of the decision (bl-d25a), so what is left at the
-# flip is the decision itself, a crates.io trusted publisher, and arming
-# `.github/workflows/release-plz.yml`. See bl-006e.
-publish = false
+# What the flip does NOT do, and the distinction is the whole of why `true` is
+# safe here. It does not make a publication automatic: this repository's release
+# workflow has no automatic trigger and a first job that refuses outright, and
+# arming it is a separate, severable operator act. It does not make a
+# publication cheap either — `cargo publish` stays irreversible, and a yanked
+# version stays downloadable — but the irreversibility left is now per VERSION
+# rather than per CRATE, and the two things that guard a version's CONTENT are
+# below and beside: the `include` allowlist, and `src/packaged_tests.rs`, which
+# reads the real `cargo package --list` on every gate run and fails on anything
+# no class rules in.
+#
+# The registry name is no longer a placeholder to protect; it is this crate.
+publish = true
 
 # WHAT `cargo publish` MAY UPLOAD, as an ALLOWLIST (bl-d25a, prep for bl-006e).
 #
@@ -24,8 +39,8 @@ publish = false
 # symmetric: a missing `include` entry costs a BUILD, which is loud and
 # reversible, while a missing `exclude` entry costs a PUBLICATION that cannot
 # be recalled — a yanked version stays downloadable. So the list fails closed,
-# and `src/packaged.rs` pays that cost's one bill (a compile input that is not
-# a `.rs` file under `src` must be ruled in here before it can ship).
+# and `src/packaged_tests.rs` pays that cost's one bill (a compile input that
+# is not a `.rs` file under `src` must be ruled in here before it can ship).
 #
 # Declaring nothing packages the WHOLE TREE, which is the defect this closes:
 # without these four lines `cargo package` ships the agent guide, the design
