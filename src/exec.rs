@@ -144,9 +144,16 @@ pub fn execute(set: &[Local], invocation: &Invocation, deadline: Duration) -> Ca
 /// operator's own document says this entry may (`"subject_cwd": true`) —
 /// a box must opt in to executing at a path a caller names, because the
 /// directory is one of the three things thrall enforces (DESIGN §3.5) and
-/// it stays the operator's unless the operator says otherwise. Both
-/// refusals name the remedy in the operator's terms, and both are the
+/// it stays the operator's unless the operator says otherwise. Every
+/// refusal names the remedy in the operator's terms, and all are the
 /// same in-band three facts every other refusal here is.
+///
+/// **A relative directory is refused before it is looked for** (bl-3c93). It
+/// would resolve against whatever directory this process was started in, which
+/// is the hazard the operator's own `cwd` is refused for at the read
+/// (`config::one`) and the one `paths::root` refuses for the data root — and a
+/// relative path that happened to exist there would run the tool somewhere
+/// nobody named, silently, which is worse than a refusal.
 fn subject_cwd(
     local: &Local,
     invocation: &Invocation,
@@ -167,6 +174,16 @@ fn subject_cwd(
         ));
     }
     let path = std::path::PathBuf::from(cwd);
+    if !path.is_absolute() {
+        return Err(refused(
+            NO_SUCH_TOOL,
+            &format!(
+                "the invocation's working directory {cwd:?} is not an absolute \
+                 path; a relative one would run the tool wherever this process \
+                 was started, which is a directory nobody named"
+            ),
+        ));
+    }
     if !path.is_dir() {
         return Err(refused(
             NO_SUCH_TOOL,

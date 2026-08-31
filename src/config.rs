@@ -89,18 +89,35 @@ pub fn read(file: &Path) -> Result<Vec<Local>, String> {
 
 /// One element: the advertised three read by the **same** decoder the wire
 /// spends, then the local two.
+///
+/// **`cwd` must be absolute, and that is decided here** (bl-3c93). Whether a
+/// path is absolute is a property of the document — static, knowable at the
+/// read, and never changing afterwards — so it belongs with the empty argv and
+/// the unusable name rather than at the first invocation. It is the refusal
+/// `paths::root` already makes about the data root, in this operator's other
+/// document: a relative path resolves against whatever directory the
+/// supervisor happened to start this process in, which nobody wrote down and
+/// which changes when the unit file does. Whether the directory *exists* is a
+/// fact about the box rather than about the file, can change between the read
+/// and the run, and is answered by the spawn (`exec::child`).
 fn one(row: &Value) -> Result<Local, String> {
     let o = row.as_object().ok_or("tool: not a JSON object")?;
     let command = strings_of(o, "command").map_err(|e| format!("tool: {e}"))?;
     if command.is_empty() {
         return Err("tool: field \"command\" is an empty argv".to_owned());
     }
+    let cwd = opt_str_of(o, "cwd").map_err(|e| format!("tool: {e}"))?;
+    if let Some(cwd) = cwd.as_deref().filter(|cwd| !Path::new(cwd).is_absolute()) {
+        return Err(format!(
+            "tool: field \"cwd\" is {cwd:?}, which is not an absolute path — where \
+             a tool runs must not depend on the directory this process was started \
+             in, which is a place nobody chose and nobody can find again"
+        ));
+    }
     Ok(Local {
         tool: tools::of_one(row)?,
         command,
-        cwd: opt_str_of(o, "cwd")
-            .map_err(|e| format!("tool: {e}"))?
-            .map(PathBuf::from),
+        cwd: cwd.map(PathBuf::from),
     })
 }
 

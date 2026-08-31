@@ -168,6 +168,20 @@ also be **addressable**: a name that is not a single path component, or one name
 on two entries, refuses the whole file at the read rather than at the first
 invocation.
 
+**A `cwd` must be absolute, and that is part of being addressable** (bl-3c93).
+A relative one resolves against whatever directory the supervisor happened to
+start this process in — a place nobody wrote down, which changes when the unit
+file does, and which nothing in the running system reports. It is the refusal
+`paths::root` already makes about the data root (*"a relative fallback would
+put an operator's certificates wherever the supervisor happened to start the
+process, which is a place nobody chose and nobody can find again"*), held for
+the operator's other document. **Shape is refused at the read; existence is
+not.** Whether a path is absolute is a property of the file, static and knowable
+when it is read, so it joins the empty argv and the duplicate name there.
+Whether the directory exists is a property of the box, it can change between
+the read and the run, and it is answered by the spawn — in band, naming the
+directory (§3.5).
+
 `command` is an **argv, spawned directly**. No shell, and no interpolation of
 the invocation's input into it: a shell would make the declared `input_schema`
 advisory and turn an operator's config file into a command-injection surface
@@ -212,7 +226,17 @@ things locally, and it is not a sandbox:
   `subject_cwd` (§3.4, bl-36f7). An invocation carrying a directory against an
   unconsenting entry is refused in band naming the key; a consented directory
   this box does not hold is refused in band too, because the far end named
-  this box as holding it and it does not.
+  this box as holding it and it does not. **Either one must be absolute**, and
+  a relative one is refused rather than resolved (bl-3c93) — the entry's at the
+  read (§3.4), the invocation's in band, because a relative path that happened
+  to exist beside this process would run the tool somewhere nobody named.
+  **And a directory that is not one is reported as itself**: a fork fails for
+  the program, for the argv or for the directory and the operating system
+  spells all three `ENOENT`, so the sentence built from the program alone named
+  the wrong party two times in three — an operator read *"`<the command>`: No
+  such file or directory"* about a command that was exactly right. The
+  directory is looked at after the failure, where the look is free and cannot
+  refuse a fork that would have worked.
 - **The deadline, over a process group**: the child is spawned as the leader of
   a group of its own, that group is asked to stop with `SIGTERM`, the grace is
   waited out on the child, and then the group is killed.

@@ -9,10 +9,11 @@ use crate::tools::Tool;
 use serde_json::{Value, json};
 use std::time::Duration;
 
-/// The worktree lane's three verdicts (REMOTE §5.4, bl-36f7) — its own file
-/// at the 300-line cap, on the real seam: these tests are about where a tool
-/// runs and who consented, not about the contract or the cascade.
-mod subject;
+/// **Where a tool runs** — its own file on a real seam: the operator's own
+/// directory (bl-3c93) and the worktree lane's, which the invocation names and
+/// the entry consents to (REMOTE §5.4, bl-36f7). Not the contract, not the
+/// cascade, and not what bounds a capture.
+mod placement;
 
 /// What bounds a capture (bl-6c14, bl-6028) — its own file for the same
 /// reason: these are tests about how much and how long, not about the tool
@@ -72,28 +73,6 @@ fn stderr_and_a_failing_exit_code_are_carried_as_they_are() {
             stderr: "err".to_owned(),
             exit_code: 3,
         }
-    );
-}
-
-/// The operator's `cwd` is where the tool runs, and it is the only thing about
-/// the child's placement that thrall decides.
-#[test]
-fn a_tool_runs_where_the_operator_said_it_would() {
-    let scratch = Scratch::new();
-    let mut local = tool("Where", "pwd");
-    local.cwd = Some(scratch.path().to_path_buf());
-    let got = execute(&[local], &call("Where", json!({})), DEADLINE);
-    assert_eq!(got.exit_code, 0, "{got:?}");
-    assert!(
-        got.stdout.trim().ends_with(
-            scratch
-                .path()
-                .file_name()
-                .expect("a name")
-                .to_string_lossy()
-                .as_ref()
-        ),
-        "{got:?}"
     );
 }
 

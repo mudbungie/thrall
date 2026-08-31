@@ -200,3 +200,25 @@ fn a_document_that_offers_nothing_is_an_empty_set() {
     assert_eq!(written(&scratch, "[]"), Ok(Vec::new()));
     assert_eq!(advertisement(&[]), Vec::new());
 }
+
+/// **A relative `cwd` is refused at the read** (bl-3c93), naming the key and
+/// what was written. Where a tool runs must not depend on the directory a
+/// supervisor happened to start this process in — a place nobody chose and
+/// nobody can find again — which is the same refusal `paths::root` makes about
+/// the data root, held here for the operator's other document.
+#[test]
+fn a_relative_working_directory_refuses_the_document_at_the_read() {
+    let scratch = Scratch::new();
+    let said = written(
+        &scratch,
+        &json!([{"name": "Bash", "description": "a shell",
+                 "input_schema": {"type": "object"},
+                 "command": ["/bin/sh"], "cwd": "relative/dir"}])
+        .to_string(),
+    )
+    .expect_err("a relative cwd is not addressable");
+    assert!(said.contains("\"cwd\""), "{said}");
+    assert!(said.contains("relative/dir"), "{said}");
+    assert!(said.contains("absolute"), "{said}");
+    assert!(said.contains(TOOLS), "the file is named: {said}");
+}

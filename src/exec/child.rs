@@ -34,10 +34,11 @@ const POLL: Duration = Duration::from_millis(20);
 
 /// The spawn and the drain. The `Err` is a fork that never happened — an argv
 /// with no program in it, a missing binary, an unusable working directory —
-/// which is the one outcome that is not the child's own verdict. `subject`
-/// is the invocation's own working directory when the entry consents
-/// (`exec::subject_cwd`); it outranks the entry's `cwd`, which stands for every
-/// cwd-less invocation exactly as before.
+/// which is the one outcome that is not the child's own verdict, and which of
+/// the three it was is [`unstarted`]'s to say. `subject` is the invocation's
+/// own working directory when the entry consents (`exec::subject_cwd`); it
+/// outranks the entry's `cwd`, which stands for every cwd-less invocation
+/// exactly as before.
 pub(super) fn run(
     local: &Local,
     subject: Option<&std::path::Path>,
@@ -53,10 +54,11 @@ pub(super) fn run(
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    if let Some(cwd) = subject.or(local.cwd.as_deref()) {
+    let cwd = subject.or(local.cwd.as_deref());
+    if let Some(cwd) = cwd {
         cmd.current_dir(cwd);
     }
-    let mut child = crate::spawn::spawn(&mut cmd).map_err(|e| format!("{head}: {e}"))?;
+    let mut child = crate::spawn::spawn(&mut cmd).map_err(|e| unstarted(head, cwd, &e))?;
 
     let mut pipes = Pipes::new(&mut child, input.to_string().into_bytes());
     let (exit_code, note) = waited(&mut child, &mut pipes, deadline);
@@ -67,6 +69,33 @@ pub(super) fn run(
     drained.err.extend_from_slice(drained.note.as_bytes());
     drained.err.extend_from_slice(note.as_bytes());
     Ok(captured(&drained.out, &drained.err, exit_code))
+}
+
+/// **The fork that never happened, said about the thing that was actually
+/// wrong** (bl-3c93).
+///
+/// A spawn fails because the program is not there, because the argv named
+/// nothing, or because the working directory is unusable — and the operating
+/// system spells all three `ENOENT`, so a sentence built from the program alone
+/// names the wrong party two times in three. An operator reading *"`<the
+/// command>`: No such file or directory"* about a command that is exactly right
+/// goes looking at a file that is exactly right.
+///
+/// **The directory is looked at only after the failure.** A check before the
+/// fork would stat on every invocation to answer a question that is almost
+/// always "yes", and could refuse a spawn that would have worked; after it, the
+/// look is free and the answer is the one the operator needs. It is the
+/// *existence* half only — the shape half (a relative path) is the document's
+/// and `config::one` refuses it at the read.
+fn unstarted(head: &str, cwd: Option<&std::path::Path>, e: &std::io::Error) -> String {
+    match cwd.filter(|dir| !dir.is_dir()) {
+        Some(dir) => format!(
+            "the working directory {:?} is not a directory on this box, so \
+             {head} was never reached ({e})",
+            dir.display().to_string()
+        ),
+        None => format!("{head}: {e}"),
+    }
 }
 
 /// Wait for the child, draining it as it goes, or stop it. The second half of
