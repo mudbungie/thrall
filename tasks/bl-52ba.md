@@ -1,7 +1,8 @@
 +++
 title = """two refusals are a library's diagnostics rather than the operator's: the lost-channel sentence carries a docs URL and no address, and a non-certificate leaf earns "no items found""""
 created = 1788150531
-updated = 1788150531
+updated = 1788151867
+claimant = "OrderPlumber"
 priority = 2
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
 +++
