@@ -1,13 +1,14 @@
 [package]
 name = "thrall"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2024"
 description = "thrall: the foot — a tool-execution client for a yog server"
 license = "MIT"
 readme = "README.md"
 # The source of the published crate, and it is named here because a VERSION's
-# metadata is frozen at publication: 0.0.1 is the only chance the first
-# published thrall gets to carry a link back. `cargo package` warns when a
+# metadata is frozen at publication — every version carries its own copy, and
+# 0.0.1 was the first chance the published thrall got to carry a link back at
+# all. `cargo package` warns when a
 # manifest names no documentation, homepage or repository, and that warning was
 # standing. The repository is public (bl-006e's remote half), so naming it
 # discloses nothing that is not already served from it.
