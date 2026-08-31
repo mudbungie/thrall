@@ -90,9 +90,24 @@ pub fn foot(chain: &Path) -> Result<String, String> {
 /// The first certificate in a PEM chain, as DER. The leaf comes first by
 /// convention and by every mint's own order; what follows it is the chain to
 /// the anchor, and none of it is this box's identity.
+///
+/// **The refusal says what the bytes should have been** (bl-52ba). This is what
+/// a mis-copied file looks like, and it is the one refusal in this file that
+/// used to say only what the PEM reader said — *"no items found"* — next to a
+/// sibling one line away that names the grade, the section that fixes it and
+/// the act that mints one. A file that locates a problem and stops there leaves
+/// the operator exactly where they started.
 fn first(chain: &Path) -> Result<Vec<u8>, String> {
-    let held =
-        CertificateDer::from_pem_file(chain).map_err(|e| format!("{}: {e}", chain.display()))?;
+    let held = CertificateDer::from_pem_file(chain).map_err(|e| {
+        format!(
+            "{}: no certificate could be read here — a thrall's {} holds the leaf \
+             its operator issued for this channel, PEM-encoded, with the chain to \
+             the anchor after it (REMOTE §8.2). {} ({e})",
+            chain.display(),
+            super::material::CHAIN,
+            super::material::REMEDY
+        )
+    })?;
     Ok(held.to_vec())
 }
 

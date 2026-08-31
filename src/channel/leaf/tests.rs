@@ -87,14 +87,25 @@ fn a_leaf_that_names_no_client_is_refused_even_when_it_says_foot() {
 
 /// A chain that is not there, or holds no certificate, refuses naming the path
 /// — never a channel opened on bytes nobody read.
+///
+/// **And it says what the bytes should have been** (bl-52ba). This is what a
+/// mis-copied file looks like, and the operator has nothing else to go on: the
+/// sibling refusal one line away names the grade and the act that mints one,
+/// and until this ball the one for bytes that are not a certificate at all
+/// said only what the library said — "no items found".
 #[test]
-fn a_chain_that_holds_no_certificate_refuses() {
+fn a_chain_that_holds_no_certificate_refuses_and_says_what_was_wanted() {
     let scratch = Scratch::new();
     let missing = scratch.join("nowhere.pem");
     assert!(foot(&missing).expect_err("refused").contains("nowhere.pem"));
-    let empty = scratch.join("empty.pem");
-    std::fs::write(&empty, b"").expect("write");
-    assert!(foot(&empty).expect_err("refused").contains("empty.pem"));
+    for (leaf, bytes) in [("empty.pem", b"".as_slice()), ("junk.pem", b"not a pem")] {
+        let file = scratch.join(leaf);
+        std::fs::write(&file, bytes).expect("write");
+        let said = foot(&file).expect_err("refused");
+        assert!(said.contains(leaf), "{said}");
+        assert!(said.contains("no certificate"), "{said}");
+        assert!(said.contains(crate::channel::material::REMEDY), "{said}");
+    }
 }
 
 /// The subject is read most-specific-last: two common names in one subject, and

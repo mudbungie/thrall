@@ -165,6 +165,31 @@ fn a_leaf_the_engine_will_not_accept_never_reaches_the_boundary() {
     assert!(scratch.path().is_dir());
 }
 
+/// **An engine that goes away mid-conversation is thrall's own sentence, not
+/// its TLS library's** (bl-52ba). It is the failure a running foot will
+/// actually hit, and the one place a supervisor's log is the only thing an
+/// operator gets — so it names the address that went away and what this box
+/// will and will not do about it, exactly as the connect refusals beside it do.
+/// The library's account follows; it does not stand in for the sentence.
+#[test]
+fn an_engine_that_vanishes_names_the_address_and_says_what_happens_next() {
+    let scratch = Scratch::new();
+    mint::material(scratch.path());
+    let engine = Engine::vanishes(scratch.path());
+    let held = read_dir(scratch.path())
+        .expect("readable")
+        .expect("provisioned");
+    let channel = Channel::open(&held).expect("opened");
+    let said = channel
+        .ask(&json!({"op": "advertise", "tools": []}))
+        .expect_err("the engine went away");
+    assert!(said.starts_with("receive "), "the leg comes first: {said}");
+    assert!(said.contains(&held.address), "no address: {said}");
+    assert!(said.contains("does not reconnect"), "{said}");
+    assert!(said.contains("supervision"), "no remedy: {said}");
+    assert_eq!(engine.heard().len(), 2, "the foot did speak first");
+}
+
 /// The engine's name comes off the address and from nowhere else: an IP
 /// literal is an IP identity — bracketed or not — and anything else is a DNS
 /// name.

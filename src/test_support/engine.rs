@@ -53,16 +53,36 @@ impl Engine {
     /// the two ends disagree without a second code path.
     pub(crate) fn start(dir: &Path, protocol: u32, script: Vec<Vec<Value>>) -> Self {
         let config = server_config(dir);
-        let listener = TcpListener::bind("127.0.0.1:0").expect("a loopback port");
-        let address = listener.local_addr().expect("bound").to_string();
-        std::fs::write(dir.join(material::ADDRESS), address).expect("the address file");
-        let seen = Arc::new(Mutex::new(Vec::new()));
+        let (listener, seen) = bound(dir);
         let recorded = Arc::clone(&seen);
         std::thread::spawn(move || {
             for answer in script {
                 let (tcp, _) = listener.accept().expect("a dial");
-                serve(&config, tcp, protocol, &answer, &recorded);
+                serve(&config, tcp, protocol, Some(&answer), &recorded);
             }
+        });
+        Self { seen }
+    }
+
+    /// An engine that states its version, takes what the foot says — and then
+    /// **goes away mid-conversation**, with no answer and no TLS `close_notify`.
+    ///
+    /// It is the failure a running foot will actually hit, and the one the
+    /// scripted form cannot produce: every answer there ends in a terminator,
+    /// which is an engine finishing rather than an engine disappearing.
+    pub(crate) fn vanishes(dir: &Path) -> Self {
+        let config = server_config(dir);
+        let (listener, seen) = bound(dir);
+        let recorded = Arc::clone(&seen);
+        std::thread::spawn(move || {
+            let (tcp, _) = listener.accept().expect("a dial");
+            serve(
+                &config,
+                tcp,
+                crate::channel::hello::PROTOCOL,
+                None,
+                &recorded,
+            );
         });
         Self { seen }
     }
@@ -76,8 +96,20 @@ impl Engine {
     }
 }
 
+/// Bind loopback and write the bound address into `dir`, where
+/// [`material`](crate::channel::material) reads it — so a test opens a channel
+/// exactly the way an operator-provisioned box does.
+fn bound(dir: &Path) -> (TcpListener, Arc<Mutex<Vec<Value>>>) {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("a loopback port");
+    let address = listener.local_addr().expect("bound").to_string();
+    std::fs::write(dir.join(material::ADDRESS), address).expect("the address file");
+    (listener, Arc::new(Mutex::new(Vec::new())))
+}
+
 /// One connection: state a version, record the two frames the foot writes —
-/// its own preface and its request — then answer and terminate.
+/// its own preface and its request — then answer and terminate. `None` is the
+/// engine that goes away instead: nothing written, and the stream dropped where
+/// it stands.
 ///
 /// Every write ignores its error. A test that makes thrall refuse mid-exchange
 /// — a version mismatch, an untrusted anchor — leaves this end writing into a
@@ -87,7 +119,7 @@ fn serve(
     config: &Arc<ServerConfig>,
     tcp: TcpStream,
     protocol: u32,
-    answer: &[Value],
+    answer: Option<&[Value]>,
     seen: &Arc<Mutex<Vec<Value>>>,
 ) {
     let conn = ServerConnection::new(Arc::clone(config)).expect("a server connection");
@@ -100,6 +132,9 @@ fn serve(
                 .push(said);
         }
     }
+    let Some(answer) = answer else {
+        return;
+    };
     for value in answer {
         let _ = frame::write_value(&mut tls, value);
     }

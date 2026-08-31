@@ -79,6 +79,21 @@ to add and would dissolve the reason thrall exists.
   the failure. Restart policy belongs to the supervision the operator's machine
   already has, and inventing one here would be thrall deciding how a box it
   does not administer runs a program.
+
+  **Which makes the sentence the product, and it is written for the operator**
+  (bl-52ba). A supervisor's log is the whole of what an operator gets on this
+  path, so every refusal here names the address that failed and says what this
+  box will and will not do next — the same shape the connect refusals already
+  had, held for the one an engine going away actually produces. A library's own
+  diagnosis answers neither question: it names no address, and "peer closed
+  connection without sending TLS close_notify", with a crate documentation URL
+  after it, is a fact about TLS rather than about what to do. **It follows
+  thrall's sentence and never replaces it** — right text for the reader who
+  wants it, wrong text for the reader who has to act. The same rule governs the
+  refusals about this box's own material: `channel::leaf` refusing bytes that
+  are not a certificate says what the file should have held and cites
+  `material::REMEDY`, rather than passing on the PEM reader's *"no items
+  found"*.
 - **It runs one invocation at a time, per channel.** Serial, which is what
   makes a busy foot *absent* at the far end — and why presence is not the
   routing predicate there. **Per channel** is the whole of the qualification and

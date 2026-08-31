@@ -106,11 +106,34 @@ impl Channel {
         let mut tls = self.dial(request)?;
         let mut stream = Vec::new();
         loop {
-            match frame::read_value(&mut tls).map_err(|e| format!("receive: {e}"))? {
+            match frame::read_value(&mut tls).map_err(|e| self.failed("receive", &e))? {
                 Some(chunk) => stream.push(chunk),
                 None => return Ok(stream),
             }
         }
+    }
+
+    /// **A channel that failed, in this box's own words** (bl-52ba).
+    ///
+    /// The sentence IS the product on this path: a foot never reconnects
+    /// (DESIGN §2), so what a supervisor's log carries is the whole of what an
+    /// operator gets — and what they need from it is which engine went away and
+    /// whether anything is going to happen next. A library's own diagnosis
+    /// answers neither: it names no address, and "peer closed connection
+    /// without sending TLS close_notify" is a fact about TLS rather than about
+    /// what to do. **It follows the sentence rather than replacing it**, because
+    /// it is the right text for the one reader who wants it and the wrong text
+    /// for the one who has to act.
+    ///
+    /// `leg` is the half that failed, so this reads like the connect refusals
+    /// beside it: the act, the address, then what happened.
+    fn failed(&self, leg: &str, e: &std::io::Error) -> String {
+        format!(
+            "{leg} {}: the channel to the engine failed, and thrall does not \
+             reconnect — bringing this foot back is the supervision this machine \
+             already has. What the {leg} reported: {e}",
+            self.address
+        )
     }
 
     /// Connect, handshake and send. The TLS handshake happens inside the first
@@ -129,8 +152,8 @@ impl Channel {
         let conn = ClientConnection::new(Arc::clone(&self.config), self.name.clone())
             .map_err(|e| format!("tls {}: {e}", self.address))?;
         let mut tls = StreamOwned::new(conn, tcp);
-        hello::state(&mut tls).map_err(|e| format!("send: {e}"))?;
-        frame::write_value(&mut tls, request).map_err(|e| format!("send: {e}"))?;
+        hello::state(&mut tls).map_err(|e| self.failed("send", &e))?;
+        frame::write_value(&mut tls, request).map_err(|e| self.failed("send", &e))?;
         hello::confirm(&mut tls)?;
         Ok(tls)
     }
