@@ -1,7 +1,8 @@
 +++
 title = "the first publish: the flag flips and 0.0.1 ships to the registry by hand"
 created = 1788146073
-updated = 1788146073
+updated = 1788146074
+claimant = "OrderTollman"
 priority = 1
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
 +++
