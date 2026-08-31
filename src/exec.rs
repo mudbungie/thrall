@@ -32,11 +32,14 @@
 //! operator's config — which names may run at all, with which argv and in which
 //! directory — plus this deadline. It is not a sandbox and does not pretend to
 //! be one. The child runs as this process's user, with this process's
-//! environment less the scrub the spawn boundary performs, and **what the child
-//! itself starts is not terminated with it**: the cascade signals the child,
-//! not its process group, so a tool that daemonizes something outlives its own
-//! deadline. Whoever administers the box is the party that can contain a foot,
-//! and the design must not imply otherwise.
+//! environment less the scrub the spawn boundary performs. **The deadline
+//! reaches what the child started** (bl-a78e): the child leads a process group
+//! of its own and the cascade signals that group, so a tool that backgrounds a
+//! helper and then hangs does not leave the helper behind. What it does not
+//! reach is a descendant that left the group under its own hand — `setsid` and
+//! `setpgid` are the child's to call, and a process outside the group is
+//! outside the signal. Whoever administers the box is still the party that can
+//! contain a foot, and the design must not imply otherwise.
 
 use std::io::{Read, Write};
 use std::process::{Child, Stdio};
@@ -158,22 +161,46 @@ fn waited(child: &mut Child, deadline: Duration) -> (i32, String) {
     }
 }
 
-/// **The cascade**: ask, wait, insist. A tool that traps `SIGTERM` to flush a
-/// file gets the grace; one that ignores it does not get to outlive its
-/// deadline. The sentence says both what happened and how long it was given, so
-/// an operator reading a transcript can tell a slow tool from a stuck one.
+/// **The cascade**: ask, wait, insist — and its subject is the child's process
+/// GROUP, so a tool that started something does not leave that something behind
+/// (bl-a78e). A tool that traps `SIGTERM` to flush a file gets the grace; one
+/// that ignores it does not get to outlive its deadline. The sentence says both
+/// what happened and how long it was given, so an operator reading a transcript
+/// can tell a slow tool from a stuck one.
+///
+/// **The grace is the child's, and only the child's.** The wait polls the tool
+/// this box was asked to run; a helper of its that ignores the ask cannot extend
+/// a deadline the invocation has already overrun. The insist is the group's
+/// either way — a leader with good manners is not a reason to leave its
+/// stragglers running, which is the whole gap this closes.
+///
+/// The final wait is unbounded, and what bounds it is the invariant that the
+/// child is a member of the group just killed. That is the spawn boundary's to
+/// hold, not this function's to re-check: a `Child::kill` here would be a second
+/// mechanism for a case the boundary excludes, and one whose effect no test
+/// could ever reach.
 fn stopped(child: &mut Child, deadline: Duration) -> String {
-    crate::sys::terminate(child.id());
+    // The child leads its own group (`spawn::command`), so its id is the
+    // group's — read here, before the wait below can reap it away.
+    let group = child.id();
+    crate::sys::terminate_group(group);
     let asked = Instant::now();
+    let mut answered = false;
     while asked.elapsed() < GRACE {
         if let Ok(Some(_)) = child.try_wait() {
-            return format!("\nthrall: no answer within {deadline:?}; terminated\n");
+            answered = true;
+            break;
         }
         std::thread::sleep(POLL);
     }
-    let _ = child.kill();
+    crate::sys::kill_group(group);
     let _ = child.wait();
-    format!("\nthrall: no answer within {deadline:?}, and none to the signal; killed\n")
+    if answered {
+        return format!("\nthrall: no answer within {deadline:?}; the group was terminated\n");
+    }
+    format!(
+        "\nthrall: no answer within {deadline:?}, and none to the signal; the group was killed\n"
+    )
 }
 
 /// Drain one pipe on its own thread.

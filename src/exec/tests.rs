@@ -168,6 +168,37 @@ fn a_tool_that_ignores_the_signal_is_killed_after_the_grace() {
     assert!(got.stderr.contains("killed"), "{got:?}");
 }
 
+/// **The deadline reaches what the tool started** (bl-a78e). The child leads a
+/// process group of its own, the cascade signals the group, so a helper the tool
+/// backgrounded stops with it instead of running on past the capture.
+///
+/// Both directions in one test, because an absence proves nothing on its own: the
+/// helper says it STARTED before it waits, so a run in which it never ran at all
+/// fails here rather than passing as a containment it did not perform.
+#[test]
+fn a_helper_the_tool_started_stops_with_the_tool() {
+    let scratch = Scratch::new();
+    let started = scratch.path().join("started");
+    let outlived = scratch.path().join("outlived");
+    let set = [tool(
+        "Forker",
+        &format!(
+            "( : > {}; sleep 1; : > {} ) & sleep 30",
+            started.display(),
+            outlived.display()
+        ),
+    )];
+    let got = execute(&set, &call("Forker", json!({})), brief());
+    assert_eq!(got.exit_code, TIMED_OUT, "{got:?}");
+    assert!(started.exists(), "the helper never ran: {got:?}");
+    // Past the helper's own wait, so a survivor has had its chance to write.
+    std::thread::sleep(Duration::from_millis(1_500));
+    assert!(
+        !outlived.exists(),
+        "the helper outlived the deadline that stopped its parent"
+    );
+}
+
 /// A child a signal ended, and that this foot did not signal, says *a signal
 /// ended it* — and does not pretend to say which, because the number is not
 /// readable without a platform extension this crate does not take.

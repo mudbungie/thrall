@@ -194,17 +194,39 @@ things locally, and it is not a sandbox:
   invoked, and what runs is that entry's argv, spawned directly — no shell, and
   no interpolation of the invocation's input into it.
 - **The directory**, when the operator named a `cwd`.
-- **The deadline**: the child is asked to stop with `SIGTERM`, given a grace,
-  and then killed.
+- **The deadline, over a process group**: the child is spawned as the leader of
+  a group of its own, that group is asked to stop with `SIGTERM`, the grace is
+  waited out on the child, and then the group is killed.
 
 Everything else is the box's. The child runs as this process's user, with this
 process's environment less the git scrub the spawn boundary performs — no
-namespace, no rlimit, no filesystem restriction. And **the cascade signals the
-child, not its process group**, so a tool that starts something and returns
-leaves that something running past its own deadline. Closing that needs the
-child to be a process-group leader and the signal to be sent to the group, which
-is a change to how thrall spawns rather than a knob (bl-a78e). Until then the
-sentence above is the claim, and it is the whole claim.
+namespace, no rlimit, no filesystem restriction.
+
+**The cascade signals the group, and that is now what it means** (bl-a78e). The
+group is decided at the spawn boundary rather than at the deadline — a child is
+BORN leading one (`CommandExt::process_group`, safe `std`), so `Child::id` is
+the group id and nothing has to be carried to the cascade for it to aim. Three
+things about it are the design and not the implementation:
+
+- **The grace is the child's alone.** The wait polls the tool this box was
+  asked to run; a helper that ignores `SIGTERM` cannot extend a deadline the
+  invocation has already overrun.
+- **The insist is the group's either way.** The `SIGKILL` goes to the group
+  whether or not the child answered the ask, because a leader with good manners
+  is not a reason to leave its stragglers running — which was the whole gap.
+- **`kill(2)` keeps its guard.** A group signal is a negative argument, and the
+  confined file (§4, `src/sys.rs`) still refuses a non-positive one from a
+  caller; the negation is its own act, inside two functions whose names say
+  `group`. A signal cannot be widened by passing a different number, only by
+  calling a differently-named function.
+
+**Two things the group does not reach, stated because they are the claim's
+edge.** A descendant that leaves the group under its own hand — `setsid`, or its
+own `setpgid` — is outside the signal, and nothing a foot can do short of a
+namespace changes that. And a tool that finishes *within* its deadline is not
+signalled at all: the cascade is the deadline's, so whatever such a tool
+deliberately left running is left running, exactly as a shell would leave it.
+The deadline means the invocation is over; it does not mean the box is swept.
 
 **A container image does not change that sentence** (bl-3586, under yog
 bl-223f). thrall ships an OCI image because an image is a convenient unit of
@@ -269,8 +291,8 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/exec.rs` | **The executor** (bl-4cda): the tool contract, the deadline and its cascade, the one transcode. Every outcome is a capture — a tool that ran, one that overran, a name this box does not carry, a command that would not start. |
 | `src/serve.rs` | What `thrall run` does: read the document, read the channels, serve until they stop. There is no success exit, so none is spelled. |
 | `src/paths.rs` | The one data root, named by `$XDG_DATA_HOME` or `$HOME` and by nothing of thrall's own. Neither set is a refusal, never a relative guess. |
-| `src/spawn.rs` | **The spawn boundary.** Every child process is built AND forked here — nowhere else builds a `Command`, and nowhere else spends one. **Founded by bl-a4a5**, before it had a production tenant, which is the point of the row: a boundary rule that arrives after the first spawn site is a rule that has to be argued with. |
-| `src/sys.rs` | **The confined `unsafe` file**, and it holds exactly one thing: `SIGTERM`, which `std` has no spelling for (`Child::kill` is `SIGKILL`). Declared rather than depended on — `kill(2)` is in the libc `std` already links. |
+| `src/spawn.rs` | **The spawn boundary.** Every child process is built AND forked here — nowhere else builds a `Command`, and nowhere else spends one. It decides three things a spawn site could forget: the git-environment scrub, the **process group** the child is born leading (bl-a78e, §3.5), and the fork lock the suite needs. **Founded by bl-a4a5**, before it had a production tenant, which is the point of the row: a boundary rule that arrives after the first spawn site is a rule that has to be argued with. |
+| `src/sys.rs` | **The confined `unsafe` file**, and it holds exactly one thing: signalling a process GROUP, which `std` has no spelling for at all (`Child::kill` is `SIGKILL` to one process, and there is no `Child::terminate`). Declared rather than depended on — `kill(2)` is in the libc `std` already links. The sign guard did not move when the group arrived (§3.5): the negation is this file's, the callers pass a positive id. |
 | `src/state.rs` | **The lock chokepoint.** Every `Mutex`/`RwLock` in the crate. Unbuilt, and it stayed that way: the only cross-thread hand-offs thrall has are a `JoinHandle`'s own answer (the pipes a child writes, the sentence a channel ends with), which need no lock. The suite's fork lock is **not** a tenant — a test's serialization lock is scaffolding, and the rule's own text sends it to `src/test_support.rs`. |
 | `src/test_support.rs` | `cfg(test)` only. The scratch directory, the fork lock, the stand-in engine, and the certificate mint the suite performs on the operator's behalf. |
 
