@@ -24,7 +24,11 @@ fn offering(root: &Path) {
 fn channel(root: &Path, leaf: &str, script: Vec<Value>) -> Engine {
     let dir = entries::dir(root).join(leaf);
     mint::material(&dir);
-    Engine::start(&dir, 1, script.into_iter().map(|v| vec![v]).collect())
+    Engine::start(
+        &dir,
+        crate::channel::hello::PROTOCOL,
+        script.into_iter().map(|v| vec![v]).collect(),
+    )
 }
 
 fn advertised() -> Value {

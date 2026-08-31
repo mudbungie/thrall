@@ -13,6 +13,7 @@ fn bash() -> Tool {
         input_schema: json!({"type": "object",
                              "properties": {"command": {"type": "string"}},
                              "required": ["command"]}),
+        subject_cwd: false,
     }
 }
 
@@ -35,6 +36,7 @@ fn a_set_encodes_as_its_array() {
         name: "Read".to_owned(),
         description: "read a file".to_owned(),
         input_schema: json!({"type": "object"}),
+        subject_cwd: false,
     };
     let said = encode(&[bash(), other.clone()]);
     let rows = said.as_array().expect("an array");
@@ -110,4 +112,27 @@ fn one_name_twice_in_one_set_declines_naming_it() {
 fn an_addressable_set_passes_and_so_does_an_empty_one() {
     assert_eq!(validate(&[bash()]), Ok(()));
     assert_eq!(validate(&[]), Ok(()));
+}
+
+/// **The optional fourth fact** (bl-36f7): consent rides only when true,
+/// absence reads false, and a mistyped value refuses rather than silently
+/// dropping an operator's statement.
+#[test]
+fn subject_cwd_rides_only_when_true_and_a_mistyped_one_refuses() {
+    let mut consenting = bash();
+    consenting.subject_cwd = true;
+    let spelled = one(&consenting);
+    assert_eq!(spelled.get("subject_cwd"), Some(&json!(true)));
+    assert_eq!(of_one(&spelled), Ok(consenting.clone()));
+
+    let plain = one(&bash());
+    assert!(plain.get("subject_cwd").is_none(), "absence is the default");
+    assert_eq!(of_one(&plain), Ok(bash()));
+
+    let mut mistyped = spelled;
+    mistyped["subject_cwd"] = json!("yes");
+    assert_eq!(
+        of_one(&mistyped),
+        Err("tool: field \"subject_cwd\" is not a boolean".to_owned())
+    );
 }

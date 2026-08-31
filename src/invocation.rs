@@ -35,6 +35,10 @@ pub struct Invocation {
     pub tool: String,
     /// The `tool_use.input` JSON, verbatim.
     pub input: Value,
+    /// The subject's location, when the invocation carries one (REMOTE §5's
+    /// worktree lane, bl-36f7): the working directory to execute at,
+    /// honoured only for an entry the operator marked `subject_cwd`.
+    pub cwd: Option<String>,
 }
 
 impl Eq for Invocation {}
@@ -51,8 +55,12 @@ pub struct Capture {
 /// One queued invocation as JSON — the follow-class read's row, in the one
 /// spelling.
 pub fn invocation_value(invocation: &Invocation) -> Value {
-    json!({ "invocation": invocation.id, "tool": invocation.tool,
-            "input": invocation.input })
+    let mut o = json!({ "invocation": invocation.id, "tool": invocation.tool,
+            "input": invocation.input });
+    if let (Some(cwd), Some(map)) = (&invocation.cwd, o.as_object_mut()) {
+        map.insert("cwd".to_owned(), Value::String(cwd.clone()));
+    }
+    o
 }
 
 /// [`invocation_value`]'s inverse, strict.
@@ -65,6 +73,11 @@ pub fn invocation_of(v: &Value) -> Result<Invocation, String> {
             .get("input")
             .cloned()
             .ok_or("invocation: missing field \"input\"")?,
+        cwd: match o.get("cwd") {
+            None | Some(Value::Null) => None,
+            Some(Value::String(s)) => Some(s.clone()),
+            Some(_) => return Err("invocation: field \"cwd\" is not a string".to_owned()),
+        },
     })
 }
 

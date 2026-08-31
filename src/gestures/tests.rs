@@ -10,6 +10,7 @@ fn bash() -> Tool {
         name: "Bash".to_owned(),
         description: "run a command in a shell".to_owned(),
         input_schema: json!({"type": "object"}),
+        subject_cwd: false,
     }
 }
 
@@ -96,6 +97,7 @@ fn the_read_answers_rows_and_an_empty_answer_is_ordinary() {
             id: "i-1".to_owned(),
             tool: "Bash".to_owned(),
             input: json!({"a": 1}),
+            cwd: None,
         }])))
     );
     assert_eq!(

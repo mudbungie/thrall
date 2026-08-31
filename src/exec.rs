@@ -100,16 +100,69 @@ pub fn execute(set: &[Local], invocation: &Invocation, deadline: Duration) -> Ca
             ),
         );
     };
-    match run(local, &invocation.input, deadline) {
+    let cwd = match subject_cwd(local, invocation) {
+        Ok(cwd) => cwd,
+        Err(capture) => return capture,
+    };
+    match run(local, cwd.as_deref(), &invocation.input, deadline) {
         Ok(capture) => capture,
         Err(reason) => refused(NO_SUCH_TOOL, &reason),
     }
 }
 
+/// **The worktree lane's gate on this box** (REMOTE §5.4, bl-36f7): an
+/// invocation carrying a working directory runs there only when the
+/// operator's own document says this entry may (`"subject_cwd": true`) —
+/// a box must opt in to executing at a path a caller names, because the
+/// directory is one of the three things thrall enforces (DESIGN §3.5) and
+/// it stays the operator's unless the operator says otherwise. Both
+/// refusals name the remedy in the operator's terms, and both are the
+/// same in-band three facts every other refusal here is.
+fn subject_cwd(
+    local: &Local,
+    invocation: &Invocation,
+) -> Result<Option<std::path::PathBuf>, Capture> {
+    let Some(cwd) = invocation.cwd.as_deref() else {
+        return Ok(None);
+    };
+    if !local.tool.subject_cwd {
+        return Err(refused(
+            NO_SUCH_TOOL,
+            &format!(
+                "the invocation names a working directory, and this box's config \
+                 does not consent: add \"subject_cwd\": true to the {:?} entry in \
+                 tools.json on this machine, or call a loaded instance of the tool \
+                 instead",
+                invocation.tool
+            ),
+        ));
+    }
+    let path = std::path::PathBuf::from(cwd);
+    if !path.is_dir() {
+        return Err(refused(
+            NO_SUCH_TOOL,
+            &format!(
+                "the invocation's working directory {cwd:?} is not a directory on \
+                 this box; the consenting machine must actually hold the \
+                 conversation's worktree"
+            ),
+        ));
+    }
+    Ok(Some(path))
+}
+
 /// The spawn and the drain. The `Err` is a fork that never happened — an argv
 /// with no program in it, a missing binary, an unusable working directory —
-/// which is the one outcome that is not the child's own verdict.
-fn run(local: &Local, input: &Value, deadline: Duration) -> Result<Capture, String> {
+/// which is the one outcome that is not the child's own verdict. `subject`
+/// is the invocation's own working directory when the entry consents
+/// ([`subject_cwd`]); it outranks the entry's `cwd`, which stands for every
+/// cwd-less invocation exactly as before.
+fn run(
+    local: &Local,
+    subject: Option<&std::path::Path>,
+    input: &Value,
+    deadline: Duration,
+) -> Result<Capture, String> {
     let (head, args) = local
         .command
         .split_first()
@@ -119,7 +172,7 @@ fn run(local: &Local, input: &Value, deadline: Duration) -> Result<Capture, Stri
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    if let Some(cwd) = local.cwd.as_deref() {
+    if let Some(cwd) = subject.or(local.cwd.as_deref()) {
         cmd.current_dir(cwd);
     }
     let mut child = crate::spawn::spawn(&mut cmd).map_err(|e| format!("{head}: {e}"))?;

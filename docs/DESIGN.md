@@ -173,6 +173,18 @@ the invocation's input into it: a shell would make the declared `input_schema`
 advisory and turn an operator's config file into a command-injection surface
 for anything the model can type.
 
+**`subject_cwd` is the worktree lane's per-tool consent** (REMOTE §5.4 as
+amended by yog bl-77be; thrall bl-36f7). An entry carrying
+`"subject_cwd": true` states that this box will execute that tool at a working
+directory the *invocation* names — the conversation's own resolved cwd, which
+REMOTE §5 calls the subject's location. It is part of the ADVERTISED element
+(the engine routes the lane on it), so the projection carries it; absent reads
+false, and a mistyped value refuses the file at the read, like every other
+field here. The consent is meaningful only on a box that actually holds the
+engine's worktrees — REMOTE §5.4's co-located thrall, the normal install — and
+severable in the way this whole document is: deleting the key deletes the
+capability.
+
 ### 3.5 Containment honesty
 
 REMOTE §5, and this one is a design constraint on the *prose* as much as the
@@ -195,7 +207,12 @@ things locally, and it is not a sandbox:
 - **The name**, from the operator's document: a tool absent from it cannot be
   invoked, and what runs is that entry's argv, spawned directly — no shell, and
   no interpolation of the invocation's input into it.
-- **The directory**, when the operator named a `cwd`.
+- **The directory**: the operator's `cwd` when the entry names one — or the
+  invocation's own, when and only when the operator marked the entry
+  `subject_cwd` (§3.4, bl-36f7). An invocation carrying a directory against an
+  unconsenting entry is refused in band naming the key; a consented directory
+  this box does not hold is refused in band too, because the far end named
+  this box as holding it and it does not.
 - **The deadline, over a process group**: the child is spawned as the leader of
   a group of its own, that group is asked to stop with `SIGTERM`, the grace is
   waited out on the child, and then the group is killed.
@@ -264,6 +281,11 @@ Separately installed ends make version skew possible for the first time. The
 handshake carries a protocol version, and a mismatch **refuses fail-closed,
 naming both versions**. A foot and an engine that disagree about the wire must
 not discover it one field at a time.
+
+The version moves in lockstep with the engine's, and the engine's corpus
+ledger is what forces a move: PROTOCOL 2 (bl-36f7) is the worktree lane's
+bump — the advertised element gained `subject_cwd` and the invocation gained
+`cwd`, both optional, both a change to a shape already in use.
 
 ---
 

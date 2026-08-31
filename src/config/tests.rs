@@ -73,11 +73,13 @@ fn the_advertisement_is_the_document_with_the_local_half_dropped() {
                 input_schema: json!({"type": "object",
                                      "properties": {"command": {"type": "string"}},
                                      "required": ["command"]}),
+                subject_cwd: false,
             },
             Tool {
                 name: "Read".to_owned(),
                 description: "read a file".to_owned(),
                 input_schema: json!({"type": "object"}),
+                subject_cwd: false,
             },
         ]
     );

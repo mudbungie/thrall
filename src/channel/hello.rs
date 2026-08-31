@@ -36,7 +36,7 @@ use super::frame;
 /// decode) — the boundary correcting itself, not two protocols meeting. The
 /// integer moves when the *existing* shape changes meaning: the framing, the
 /// envelope, or what a spelling already in use is taken to say.
-pub const PROTOCOL: u32 = 1;
+pub const PROTOCOL: u32 = 2;
 
 /// The preface's one key, and the whole of its shape.
 const KEY: &str = "protocol";

@@ -9,6 +9,11 @@ use crate::tools::Tool;
 use serde_json::{Value, json};
 use std::time::Duration;
 
+/// The worktree lane's three verdicts (REMOTE §5.4, bl-36f7) — its own file
+/// at the 300-line cap, on the real seam: these tests are about where a tool
+/// runs and who consented, not about the contract or the cascade.
+mod subject;
+
 /// One tool this box offers, running `script` under `/bin/sh`.
 fn tool(name: &str, script: &str) -> Local {
     Local {
@@ -16,6 +21,7 @@ fn tool(name: &str, script: &str) -> Local {
             name: name.to_owned(),
             description: "a tool".to_owned(),
             input_schema: json!({"type": "object"}),
+            subject_cwd: false,
         },
         command: vec!["/bin/sh".to_owned(), "-c".to_owned(), script.to_owned()],
         cwd: None,
@@ -28,6 +34,7 @@ fn call(name: &str, input: Value) -> Invocation {
         id: "i-1".to_owned(),
         tool: name.to_owned(),
         input,
+        cwd: None,
     }
 }
 

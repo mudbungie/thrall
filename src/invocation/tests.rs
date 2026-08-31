@@ -8,6 +8,7 @@ fn call() -> Invocation {
         id: "i-1".to_owned(),
         tool: "Bash".to_owned(),
         input: json!({"command": "echo hi"}),
+        cwd: None,
     }
 }
 
@@ -106,5 +107,27 @@ fn the_default_capture_is_silence_and_success() {
     assert_eq!(
         capture_value(&Capture::default()),
         json!({"stdout": "", "stderr": "", "exit_code": 0})
+    );
+}
+
+/// **The subject's location** (bl-36f7): a carried cwd round-trips, absence
+/// stays absent on the wire, and a mistyped one refuses with the key.
+#[test]
+fn a_carried_cwd_round_trips_and_a_mistyped_one_refuses() {
+    let mut placed = call();
+    placed.cwd = Some("/w/home/agents/c-1".to_owned());
+    let spelled = invocation_value(&placed);
+    assert_eq!(spelled.get("cwd"), Some(&json!("/w/home/agents/c-1")));
+    assert_eq!(invocation_of(&spelled), Ok(placed));
+
+    let bare = invocation_value(&call());
+    assert!(bare.get("cwd").is_none(), "absence stays absent");
+    assert_eq!(invocation_of(&bare), Ok(call()));
+
+    let mut mistyped = bare;
+    mistyped["cwd"] = json!(7);
+    assert_eq!(
+        invocation_of(&mistyped),
+        Err("invocation: field \"cwd\" is not a string".to_owned())
     );
 }

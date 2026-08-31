@@ -145,7 +145,11 @@ fn an_answer_no_foot_gesture_can_earn_ends_the_channel() {
 fn an_engine_that_ends_the_stream_without_answering_ends_the_channel() {
     let scratch = Scratch::new();
     mint::material(scratch.path());
-    let _engine = Engine::start(scratch.path(), 1, vec![vec![]]);
+    let _engine = Engine::start(
+        scratch.path(),
+        crate::channel::hello::PROTOCOL,
+        vec![vec![]],
+    );
     let held = read_dir(scratch.path())
         .expect("readable")
         .expect("provisioned");

@@ -23,6 +23,7 @@ fn set() -> Vec<Local> {
             name: "Bash".to_owned(),
             description: "run a command in a shell".to_owned(),
             input_schema: json!({"type": "object"}),
+            subject_cwd: false,
         },
         command: vec!["/usr/local/libexec/thrall-tools/bash-tool".to_owned()],
         cwd: None,
@@ -70,7 +71,11 @@ fn refusal(said: &str) -> Value {
 /// with the n-th entry of `script` — one frame each.
 fn engine_at(dir: &Path, script: Vec<Value>) -> Engine {
     mint::material(dir);
-    Engine::start(dir, 1, script.into_iter().map(|v| vec![v]).collect())
+    Engine::start(
+        dir,
+        crate::channel::hello::PROTOCOL,
+        script.into_iter().map(|v| vec![v]).collect(),
+    )
 }
 
 /// A box with one channel, and the engine standing at it.
