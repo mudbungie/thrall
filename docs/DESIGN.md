@@ -247,6 +247,37 @@ signalled at all: the cascade is the deadline's, so whatever such a tool
 deliberately left running is left running, exactly as a shell would leave it.
 The deadline means the invocation is over; it does not mean the box is swept.
 
+**The deadline bounds the CAPTURE, and those were two different things**
+(bl-6c14). A pipe outlives the process that was given it: a read ends when
+*every* writer has closed, and a tool that backgrounds a helper hands that
+helper the same stdout and stderr write ends. So a foot that bounded the child
+and then drained the pipes bounded nothing — the drain waited on a stranger it
+never started, the invocation earned no capture, and the serial loop behind it
+waited too, which is the hang §1's whole leg exists to exclude. Nothing
+recovered it: a foot never reconnects, so the wedge was the channel's for the
+process's remaining life.
+
+The half that had to give is the *waiting*, not the reading:
+
+- **The drain asks what is there, rather than waiting for the end.** Every
+  descriptor is non-blocking (`src/exec/pipes.rs`, and `fcntl(2)` beside
+  `kill(2)` in §4's confined file), so a read answers with what the pipe holds
+  now. Once the tool has exited, everything it wrote is already in the pipe —
+  `write(2)` completed before `exit(2)` did — so one such pass is exactly what
+  the capture is owed. **Bytes the tool produced are still delivered**, which
+  is the property a merely-bounded drain would have thrown away.
+- **A write end a stranger holds cannot extend the invocation.** The last pass
+  keeps reading only while bytes keep arriving, under a wall of the cascade's
+  own grace, so a helper writing as fast as the foot can read is bounded like
+  everything else here.
+- **One loop, and no threads.** The two drains and the input feed used to be
+  threads *because* each of them could block. None of them can now, so the poll
+  that already watched the child pumps all three, and the whole capture is
+  inside the one clock. It also removes the pipe-buffer hazard as a separate
+  concern rather than as a separate mechanism: the thing that watches the
+  deadline is the thing that reads, so a tool writing more than a pipe holds is
+  drained by the same tick that would have timed it out.
+
 **A container image does not change that sentence** (bl-3586, under yog
 bl-223f). thrall ships an OCI image because an image is a convenient unit of
 install, and for no other reason: nothing in thrall uses the container
@@ -312,11 +343,13 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/gestures.rs` | **The foot set** (bl-a2ea): `advertise`, `invocations`, `complete`, and the answers they can earn. The enumeration is the enforcement thrall can keep — there is no spelling here for a fourth verb. |
 | `src/invocation.rs` | What crosses the routing leg: the invocation a foot is handed and the capture it hands back, each in one strict spelling. |
 | `src/run.rs` | **The loop**: present, wait, hand off, answer — and the fan that serves every channel at once. Execution is a parameter (`Handoff`), which is what lets the whole conversation be tested against a real engine and a one-line executor. |
-| `src/exec.rs` | **The executor** (bl-4cda): the tool contract, the deadline and its cascade, the one transcode. Every outcome is a capture — a tool that ran, one that overran, a name this box does not carry, a command that would not start. |
+| `src/exec.rs` | **The executor's dispatch** (bl-4cda): which entry an invocation names, whose working directory it may run in (§3.4's `subject_cwd`), and the three facts that come back. Every outcome is a capture — a tool that ran, one that overran, a name this box does not carry, a command that would not start. |
+| `src/exec/child.rs` | One child, from the fork to the capture: the spawn, the poll that is also the drain, and the cascade that stops a tool which will not stop itself. Split from `exec.rs` when the drain moved into the poll (bl-6c14) — the seam is *deciding what to run* against *running it*. |
+| `src/exec/pipes.rs` | The child's three pipes, pumped without blocking (bl-6c14, §3.5). A read answers with what the pipe holds now, so a write end a helper still holds cannot outlast the invocation — and the drains and the input feed stop being threads, because none of them can block any more. |
 | `src/serve.rs` | What `thrall run` does: read the document, read the channels, serve until they stop. There is no success exit, so none is spelled. |
 | `src/paths.rs` | The one data root, named by `$XDG_DATA_HOME` or `$HOME` and by nothing of thrall's own. Neither set is a refusal, never a relative guess. |
 | `src/spawn.rs` | **The spawn boundary.** Every child process is built AND forked here — nowhere else builds a `Command`, and nowhere else spends one. It decides three things a spawn site could forget: the git-environment scrub, the **process group** the child is born leading (bl-a78e, §3.5), and the fork lock the suite needs. **Founded by bl-a4a5**, before it had a production tenant, which is the point of the row: a boundary rule that arrives after the first spawn site is a rule that has to be argued with. |
-| `src/sys.rs` | **The confined `unsafe` file**, and it holds exactly one thing: signalling a process GROUP, which `std` has no spelling for at all (`Child::kill` is `SIGKILL` to one process, and there is no `Child::terminate`). Declared rather than depended on — `kill(2)` is in the libc `std` already links. The sign guard did not move when the group arrived (§3.5): the negation is this file's, the callers pass a positive id. |
+| `src/sys.rs` | **The confined `unsafe` file**, and it holds two things, both raw process effects `std` does not wrap. Signalling a process GROUP, which `std` has no spelling for at all (`Child::kill` is `SIGKILL` to one process, and there is no `Child::terminate`); the sign guard did not move when the group arrived (§3.5) — the negation is this file's, the callers pass a positive id. And putting a pipe into non-blocking mode (bl-6c14), which `std` spells for sockets and for nothing else — a `ChildStdout` has no `set_nonblocking`, and borrowing the socket one by wrapping the descriptor in a `UnixStream` would read the pipe with `recv(2)`, which a pipe refuses. Both are declared rather than depended on: `kill(2)` and `fcntl(2)` are in the libc `std` already links, so neither costs a crate, a build script or a lockfile line. |
 | `src/state.rs` | **The lock chokepoint.** Every `Mutex`/`RwLock` in the crate. Unbuilt, and it stayed that way: the only cross-thread hand-offs thrall has are a `JoinHandle`'s own answer (the pipes a child writes, the sentence a channel ends with), which need no lock. The suite's fork lock is **not** a tenant — a test's serialization lock is scaffolding, and the rule's own text sends it to `src/test_support.rs`. |
 | `src/test_support.rs` | `cfg(test)` only. The scratch directory, the fork lock, the stand-in engine, and the certificate mint the suite performs on the operator's behalf. |
 | `src/packaged_tests.rs` | `cfg(test)` only. **The publication guard** (bl-d25a): what `cargo publish` would upload, read off the real `cargo package --list` and judged against the classes `Cargo.toml`'s `include` allowlist rules in — both directions, since a shape guard dies by matching nothing. It is in `src` rather than a `tests/` crate because it forks a child and the spawn boundary is `pub(crate)`; an integration crate could only reach a bare `Command::new`, which the confinement rules refuse. |

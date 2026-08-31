@@ -40,30 +40,32 @@
 //! `setpgid` are the child's to call, and a process outside the group is
 //! outside the signal. Whoever administers the box is still the party that can
 //! contain a foot, and the design must not imply otherwise.
+//!
+//! **The deadline bounds the capture and not merely the child** (bl-6c14).
+//! That distinction is the whole of `child` and `pipes` below: a pipe outlives
+//! the process it was given to, so a helper the tool backgrounded used to hold
+//! this end reading after the tool had exited — an invocation that earned no
+//! answer, which is the one thing this file's second paragraph says cannot
+//! happen.
+//!
+//! **This file is the dispatch.** Which entry, whose directory, and the three
+//! facts that come back; running the child is `child`, and reading it without
+//! blocking is `pipes`.
 
-use std::io::{Read, Write};
-use std::process::{Child, Stdio};
-use std::thread::JoinHandle;
-use std::time::{Duration, Instant};
-
-use serde_json::Value;
+use std::time::Duration;
 
 use crate::config::{self, Local};
 use crate::invocation::{Capture, Invocation};
+
+/// One child, from the fork to the capture.
+mod child;
+/// The child's three pipes, pumped without blocking.
+mod pipes;
 
 /// **This box's own bound on one tool.** It is not a knob: a tool that has not
 /// answered is working, and the asking side's longer patience is what covers
 /// the case where this whole process went away.
 pub const DEADLINE: Duration = Duration::from_mins(2);
-
-/// How long a child gets between being asked to stop and being stopped. Long
-/// enough for a tool to flush a file or drop a lock, short enough that the
-/// engine's own patience is not spent on a corpse.
-const GRACE: Duration = Duration::from_secs(2);
-
-/// How often a running child is looked at. A latency knob on the *answer*, not
-/// on the run: the child streams into its pipes regardless.
-const POLL: Duration = Duration::from_millis(20);
 
 /// The verdict a child that outran its deadline earns — the shell's own
 /// convention for `timeout`, so an operator reading a transcript recognizes it.
@@ -104,7 +106,7 @@ pub fn execute(set: &[Local], invocation: &Invocation, deadline: Duration) -> Ca
         Ok(cwd) => cwd,
         Err(capture) => return capture,
     };
-    match run(local, cwd.as_deref(), &invocation.input, deadline) {
+    match child::run(local, cwd.as_deref(), &invocation.input, deadline) {
         Ok(capture) => capture,
         Err(reason) => refused(NO_SUCH_TOOL, &reason),
     }
@@ -149,127 +151,6 @@ fn subject_cwd(
         ));
     }
     Ok(Some(path))
-}
-
-/// The spawn and the drain. The `Err` is a fork that never happened — an argv
-/// with no program in it, a missing binary, an unusable working directory —
-/// which is the one outcome that is not the child's own verdict. `subject`
-/// is the invocation's own working directory when the entry consents
-/// ([`subject_cwd`]); it outranks the entry's `cwd`, which stands for every
-/// cwd-less invocation exactly as before.
-fn run(
-    local: &Local,
-    subject: Option<&std::path::Path>,
-    input: &Value,
-    deadline: Duration,
-) -> Result<Capture, String> {
-    let (head, args) = local
-        .command
-        .split_first()
-        .ok_or("the command is an empty argv")?;
-    let mut cmd = crate::spawn::command(head);
-    cmd.args(args)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    if let Some(cwd) = subject.or(local.cwd.as_deref()) {
-        cmd.current_dir(cwd);
-    }
-    let mut child = crate::spawn::spawn(&mut cmd).map_err(|e| format!("{head}: {e}"))?;
-
-    // The input goes down its own thread and the pipes are drained on theirs,
-    // so no party can wedge another: a tool that never reads its input, and one
-    // that writes more than a pipe buffer holds, are both ordinary here.
-    let payload = input.to_string();
-    let feeding = child.stdin.take().map(|mut pipe| {
-        std::thread::spawn(move || {
-            let _ = pipe.write_all(payload.as_bytes());
-        })
-    });
-    let out = child.stdout.take().map(reading);
-    let err = child.stderr.take().map(reading);
-
-    let (exit_code, note) = waited(&mut child, deadline);
-    if let Some(feeding) = feeding {
-        let _ = feeding.join();
-    }
-    let mut stderr = out_of(err);
-    stderr.extend_from_slice(note.as_bytes());
-    Ok(captured(&out_of(out), &stderr, exit_code))
-}
-
-/// Wait for the child, or stop it. The second half of the answer is what to say
-/// about the stopping — empty when the child answered on its own, because a
-/// tool that finished has nothing this foot needs to add.
-fn waited(child: &mut Child, deadline: Duration) -> (i32, String) {
-    let started = Instant::now();
-    loop {
-        if let Ok(Some(ended)) = child.try_wait() {
-            return (ended.code().unwrap_or(SIGNALLED), String::new());
-        }
-        if started.elapsed() >= deadline {
-            return (TIMED_OUT, stopped(child, deadline));
-        }
-        std::thread::sleep(POLL);
-    }
-}
-
-/// **The cascade**: ask, wait, insist — and its subject is the child's process
-/// GROUP, so a tool that started something does not leave that something behind
-/// (bl-a78e). A tool that traps `SIGTERM` to flush a file gets the grace; one
-/// that ignores it does not get to outlive its deadline. The sentence says both
-/// what happened and how long it was given, so an operator reading a transcript
-/// can tell a slow tool from a stuck one.
-///
-/// **The grace is the child's, and only the child's.** The wait polls the tool
-/// this box was asked to run; a helper of its that ignores the ask cannot extend
-/// a deadline the invocation has already overrun. The insist is the group's
-/// either way — a leader with good manners is not a reason to leave its
-/// stragglers running, which is the whole gap this closes.
-///
-/// The final wait is unbounded, and what bounds it is the invariant that the
-/// child is a member of the group just killed. That is the spawn boundary's to
-/// hold, not this function's to re-check: a `Child::kill` here would be a second
-/// mechanism for a case the boundary excludes, and one whose effect no test
-/// could ever reach.
-fn stopped(child: &mut Child, deadline: Duration) -> String {
-    // The child leads its own group (`spawn::command`), so its id is the
-    // group's — read here, before the wait below can reap it away.
-    let group = child.id();
-    crate::sys::terminate_group(group);
-    let asked = Instant::now();
-    let mut answered = false;
-    while asked.elapsed() < GRACE {
-        if let Ok(Some(_)) = child.try_wait() {
-            answered = true;
-            break;
-        }
-        std::thread::sleep(POLL);
-    }
-    crate::sys::kill_group(group);
-    let _ = child.wait();
-    if answered {
-        return format!("\nthrall: no answer within {deadline:?}; the group was terminated\n");
-    }
-    format!(
-        "\nthrall: no answer within {deadline:?}, and none to the signal; the group was killed\n"
-    )
-}
-
-/// Drain one pipe on its own thread.
-fn reading<R: Read + Send + 'static>(mut pipe: R) -> JoinHandle<Vec<u8>> {
-    std::thread::spawn(move || {
-        let mut bytes = Vec::new();
-        let _ = pipe.read_to_end(&mut bytes);
-        bytes
-    })
-}
-
-/// What one drained pipe held.
-fn out_of(reader: Option<JoinHandle<Vec<u8>>>) -> Vec<u8> {
-    reader
-        .and_then(|reader| reader.join().ok())
-        .unwrap_or_default()
 }
 
 /// The three facts, transcoded once.

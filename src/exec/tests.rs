@@ -216,8 +216,9 @@ fn a_child_a_signal_ended_says_a_signal_ended_it() {
     assert_eq!(got.exit_code, SIGNALLED);
 }
 
-/// A tool that never reads its input cannot wedge the foot: the input goes down
-/// its own thread, so nothing here waits on a pipe the child has abandoned.
+/// A tool that never reads its input cannot wedge the foot: the write is
+/// non-blocking like every other move the loop makes, so nothing here waits on
+/// a pipe the child has abandoned.
 #[test]
 fn a_tool_that_ignores_its_input_still_answers() {
     let set = [tool("Deaf", "printf done")];
@@ -235,6 +236,29 @@ fn a_tool_that_writes_more_than_a_pipe_holds_still_answers() {
     let got = execute(&set, &call("Loud", json!({})), DEADLINE);
     assert_eq!(got.stdout.len(), 300_000);
     assert_eq!(got.exit_code, 0);
+}
+
+/// **A tool that backgrounds a helper and exits still earns its capture**
+/// (bl-6c14). The helper inherits the child's stdout and stderr write ends, so
+/// a drain that ends only when every writer has closed is a drain waiting on a
+/// stranger — and the serial loop behind it waits with it, forever. The
+/// deadline bounds the whole capture, not the child's own exit.
+///
+/// Both halves in one test, because a bounded drain that dropped the bytes
+/// would satisfy the first half alone: the tool's own output is delivered, and
+/// it is delivered without waiting on the helper.
+#[test]
+fn a_tool_that_leaves_a_helper_holding_the_pipes_still_answers() {
+    let set = [tool("Daemon", "sleep 5 & printf started")];
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = tx.send(execute(&set, &call("Daemon", json!({})), DEADLINE));
+    });
+    let got = rx
+        .recv_timeout(Duration::from_secs(2))
+        .expect("the capture, long before the helper lets the pipes go");
+    assert_eq!(got.stdout, "started", "{got:?}");
+    assert_eq!(got.exit_code, 0, "{got:?}");
 }
 
 /// The hand-off the loop takes is this executor under this box's own bound, so
