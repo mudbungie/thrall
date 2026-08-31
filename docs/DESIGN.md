@@ -295,6 +295,7 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/sys.rs` | **The confined `unsafe` file**, and it holds exactly one thing: signalling a process GROUP, which `std` has no spelling for at all (`Child::kill` is `SIGKILL` to one process, and there is no `Child::terminate`). Declared rather than depended on — `kill(2)` is in the libc `std` already links. The sign guard did not move when the group arrived (§3.5): the negation is this file's, the callers pass a positive id. |
 | `src/state.rs` | **The lock chokepoint.** Every `Mutex`/`RwLock` in the crate. Unbuilt, and it stayed that way: the only cross-thread hand-offs thrall has are a `JoinHandle`'s own answer (the pipes a child writes, the sentence a channel ends with), which need no lock. The suite's fork lock is **not** a tenant — a test's serialization lock is scaffolding, and the rule's own text sends it to `src/test_support.rs`. |
 | `src/test_support.rs` | `cfg(test)` only. The scratch directory, the fork lock, the stand-in engine, and the certificate mint the suite performs on the operator's behalf. |
+| `src/packaged_tests.rs` | `cfg(test)` only. **The publication guard** (bl-d25a): what `cargo publish` would upload, read off the real `cargo package --list` and judged against the classes `Cargo.toml`'s `include` allowlist rules in — both directions, since a shape guard dies by matching nothing. It is in `src` rather than a `tests/` crate because it forks a child and the spawn boundary is `pub(crate)`; an integration crate could only reach a bare `Command::new`, which the confinement rules refuse. |
 
 **There is no flat material root, and its absence is a simplification rather
 than an omission** (bl-a4a5). Upstream a client box also holds material
@@ -353,10 +354,12 @@ work that has not started.
   tree, the commit message and the task store are all read by one rule table
   before anything is written. What does not exist is the check that runs
   *after* publication — a scan of the published ref, which is the only one an
-  author cannot switch off. It needs a remote, and thrall has none (bl-006e).
-  Until then thrall's disclosure posture is prevention only: local, and
-  bypassable by whoever runs it. That is worth stating plainly rather than
-  implying a gate that reaches further than it does.
+  author cannot switch off. It needed a remote, and **that reason has expired**:
+  bl-006e's remote half landed, so both the trunk and the task store now
+  publish, and the gap is now a gap rather than a wait (bl-e95a). Until it is
+  filled thrall's disclosure posture is prevention only: local, and bypassable
+  by whoever runs it. That is worth stating plainly rather than implying a gate
+  that reaches further than it does.
 Nothing else. The confinement rules that stood here — `unsafe`, the lock
 chokepoint, the spawn boundary — landed in bl-1827, ahead of the surfaces they
 govern, and §4 says where each one points and why that order is the right one.

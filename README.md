@@ -70,6 +70,17 @@ first ships is an operator decision that has not been made, and `cargo publish`
 is irreversible — a yanked version stays downloadable. The flag is the
 enforcement rather than a note, because a note is not a gate.
 
+What the flip would need is already built, and none of it publishes anything.
+`Cargo.toml` declares an anchored `include` **allowlist** — never an `exclude`,
+because a missing `include` entry costs a build, which is loud and reversible,
+while a missing `exclude` entry costs a publication that cannot be recalled —
+and `src/packaged_tests.rs` reads the real `cargo package --list` and fails on
+any path outside the ruled-in classes, in both directions. Without that list
+the tree packages whole: the agent guide, the design document, every rule and
+hook, and a corpus of deliberately fabricated secrets, shipped beside the
+binary. The guard judges file CLASSES and never content; auditing the list
+itself stays a human act.
+
 ## Build
 
 `make` is the build authority. `make check` is the whole gate and nothing runs
@@ -122,9 +133,10 @@ repo's release workflow at tag time, and what publishes is the version tag and
 the manifest digest, both immutable, never a moving `latest` (yog
 `docs/DESIGN.md` §10.1, operator ruling 2026-08-30). The push still does not
 live in this Makefile: it is not undoable, and a convenience target for an
-irreversible act is how the act happens by accident. thrall has no remote and
-no release workflow yet either (bl-006e), so nothing here can push today
-whatever the ruling says.
+irreversible act is how the act happens by accident. thrall publishes nothing
+yet either (bl-006e): the release workflow carries the shape and not the
+trigger, and it has no image job, so nothing can push today whatever the ruling
+says.
 
 ### The image-side disclosure gate
 

@@ -82,10 +82,11 @@ one question a publication checklist asks is now asked once per channel, and
 `make image-scan` is the container half's answer to `cargo package --list`.
 
 **What no hook can promise.** This scans one tree. Old commits, other refs,
-and anything published elsewhere are outside it — and thrall has no published
-ref at all yet, so the late half (a scan of what is actually public) does not
-exist and lands with the remote (bl-006e). Today thrall has prevention only:
-local, and bypassable by whoever runs it.
+and anything published elsewhere are outside it — and thrall now HAS published
+refs (bl-006e's remote half landed; the trunk and the task store go to the same
+remote), while the late half (a scan of what is actually public) still does not
+exist: bl-e95a. So thrall has prevention only: local, and bypassable by whoever
+runs it.
 
 ### The confinement rules, and the three files they name
 
@@ -126,10 +127,11 @@ Tasks are `bl` (balls). Run `bl --skill` before using it, and
   `work/<id>` worktree; **every edit goes there**, never on `main`. A stray
   edit on `main` is invisible to the squash and is left behind. Always pass
   `--as ID` — never let the model invent a name.
-- The store is founded **stealth**: `task-remote` is the "no remote, on
-  purpose" sentinel, so no op pushes or discovers anything. Setting a remote is
-  an operator decision (bl-006e), and the publication checklist in that ball
-  applies in full before a first push.
+- The store **publishes**. It was founded stealth — `task-remote` held the "no
+  remote, on purpose" sentinel — and bl-006e's remote half cleared it: the task
+  store rides to the same remote as the source, so a ball body is published
+  text the moment it is written. What that means for what you may write in one
+  is below.
 
 ## What may never enter a ball body
 
@@ -209,14 +211,22 @@ severable: `bl conf remove <op>.post thrall-leak-gate` deletes config, not code.
 preventive placement to move it to — a git hook inside the store clone is
 strictly worse (untracked, per-clone, re-founded by `bl prime`, absent on every
 other box and silently so). Upstream's answer to that residual is a scheduled
-scan of the PUBLISHED ref, which detects rather than prevents; thrall has no
-remote, so it has no such check and will not until bl-006e sets one.
+scan of the PUBLISHED ref, which detects rather than prevents; thrall now has
+the remote that check needs and not yet the check itself (bl-e95a).
 
 ## Never
 
 - Never credit AI or tooling in commit messages, code, or docs.
 - Never `cargo publish`. `publish = false` is the enforcement; the registry
-  name is held by a placeholder and is not to be touched (bl-006e).
+  name is held by a placeholder and is not to be touched (bl-006e). What the
+  flip would need is already built and none of it publishes anything
+  (bl-d25a): `Cargo.toml` declares an anchored `include` **allowlist** — never
+  an `exclude`, because a missing `include` entry costs a build and a missing
+  `exclude` entry costs a publication that cannot be recalled — `src/packaged_tests.rs`
+  judges the real `cargo package --list` against it in both directions, and
+  `.github/workflows/release-plz.yml` carries the release shape with no
+  automatic trigger and a job that refuses. Arming it is an operator's edit and
+  its checklist is that file's header.
 - Never add a dependency that is not on the approved set. **`Cargo.toml`'s
   `[dependencies]` comment is that set** (bl-e5ba, approved 2026-08-29): rustls
   with `ring` and no default features, `serde_json`, `thiserror` — each landing

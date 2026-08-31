@@ -45,3 +45,10 @@ pub(crate) mod sys;
 /// Scaffolding the suite shares. Never compiled into a released binary.
 #[cfg(test)]
 pub(crate) mod test_support;
+
+/// **The publication guard**: what `cargo publish` would upload, judged against
+/// the classes `Cargo.toml`'s `include` allowlist rules in. The name carries
+/// the `tests.rs` suffix the assert carve-out keys on — the file is nothing but
+/// tests, and a module of tests declared from here has no other way to say so.
+#[cfg(test)]
+mod packaged_tests;

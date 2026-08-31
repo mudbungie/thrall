@@ -251,8 +251,11 @@ uninstall:
 # never a moving `latest`; the `:latest` applied below is LOCAL, a convenience
 # on one box nobody else can pull.
 #
-# thrall has no remote and no release workflow yet (bl-006e), so nothing here
-# can push today whatever the ruling says. The gate below still lands first,
+# thrall publishes nothing yet (bl-006e): `.github/workflows/release-plz.yml`
+# carries the release shape but has no automatic trigger and no image job, so
+# nothing here or there can push today whatever the ruling says. The image push
+# belongs in that workflow at tag time, and is the slot its header names. The
+# gate below still lands first,
 # for the reason the confinement rules landed ahead of the surfaces they govern
 # (DESIGN §5.2): a rule installed after the first site is a rule that has to be
 # argued with.

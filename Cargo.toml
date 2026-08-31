@@ -11,12 +11,38 @@ readme = "README.md"
 # not been made. `cargo publish` is irreversible — a yanked version stays
 # downloadable — so the default is the one that cannot cost anything.
 #
-# Flipping this to `true` is not a one-line change: it also needs an `include`
-# ALLOWLIST here (never an `exclude` — a missing `include` entry costs a build,
-# which is loud and reversible, while a missing `exclude` entry costs a
-# publication that cannot be recalled) and a guard test over the real packaged
-# file list. See bl-006e.
+# Flipping this to `true` is not a one-line change. The two things it also
+# needed — the `include` allowlist below and a guard over the real packaged
+# file list — landed ahead of the decision (bl-d25a), so what is left at the
+# flip is the decision itself, a crates.io trusted publisher, and arming
+# `.github/workflows/release-plz.yml`. See bl-006e.
 publish = false
+
+# WHAT `cargo publish` MAY UPLOAD, as an ALLOWLIST (bl-d25a, prep for bl-006e).
+#
+# An allowlist and never an `exclude`, because the two failure modes are not
+# symmetric: a missing `include` entry costs a BUILD, which is loud and
+# reversible, while a missing `exclude` entry costs a PUBLICATION that cannot
+# be recalled — a yanked version stays downloadable. So the list fails closed,
+# and `src/packaged.rs` pays that cost's one bill (a compile input that is not
+# a `.rs` file under `src` must be ruled in here before it can ship).
+#
+# Declaring nothing packages the WHOLE TREE, which is the defect this closes:
+# without these four lines `cargo package` ships the agent guide, the design
+# document, every rule and hook, and `scripts/leak-fixtures/` — a corpus of
+# deliberately fabricated secrets — alongside the binary.
+#
+# EVERY PATTERN IS ANCHORED with a leading `/`. Cargo matches these
+# gitignore-style, so a bare `README.md` means "a README.md at any depth" and
+# would ship `scripts/leak-fixtures/README.md` out of a list that names no
+# `scripts` entry. That is not hypothetical; it is upstream's sighting.
+#
+# `Cargo.toml` and `Cargo.lock` are added by cargo itself and need no entry.
+include = [
+    "/src/**/*.rs",
+    "/README.md",
+    "/LICENSE",
+]
 
 # A dependency lands here with the ball that first LINKS it, never before: a
 # dependency added "for later" is one nobody ever reviewed, because it is

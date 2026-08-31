@@ -1,0 +1,183 @@
+name: Release-plz
+
+# THE RELEASE SHAPE, ON DISK AND DISARMED (bl-d25a, prep for bl-006e).
+#
+# thrall publishes NOTHING today: `Cargo.toml` carries `publish = false`, no
+# crates.io trusted publisher exists for this crate, and this workflow has no
+# automatic trigger — `workflow_dispatch` only, and the first job below refuses
+# outright. Whether, when and as what thrall first ships is an operator
+# decision that has not been made (bl-006e), and a convenience path to an
+# irreversible act is how the act happens by accident.
+#
+# It is written now, and not at the flip, for the same reason the confinement
+# rules landed before the code they govern (DESIGN §5.2): the shape of a
+# release is a design question, and one settled under the pressure of wanting
+# to ship is settled badly.
+#
+# WHAT IT WOULD DO, ARMED. Every push to main keeps ONE "release PR" open that
+# bumps the version in Cargo.toml/Cargo.lock and nothing else; merging that PR
+# is the human control point. The next run then tags `v<version>`, cuts a
+# GitHub Release, and publishes to the registry — but only behind a green
+# build, because a release that ships an untested commit is worse than no
+# release pipeline at all.
+#
+# TRUSTED PUBLISHING, which is the model this shape assumes and the reason
+# there is no secret to leak. Instead of storing a long-lived registry token in
+# this repository, crates.io records that ONE named workflow file in ONE named
+# GitHub repository may publish ONE named crate; at run time GitHub mints a
+# short-lived signed OIDC token asserting exactly that identity (repo,
+# workflow, ref) and release-plz trades it for a ~30-minute registry token
+# scoped to the crate. `id-token: write` on the release job is the whole grant,
+# and it is scoped to that job — no other job can ask. Two consequences are
+# load-bearing: the workflow FILENAME is matched literally against the OIDC
+# claim, so renaming this file breaks publishing until the registry entry is
+# updated; and trusted publishing cannot CREATE a crate that does not exist, so
+# a first version has to be published by hand — which is precisely the
+# irreversible act bl-006e holds.
+#
+# ARMING IT is an operator's edit, in this order, and each step is severable:
+#
+#   1. adjudicate bl-006e — the decision, not the mechanics;
+#   2. give this repository a CI workflow and replace the refusal job below
+#      with `uses: ./.github/workflows/ci.yml`, so `needs:` is a real build
+#      gate. It must be a CALLED workflow inside this run, never a
+#      `workflow_run` trigger: crates.io refuses OIDC tokens minted under one,
+#      so a `workflow_run` gate publishes nothing, quietly, forever;
+#   3. `publish = false` -> `true` in Cargo.toml, and read
+#      `src/packaged.rs`'s answer to what the tarball would carry;
+#   4. register the trusted publisher on the registry side, and enable
+#      "Allow GitHub Actions to create and approve pull requests" in the
+#      repository settings — without it the release-PR job 403s;
+#   5. add the automatic trigger:  push: branches: [main]
+#
+# TWO SLOTS ARE DELIBERATELY EMPTY, and each is somebody else's ball. There is
+# no artifact-upload job, though the artifacts themselves now exist — the
+# release binary and `make mac-artifact`'s aarch64-apple-darwin build, both
+# reproducible from a clean checkout, so attaching them is a job and not a
+# design question. And there is no image push: the Makefile names the registry
+# and says a push lives in a release workflow at tag time, which is this file
+# once there is a release to tag.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  refuse:
+    name: this pipeline is not armed
+    runs-on: ubuntu-latest
+    # THE DISARM, as a job rather than a comment. Every job below `needs:` it,
+    # so a dispatch of this workflow stops here and nothing downstream runs.
+    # It stands where the build gate goes: arming step 2 replaces this job
+    # with the called CI workflow, and `needs: refuse` becomes `needs: ci` —
+    # so the edit that arms the pipeline is the edit that gives it a gate, and
+    # neither can be done without the other.
+    steps:
+      - run: |
+          echo "thrall does not publish (bl-006e): publish = false, no trusted" >&2
+          echo "publisher, and no CI workflow to gate a release on. See the" >&2
+          echo "arming checklist in this file's header." >&2
+          exit 1
+
+  release-plz-pr:
+    name: release-plz PR
+    runs-on: ubuntu-latest
+    needs: refuse
+    # Owner guard: never runs in a fork. Only a direct push to main would
+    # maintain the release PR once the push trigger is added — a dispatch is
+    # for releasing, not for refreshing a PR.
+    if: github.repository_owner == 'mudbungie' && github.event_name == 'push'
+    permissions:
+      contents: write
+      pull-requests: write
+    # Never two release-PR updates at once: they would race on the branch.
+    concurrency:
+      group: release-plz-pr-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run release-plz
+        uses: release-plz/action@v0.5
+        with:
+          command: release-pr
+        env:
+          # No registry credential here: this job only opens the release PR.
+          # RELEASE_PLZ_TOKEN is an optional fine-grained PAT (contents +
+          # pull-requests write) so the PR's own commits re-trigger CI, which
+          # the default token cannot do for its own pushes.
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN || secrets.GITHUB_TOKEN }}
+
+  release-plz-release:
+    name: release-plz release
+    runs-on: ubuntu-latest
+    # The build gate. Once armed this is `needs: ci`, and a failed or skipped
+    # gate skips this job — the implicit success() in `if` sees to it.
+    needs: refuse
+    if: github.repository_owner == 'mudbungie'
+    # Job-level permissions REPLACE the workflow-level block rather than adding
+    # to it, so `contents: write` is restated here — the job needs it to push
+    # the tag and cut the Release. `id-token: write` is the trusted-publishing
+    # grant, and it exists on this job and nowhere else.
+    permissions:
+      contents: write
+      id-token: write
+    concurrency:
+      group: release-plz-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # The BRANCH, not a bare sha: release-plz resolves the current branch
+          # through its upstream, which fails on a detached HEAD.
+          ref: ${{ github.ref_name }}
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run release-plz
+        uses: release-plz/action@v0.5
+        with:
+          command: release
+        env:
+          # Publishing is authenticated by the OIDC grant above, not by a
+          # stored registry secret. release-plz performs the exchange itself.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  prune-release-branches:
+    name: prune superseded release branches
+    # `needs` with no `if`: only after the release-PR job actually ran and
+    # succeeded, so pruning only ever follows a PR refresh.
+    needs: release-plz-pr
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    # release-plz pushes a NEW timestamped `release-plz-*` branch every time it
+    # refreshes the release PR, and pushes it BEFORE opening the PR — so
+    # superseded branches pile up one per push to main, and a failed PR
+    # creation strands one with no PR to ever close. The repository's
+    # "automatically delete head branches" setting only fires on MERGE. This
+    # job runs immediately after the PR job, so the branch backing the CURRENT
+    # release PR is already open and "has no open PR" is an exact test for
+    # "superseded or orphaned" — no allowlist, no age heuristic, no state.
+    steps:
+      - uses: actions/checkout@v4
+      - name: Delete every release-plz-* branch with no open PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          open="$(gh pr list --state open --json headRefName -q '.[].headRefName')"
+          git ls-remote --heads origin 'refs/heads/release-plz-*' |
+            awk '{print $2}' | sed 's#refs/heads/##' |
+            while read -r branch; do
+              if grep -qxF "$branch" <<<"$open"; then
+                echo "keep    $branch (backs an open PR)"
+              else
+                echo "delete  $branch"
+                git push origin --delete "$branch"
+              fi
+            done
