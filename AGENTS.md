@@ -156,6 +156,21 @@ the machine state:
 - **Conversation and session ids.** Vendor resource ids, transcript keys, the
   identifiers of a specific run on a specific box.
 
+**The standing ruling — no agent-session URL in this repository's published
+text, anywhere** (bl-d747, operator 2026-08-30: *ban them, no reason to allow
+it*). The list above governs a ball body; this governs the published text no
+gate can reach. Pull-request titles and bodies, issue text, review comments and
+release notes never carry a session URL or a conversation identifier, and the
+harness convention of appending one to a pull-request body is **overridden
+here** — strip it before you open the PR, because a body cannot be un-published
+afterwards: the forge keeps a body's edit history and serves
+`refs/pull/<n>/head` forever, so an edit buys the false assurance a history
+rewrite buys elsewhere. The ruling came from the seat repository, where exactly
+that happened and is now permanent. `session-artifact` reads both forms since
+bl-d747 — the bare session id and the code-session URL path shape — so a commit
+message or a ball body carrying one is refused at the moment of writing; a PR
+body is in no tree, and that half is yours.
+
 ### The task store gate
 
 `scripts/thrall-leak-gate` is a **balls plugin** that runs
