@@ -1,0 +1,136 @@
+# The macOS artifact, cross-produced from a Linux container.
+#
+# This is NOT an image anybody installs. `Containerfile` builds the Linux image
+# — the unit of install for a box that takes containers (README "The image").
+# This file builds one FILE: the `aarch64-apple-darwin` binary, carried out of
+# a scratch layer so `create`/`cp` can lift it onto the host. Nothing here is
+# ever pushed, and the runtime reasoning that governs the other file — what the
+# foot execs, what mounts where — has no meaning for an artifact.
+#
+# WHY IT EXISTS. A mac binary that comes off somebody's laptop is a binary
+# nobody can reproduce and nothing gates. This puts it on the same line as the
+# Linux image: the same digest-pinned base, the same toolchain pin read out of
+# `rust-toolchain.toml`, the same `--locked` dependency answer the gate judged.
+#
+# ---------------------------------------------------------------------------
+# THE TOOLCHAIN IS `zig cc`, AND osxcross IS REFUSED. This is the load-bearing
+# decision of the file and it was made on licence, not on taste.
+#
+# osxcross cross-compiles for macOS by driving Apple's own SDK, which it does
+# not ship and cannot ship. The Xcode and Apple SDKs Agreement forbids the
+# arrangement twice over, and either clause alone would be enough:
+#
+#   2.7  "The grants set forth in this Agreement do not permit You to, and You
+#         agree not to, install, use or run the Apple Software or Apple
+#         Services on any non-Apple-branded computer or device, or to enable
+#         others to do so. ... You agree not to rent, lease, lend, upload to or
+#         host on any website or server, sell, redistribute, or sublicense the
+#         Apple Software and Apple Services, in whole or in part, or to enable
+#         others to do so."
+#
+#   2.5  "You may not alter the Apple Software or Services in any way in such
+#         copy, e.g., You are expressly prohibited from separately using the
+#         Apple SDKs or attempting to run any part of the Apple Software on
+#         non-Apple-branded hardware."
+#
+# The first says the SDK may never sit in this repository nor in any layer that
+# is published; the second says an operator-supplied SDK, mounted at build time
+# and never committed, is ALSO outside the grant, because the builder is not
+# Apple-branded hardware. So this is not a case of holding the SDK at arm's
+# length with a build argument — the whole arm is refused, and a Containerfile
+# that took an SDK path would be inviting the operator into a term they cannot
+# satisfy on a Linux box.
+#
+# zig acquires nothing from Apple. It ships ONE darwin stub of its own,
+# `lib/libc/darwin/libSystem.tbd`, in its own distribution and under its own
+# licence; no Apple agreement is accepted anywhere on this path.
+#
+# THE LIMIT THAT COMES WITH IT, stated here because it decides which components
+# can use this file at all: zig ships libSystem and NO framework stubs — not
+# CoreFoundation, not AppKit, not OpenGL, and no `libobjc`. A crate graph that
+# links only libSystem crosses cleanly; one that links any Apple framework
+# fails at the link step with "unable to find framework", and there is no
+# lawful way to supply the frameworks on a Linux builder. thrall links none:
+# `rustls`/`ring` and `serde_json` over std, and nothing that reaches for a
+# framework. That is why the foot's artifact is producible here and why a
+# component with a window is not (yog DESIGN §10).
+#
+# AND IT IS A C TOOLCHAIN, DELIBERATELY. `deny.toml` bans `openssl-sys`,
+# `native-tls` and `aws-lc-sys` to stop a C toolchain arriving IMPLICITLY,
+# through a dependency edge nobody reviewed. This one arrives explicitly, in a
+# file that argues for it, pinned by version and sha256, in a build stage that
+# is discarded — and the Linux `Containerfile` already installs `musl-dev` for
+# `ring` on exactly the same terms. The posture is against the accident, not
+# against the compiler.
+# ---------------------------------------------------------------------------
+
+# Stage 1 — build. The same digest-pinned base as `Containerfile`, so the mac
+# artifact and the Linux image are compiled by one rustc.
+FROM docker.io/library/rust:1.95.0-alpine3.22@sha256:064dfc925d68d1a63f4fd2871bd7dc6e6ea56692989a487185855d62885d90aa AS build
+
+# `musl-dev` for the host side of `ring`'s build script; `curl`, `tar` and `xz`
+# to fetch and unpack the pinned zig.
+RUN apk add --no-cache musl-dev curl tar xz
+
+# The toolchain pin has ONE home — rust-toolchain.toml — and the `FROM` line
+# above is a second statement of the same fact, so it can drift. This is the
+# same check `Containerfile` runs, for the same reason, and it is copied to
+# /pin rather than into the build directory because a rust-toolchain.toml in
+# the working directory sends every later cargo through rustup's shim, which
+# would try to DOWNLOAD the toolchain into an image that already has it.
+COPY rust-toolchain.toml /pin/rust-toolchain.toml
+RUN set -eu; \
+    pin=$(sed -n 's/^channel *= *"\([^"]*\)".*/\1/p' /pin/rust-toolchain.toml); \
+    have=$(rustc --version | cut -d' ' -f2); \
+    if [ "$pin" != "$have" ]; then \
+      echo "Containerfile.mac: base image rustc $have, rust-toolchain.toml pins $pin" >&2; \
+      echo "  bump the FROM tag and its digest in lockstep with the pin" >&2; \
+      exit 1; \
+    fi
+
+# zig, by version AND by sha256. The version alone is not a pin: ziglang.org
+# serves one tarball per release and a checksum is the only thing that says the
+# bytes did not change under the name. The linux-x86_64 build is statically
+# linked, so it runs on this musl base with no interpreter and no libc match.
+ARG ZIG_VERSION=0.16.0
+ARG ZIG_SHA256=70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00
+RUN set -eu; \
+    cd /tmp; \
+    tarball="zig-x86_64-linux-${ZIG_VERSION}.tar.xz"; \
+    curl -fsSLO "https://ziglang.org/download/${ZIG_VERSION}/${tarball}"; \
+    echo "${ZIG_SHA256}  ${tarball}" | sha256sum -c -; \
+    tar -xJf "${tarball}" -C /opt; \
+    mv "/opt/zig-x86_64-linux-${ZIG_VERSION}" /opt/zig; \
+    ln -s /opt/zig/zig /usr/local/bin/zig; \
+    rm -f "${tarball}"; \
+    zig version
+
+# cargo-zigbuild is what makes `zig cc` usable as rustc's linker: rustc emits
+# darwin linker flags zig does not accept, and this filters them. Exact version
+# and `--locked`, for the reason every other build step here is locked.
+ARG ZIGBUILD_VERSION=0.23.3
+RUN cargo install cargo-zigbuild --version "${ZIGBUILD_VERSION}" --locked
+
+# The target's `std`, from the same pinned toolchain. Cross-compiling needs no
+# Apple anything for this half — rustc's macOS std is distributed by rust-lang.
+RUN rustup target add aarch64-apple-darwin
+
+WORKDIR /src
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
+
+# THE MACOS FLOOR IS NOT ASKED FOR, IT IS READ BACK. rustc passes
+# `-mmacosx-version-min=11.0.0` and the pinned zig ignores it, stamping its own
+# darwin minimum into LC_BUILD_VERSION; cargo-zigbuild's `aarch64-apple-darwin.<ver>`
+# target syntax does not survive this zig either (it forms a target query zig
+# rejects). So the floor is a property of the pinned pair, not a setting, and
+# `scripts/mac-verify.sh` prints what the artifact actually carries. Do not
+# write the floor into a README from memory — read it off the binary.
+RUN cargo zigbuild --release --locked --target aarch64-apple-darwin
+
+# Stage 2 — the carrier. One file, nothing else: `podman create` + `podman cp`
+# lifts it out without running anything, and there is no runtime layer to
+# reason about because nothing here is ever run. It is not `FROM alpine` for
+# the same reason it is not pushed: this is a file in a wrapper, not an install.
+FROM scratch
+COPY --from=build /src/target/aarch64-apple-darwin/release/thrall /thrall

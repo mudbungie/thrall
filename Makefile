@@ -1,6 +1,6 @@
 .PHONY: all build release test coverage lint fmt fmt-check check ci \
         line-cap leak-scan rules-audit deny install-hooks install uninstall \
-        image image-scan clean
+        image image-scan mac-artifact clean
 
 # The build authority. Every gate step has ONE home here, and the pre-commit
 # hook calls the same targets — so the hook, a hand-run `make check` and any
@@ -296,6 +296,48 @@ image-scan:
 	@ENGINE=$(ENGINE) scripts/image-scan.sh --self-test "$(IMAGE_TAG)"
 	@ENGINE=$(ENGINE) scripts/image-scan.sh "$(IMAGE_TAG)"
 
+# The macOS artifact — the aarch64 mac binary, cross-produced from a Linux
+# container so it comes off the same reproducible line as the Linux image
+# rather than off somebody's laptop (yog DESIGN §10, thrall README "The macOS
+# artifact"). `Containerfile.mac` is the whole of what it builds and argues the
+# toolchain choice — `zig cc`, with osxcross refused on Apple's own licence
+# terms — where the decision lives.
+#
+# THE PRODUCT IS A FILE, NOT AN IMAGE. The build's last stage is `FROM scratch`
+# carrying one binary, so `create` + `cp` lifts it out without running
+# anything; the wrapper image is a fixture and is deleted below. That is why
+# `image-scan` is not wired in here and is not being skipped: the image is
+# never pushed, and the artifact's content is compiled from the same tree the
+# source gate reads, exactly as the Linux release binary is.
+#
+# IT IS VERIFIED, NOT ASSUMED. No mac exists on the build box, so the artifact
+# cannot be executed — but it can be READ, and a green build is not evidence of
+# an arm64 Mach-O that a mac would load. `scripts/mac-verify.sh` reads the
+# header, LC_BUILD_VERSION and every LC_LOAD_DYLIB out of the produced file,
+# and runs its own negative direction first (five malformed inputs it must
+# refuse), the same two-direction discipline `leak-scan` and `rules-audit`
+# hold. What it can promise and what it cannot is stated at the top of it.
+#
+# NOT part of `check`, for the reason `image` is not: `check` must run on a box
+# with no container engine, and this needs one.
+MAC_TARGET   := aarch64-apple-darwin
+MAC_IMAGE    := $(IMAGE_NAME)-macos-build:$(IMAGE_VERSION)
+MAC_DIST     := dist/$(MAC_TARGET)
+
+mac-artifact:
+	@test -n "$(ENGINE)" || { echo "mac-artifact: no podman and no docker on PATH" >&2; exit 1; }
+	@test -n "$(IMAGE_VERSION)" || { echo "mac-artifact: no version in Cargo.toml" >&2; exit 1; }
+	@scripts/mac-verify.sh --self-test
+	@echo "mac-artifact: $(notdir $(ENGINE)) build -> $(MAC_TARGET)"
+	@$(ENGINE) build -f Containerfile.mac -t "$(MAC_IMAGE)" .
+	@mkdir -p "$(MAC_DIST)"
+	@cid=$$($(ENGINE) create "$(MAC_IMAGE)") && \
+	  $(ENGINE) cp "$$cid:/$(IMAGE_NAME)" "$(MAC_DIST)/$(IMAGE_NAME)" && \
+	  $(ENGINE) rm "$$cid" >/dev/null
+	@$(ENGINE) rmi "$(MAC_IMAGE)" >/dev/null
+	@chmod +x "$(MAC_DIST)/$(IMAGE_NAME)"
+	@scripts/mac-verify.sh "$(MAC_DIST)/$(IMAGE_NAME)"
+
 # There is deliberately NO `publish` target. `Cargo.toml` carries
 # `publish = false`, the registry name is held by a placeholder, and whether
 # thrall ever ships is an operator decision (bl-006e). A convenience target for
@@ -303,3 +345,4 @@ image-scan:
 
 clean:
 	cargo clean
+	rm -rf dist

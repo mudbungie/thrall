@@ -1,2 +1,6 @@
 /target
 /lcov.info
+# The cross-produced macOS artifact (`make mac-artifact`). A build output, not
+# a source: it is reproducible from `Containerfile.mac` and belongs in a
+# release, never in the tree.
+/dist

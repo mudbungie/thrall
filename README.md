@@ -226,6 +226,119 @@ $ echo $?
 Every line of that list is a claim about bytes, and `make image-scan` is what
 turns it from a promise into a check.
 
+## The macOS artifact
+
+    make mac-artifact        # -> dist/aarch64-apple-darwin/thrall
+
+A foot runs wherever the operator's tools are, and some of those boxes are
+macs. `make mac-artifact` cross-produces the `aarch64-apple-darwin` binary
+**from the same Linux container line the image comes off** — the same
+digest-pinned base, the same toolchain pin checked against
+`rust-toolchain.toml`, the same `--locked` dependency answer the gate judged —
+so the mac binary is reproducible from the tree rather than being whatever came
+out of somebody's laptop that afternoon.
+
+The product is a **file, not an image**. The build's last stage is `FROM
+scratch` carrying one binary; the wrapper is a fixture, is never pushed, and is
+deleted when the artifact has been lifted out. `make image-scan` therefore does
+not apply to it and is not being skipped: the artifact's content is compiled
+from the same tree `make leak-scan` reads, exactly as the Linux release binary
+is.
+
+### The toolchain is `zig cc`, and osxcross is refused
+
+There were two ways to link a Mach-O binary on Linux, and the choice was made
+on Apple's licence rather than on taste. osxcross drives **Apple's own SDK**,
+which the *Xcode and Apple SDKs Agreement* forbids twice over — either clause
+alone would settle it:
+
+> **2.7** The grants set forth in this Agreement do not permit You to, and You
+> agree not to, install, use or run the Apple Software or Apple Services on any
+> non-Apple-branded computer or device, or to enable others to do so. … You
+> agree not to rent, lease, lend, upload to or host on any website or server,
+> sell, redistribute, or sublicense the Apple Software and Apple Services, in
+> whole or in part, or to enable others to do so.
+
+> **2.5** You may not alter the Apple Software or Services in any way in such
+> copy, e.g., You are expressly prohibited from separately using the Apple SDKs
+> or attempting to run any part of the Apple Software on non-Apple-branded
+> hardware.
+
+The first means the SDK may never sit in this repository nor in anything
+published from it. The second means the usual escape — take the SDK path as a
+build argument, keep it out of the tree, let the operator supply it — **does
+not work either**, because the builder is not Apple-branded hardware. So this
+repo does not hold the SDK at arm's length; it refuses the arm. A
+`Containerfile` that accepted an SDK path would be inviting the operator into a
+term they cannot satisfy on a Linux box.
+
+`zig` acquires nothing from Apple: it ships one darwin stub of its own,
+`lib/libc/darwin/libSystem.tbd`, in its own distribution and under its own
+licence, and no Apple agreement is accepted anywhere on this path. It is
+pinned by version **and** sha256; `cargo-zigbuild` (which filters the darwin
+linker flags `zig cc` will not take) is pinned exactly and installed
+`--locked`.
+
+**And yes, it is a C toolchain, deliberately.** `deny.toml` bans
+`openssl-sys`, `native-tls` and `aws-lc-sys` to stop a C toolchain arriving
+*implicitly*, through a dependency edge nobody reviewed. This one arrives
+explicitly, in a file that argues for it, in a build stage that is discarded —
+and `Containerfile` already installs `musl-dev` for `ring` on the same terms.
+The posture is against the accident, not against the compiler.
+
+### The limit that comes with it
+
+zig ships libSystem and **no framework stubs at all** — no CoreFoundation, no
+AppKit, no OpenGL, no `libobjc`. A crate graph that links only libSystem
+crosses cleanly; one that links any Apple framework fails at the link step with
+*"unable to find framework"*, and there is no lawful way to supply the
+frameworks on a Linux builder.
+
+**thrall links none of them.** Its dependency set is `rustls`/`ring` and
+`serde_json` over std, and the verified artifact loads exactly three system
+libraries, all under `/usr/lib`. That is not luck — it is the same
+single-binary discipline the approved dependency set in `Cargo.toml` is written
+to keep, and it is what makes the foot the component whose mac build a Linux
+container can honestly produce.
+
+### What is proven, and what is not
+
+There is no mac on the build box, so **the artifact is never executed**. A
+green build is not evidence: a wrong architecture, a dependency on a dylib no
+stock mac carries, and a binary macOS would refuse to start all look identical
+to a successful `cargo build`. `scripts/mac-verify.sh` reads the produced file
+instead, on any platform, with no Apple tooling:
+
+- **Proven** — 64-bit Mach-O, `arm64`, an executable (not a dylib); platform
+  macOS with the minimum-OS and SDK versions it declares; every dynamic library
+  it will ask for at load time, each of which must be a stock `/usr/lib` or
+  `/System/Library` path; and that a code signature is present at all.
+- **Not proven** — that it runs. It has the shape of a working mac binary and
+  has not been observed to be one.
+
+It runs **both directions**, the discipline `leak-scan` and `rules-audit`
+already hold here: five fabricated malformed inputs must be refused before the
+real artifact is read, because a checker that has quietly stopped checking
+passes everything forever.
+
+Two properties are worth knowing before an artifact is handed to anyone:
+
+- **The minimum macOS version is the pinned zig's, not a setting.** `rustc`
+  asks for one and this zig stamps its own; `cargo-zigbuild`'s
+  `aarch64-apple-darwin.<version>` target syntax does not survive this zig
+  either. So the floor is a property of the pinned pair — read it off the
+  artifact, where `mac-verify` prints it, and never from a document.
+- **The signature is ad-hoc, and that is not notarization.** An arm64 mac
+  refuses to start an unsigned binary; the cross-linker's ad-hoc signature
+  satisfies that and nothing more. A copy that arrives over a network carries a
+  quarantine attribute, and clearing it — or replacing the signature with a
+  real one — is an act on a mac, by the operator, and it is outside what this
+  line can do.
+
+Only `aarch64` is produced, because that is what was asked for. `x86_64-apple-darwin`
+would cross on exactly the same terms (the libSystem-only rule is about the
+crate graph, not the architecture) and is not built because nothing wants it.
+
 ## The rules
 
 Two are hard and machine-enforced:
