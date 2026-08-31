@@ -201,7 +201,7 @@ it provides none, it says none. A foot that implied more isolation than it has
 would be worse than one that offered none, because the far end would act on the
 implication.
 
-**As built (bl-4cda), here is the whole of it.** thrall enforces exactly three
+**As built (bl-4cda), here is the whole of it.** thrall enforces exactly four
 things locally, and it is not a sandbox:
 
 - **The name**, from the operator's document: a tool absent from it cannot be
@@ -216,6 +216,10 @@ things locally, and it is not a sandbox:
 - **The deadline, over a process group**: the child is spawned as the leader of
   a group of its own, that group is asked to stop with `SIGTERM`, the grace is
   waited out on the child, and then the group is killed.
+- **The size of the answer** (bl-6028): each stream of a capture is carried up
+  to `exec::CAPTURE_LIMIT` and no further. It is a bound on what this box will
+  *answer with*, never on what the tool may write — the tool runs to its own
+  end and its exit code is its own.
 
 Everything else is the box's. The child runs as this process's user, with this
 process's environment less the git scrub the spawn boundary performs — no
@@ -277,6 +281,35 @@ The half that had to give is the *waiting*, not the reading:
   concern rather than as a separate mechanism: the thing that watches the
   deadline is the thing that reads, so a tool writing more than a pipe holds is
   drained by the same tick that would have timed it out.
+
+**And the capture is bounded in SIZE by the same reasoning** (bl-6028). The
+wire carries one JSON frame per gesture and refuses one past
+`channel::frame::MAX_FRAME`; a foot that read a tool's output without a bound
+therefore had two failures queued behind a loud tool — an allocation as large
+as whatever it cared to print, and then a completion the framing refuses, which
+every layer above the frame reads as a dead channel. The foot exited, the
+invocation was answered by nothing, and the asking side waited out its whole
+slot on a tool that had finished. Three things settle it, and the first is the
+only one that is a decision:
+
+- **Truncate in band, do not refuse.** The size is a local fact and the foot is
+  holding the bytes, so it answers the shape it already answers for a deadline:
+  a bounded capture plus a `thrall:` sentence naming the stream, the limit and
+  how many bytes were dropped. A refusal naming the size would be a *second*
+  kind of non-answer for a question this box can answer, and REMOTE §5.3's
+  capture contract already rules a capture a lossy projection — *"a tool whose
+  output is not UTF-8 loses exactly the bytes no string can name"*. Size is
+  that same trade in the other axis, and unlike the transcode it can say so.
+- **The bound is derived from the frame, not typed beside it.**
+  `exec::CAPTURE_LIMIT` is `MAX_FRAME / 16`: two streams, and JSON escaping can
+  spend six bytes on one input byte, so a capture at the bound encodes to at
+  most twelve sixteenths of a frame whatever a tool prints. One home for the
+  fact, and the frame's own refusal becomes unreachable from a tool's output
+  rather than being handled twice.
+- **It bounds the ANSWER, never the tool.** The pipes keep being read past the
+  limit and the bytes are counted and dropped, because a pipe nobody drains
+  blocks the tool's next write and would turn a bounded question into a
+  timeout. The tool runs to its own end and its exit code is its own.
 
 **A container image does not change that sentence** (bl-3586, under yog
 bl-223f). thrall ships an OCI image because an image is a convenient unit of
@@ -345,7 +378,7 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/run.rs` | **The loop**: present, wait, hand off, answer — and the fan that serves every channel at once. Execution is a parameter (`Handoff`), which is what lets the whole conversation be tested against a real engine and a one-line executor. |
 | `src/exec.rs` | **The executor's dispatch** (bl-4cda): which entry an invocation names, whose working directory it may run in (§3.4's `subject_cwd`), and the three facts that come back. Every outcome is a capture — a tool that ran, one that overran, a name this box does not carry, a command that would not start. |
 | `src/exec/child.rs` | One child, from the fork to the capture: the spawn, the poll that is also the drain, and the cascade that stops a tool which will not stop itself. Split from `exec.rs` when the drain moved into the poll (bl-6c14) — the seam is *deciding what to run* against *running it*. |
-| `src/exec/pipes.rs` | The child's three pipes, pumped without blocking (bl-6c14, §3.5). A read answers with what the pipe holds now, so a write end a helper still holds cannot outlast the invocation — and the drains and the input feed stop being threads, because none of them can block any more. |
+| `src/exec/pipes.rs` | The child's three pipes, pumped without blocking and read within a bound (bl-6c14, bl-6028; §3.5). A read answers with what the pipe holds now, so a write end a helper still holds cannot outlast the invocation — and the drains and the input feed stop being threads, because none of them can block any more. Past `exec::CAPTURE_LIMIT` it keeps reading and stops keeping, counting what it dropped so the capture can say so. |
 | `src/serve.rs` | What `thrall run` does: read the document, read the channels, serve until they stop. There is no success exit, so none is spelled. |
 | `src/paths.rs` | The one data root, named by `$XDG_DATA_HOME` or `$HOME` and by nothing of thrall's own. Neither set is a refusal, never a relative guess. |
 | `src/spawn.rs` | **The spawn boundary.** Every child process is built AND forked here — nowhere else builds a `Command`, and nowhere else spends one. It decides three things a spawn site could forget: the git-environment scrub, the **process group** the child is born leading (bl-a78e, §3.5), and the fork lock the suite needs. **Founded by bl-a4a5**, before it had a production tenant, which is the point of the row: a boundary rule that arrives after the first spawn site is a rule that has to be argued with. |

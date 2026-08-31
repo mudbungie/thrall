@@ -11,11 +11,16 @@ use std::path::Path;
 
 /// Write this box's tool document, offering one tool that echoes its input.
 fn offering(root: &Path) {
+    running(root, "cat");
+}
+
+/// The same, with the shell line the one offered tool runs.
+fn running(root: &Path, script: &str) {
     std::fs::create_dir_all(root).expect("the root");
     let document = json!([{"name": "Echo",
                            "description": "echo the invocation's input",
                            "input_schema": {"type": "object"},
-                           "command": ["/bin/sh", "-c", "cat"]}]);
+                           "command": ["/bin/sh", "-c", script]}]);
     std::fs::write(config::path(root), document.to_string()).expect("write");
 }
 
@@ -138,4 +143,56 @@ fn a_foot_advertises_is_invoked_and_answers_with_what_ran() {
                "capture": {"stdout": "{\"command\":\"echo hi\"}",
                            "stderr": "", "exit_code": 0}})
     );
+}
+
+/// **A tool that outproduces the wire is answered, not fatal** (bl-6028). Its
+/// output is past `frame::MAX_FRAME`, so before the capture had a bound of its
+/// own the completion was refused by the framing, the refusal read as a dead
+/// channel, the foot exited, and the invocation was never answered by
+/// anything. Now the capture is bounded where the bytes are produced, so the
+/// completion goes out, the sentence rides in the capture, and the loop asks
+/// for its next work.
+#[test]
+fn a_capture_too_big_for_the_wire_is_answered_and_the_channel_goes_on() {
+    let scratch = Scratch::new();
+    let over = crate::channel::frame::MAX_FRAME + 1;
+    running(scratch.path(), &format!("yes hello | head -c {over}"));
+    let engine = channel(
+        scratch.path(),
+        "engine",
+        vec![
+            advertised(),
+            json!({"ok": true, "kind": "invocations",
+                   "rows": [{"invocation": "i-1", "tool": "Echo", "input": {}}]}),
+            json!({"ok": true, "kind": "routed", "invocation": "i-1",
+                   "capture": {"stdout": "", "stderr": "", "exit_code": 0}}),
+            refusal("the engine is going down"),
+        ],
+    );
+    let said = serve(scratch.path());
+    assert_eq!(said.text, "thrall: engine: the engine is going down");
+
+    let gestures: Vec<Value> = engine
+        .heard()
+        .into_iter()
+        .filter(|v| v.get("op").is_some())
+        .collect();
+    let ops: Vec<&str> = gestures
+        .iter()
+        .filter_map(|v| v.get("op")?.as_str())
+        .collect();
+    assert_eq!(ops, ["advertise", "invocations", "complete", "invocations"]);
+    let capture = &gestures[2]["capture"];
+    assert_eq!(
+        capture["stdout"].as_str().map(str::len),
+        Some(crate::exec::CAPTURE_LIMIT)
+    );
+    assert!(
+        capture["stderr"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("stdout exceeded this box's"),
+        "{capture}"
+    );
+    assert_eq!(capture["exit_code"], json!(0));
 }

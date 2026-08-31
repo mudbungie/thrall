@@ -61,9 +61,12 @@ pub(super) fn run(
     let mut pipes = Pipes::new(&mut child, input.to_string().into_bytes());
     let (exit_code, note) = waited(&mut child, &mut pipes, deadline);
     pipes.settle(Instant::now() + GRACE);
-    let (out, mut err) = pipes.take();
-    err.extend_from_slice(note.as_bytes());
-    Ok(captured(&out, &err, exit_code))
+    // The tool's own stderr first, then this box's remarks about the run —
+    // what would not fit, and what would not stop.
+    let mut drained = pipes.take();
+    drained.err.extend_from_slice(drained.note.as_bytes());
+    drained.err.extend_from_slice(note.as_bytes());
+    Ok(captured(&drained.out, &drained.err, exit_code))
 }
 
 /// Wait for the child, draining it as it goes, or stop it. The second half of

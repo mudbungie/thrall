@@ -1,5 +1,5 @@
-//! **The child's three pipes, pumped without blocking** (bl-6c14; DESIGN
-//! §3.5).
+//! **The child's three pipes, pumped without blocking and read within a
+//! bound** (bl-6c14, bl-6028; DESIGN §3.5).
 //!
 //! **A pipe outlives the process that was given it.** A read ends when *every*
 //! writer has closed, and a tool that backgrounds a helper hands that helper
@@ -22,6 +22,14 @@
 //! already watching the child — pumps all three. A capture is bounded by the
 //! deadline because there is nothing left that is not inside that loop.
 //!
+//! **How much is the other half of how long** (bl-6028). A read with no bound
+//! is an allocation as large as whatever a tool cared to print, and then a
+//! completion the framing refuses — which reads as a dead channel one layer up
+//! and takes the whole conversation with it. So the two output pipes stop
+//! keeping at [`CAPTURE_LIMIT`](super::CAPTURE_LIMIT) and keep counting: what
+//! the tool produced comes back, the sentence says what did not, and the
+//! invocation is answered.
+//!
 //! **Nothing here changes what the child sees.** `pipe(2)` gives the two ends
 //! separate file descriptions, so `O_NONBLOCK` on this end is invisible on the
 //! other: the tool's own writes block and succeed exactly as they always did.
@@ -35,25 +43,35 @@ use std::time::Instant;
 /// full one in a handful of calls and costs one page when it is empty.
 const CHUNK: usize = 16 * 1024;
 
-/// One pipe being read, and what it has yielded so far. `None` is a pipe that
-/// is finished — every writer closed, or it stopped being readable — and a
-/// finished pipe is never asked again.
+/// One pipe being read, what it has yielded so far, and what would not fit.
+/// `None` is a pipe that is finished — every writer closed, or it stopped being
+/// readable — and a finished pipe is never asked again.
 struct Sink {
+    name: &'static str,
     pipe: Option<Box<dyn Read>>,
     bytes: Vec<u8>,
+    dropped: usize,
 }
 
 impl Sink {
     /// Read everything available right now. `true` when something moved, which
     /// is what tells the loop above not to sleep yet.
+    ///
+    /// **Past the limit it keeps reading and stops keeping** (bl-6028). Not
+    /// closing the pipe, because a tool whose output nobody drains blocks on
+    /// its next write and then dies to the deadline — which would answer a
+    /// bounded question with a timeout. The bytes are counted and discarded,
+    /// so a runaway tool costs this box a memcpy and never an allocation.
     fn pump(&mut self) -> bool {
         let mut moved = false;
         let mut buf = [0u8; CHUNK];
         while let Some(pipe) = self.pipe.as_mut() {
             match pipe.read(&mut buf) {
                 Ok(n) if n > 0 => {
+                    let room = n.min(super::CAPTURE_LIMIT.saturating_sub(self.bytes.len()));
                     self.bytes
-                        .extend_from_slice(buf.get(..n).unwrap_or_default());
+                        .extend_from_slice(buf.get(..room).unwrap_or_default());
+                    self.dropped += n - room;
                     moved = true;
                 }
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock => break,
@@ -63,6 +81,21 @@ impl Sink {
             }
         }
         moved
+    }
+
+    /// The `thrall:` sentence naming what this stream lost, and nothing at all
+    /// when it lost nothing — the same shape a deadline's note takes, so the
+    /// far end reads one kind of in-band remark rather than two.
+    fn elided(&self) -> String {
+        if self.dropped == 0 {
+            return String::new();
+        }
+        format!(
+            "\nthrall: {} exceeded this box's {}-byte capture limit; {} further bytes were dropped\n",
+            self.name,
+            super::CAPTURE_LIMIT,
+            self.dropped
+        )
     }
 }
 
@@ -86,14 +119,8 @@ impl Pipes {
             stdin: unblocked(child.stdin.take()),
             payload,
             written: 0,
-            out: Sink {
-                pipe: reading(child.stdout.take()),
-                bytes: Vec::new(),
-            },
-            err: Sink {
-                pipe: reading(child.stderr.take()),
-                bytes: Vec::new(),
-            },
+            out: sink("stdout", reading(child.stdout.take())),
+            err: sink("stderr", reading(child.stderr.take())),
         }
     }
 
@@ -116,9 +143,14 @@ impl Pipes {
         while self.pump() && Instant::now() < until {}
     }
 
-    /// What the two pipes held: stdout, then stderr.
-    pub(crate) fn take(self) -> (Vec<u8>, Vec<u8>) {
-        (self.out.bytes, self.err.bytes)
+    /// What the two pipes held, and what would not fit.
+    pub(crate) fn take(self) -> Drained {
+        let note = format!("{}{}", self.out.elided(), self.err.elided());
+        Drained {
+            out: self.out.bytes,
+            err: self.err.bytes,
+            note,
+        }
     }
 
     /// Push what is left of the input, and close stdin when there is no more.
@@ -145,6 +177,27 @@ impl Pipes {
         }
         self.stdin = None;
         moved
+    }
+}
+
+/// What a run's two output pipes came to.
+pub(crate) struct Drained {
+    /// Everything the tool wrote to stdout, up to the limit.
+    pub(crate) out: Vec<u8>,
+    /// The same for stderr. The note rides *after* it and never in place of
+    /// it, so a tool's own diagnosis is never displaced by this box's.
+    pub(crate) err: Vec<u8>,
+    /// The sentence naming what either stream lost, empty when neither did.
+    pub(crate) note: String,
+}
+
+/// One output pipe, named for the sentence it may have to write.
+fn sink(name: &'static str, pipe: Option<Box<dyn Read>>) -> Sink {
+    Sink {
+        name,
+        pipe,
+        bytes: Vec::new(),
+        dropped: 0,
     }
 }
 

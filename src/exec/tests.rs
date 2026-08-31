@@ -14,6 +14,11 @@ use std::time::Duration;
 /// runs and who consented, not about the contract or the cascade.
 mod subject;
 
+/// What bounds a capture (bl-6c14, bl-6028) — its own file for the same
+/// reason: these are tests about how much and how long, not about the tool
+/// contract.
+mod bounds;
+
 /// One tool this box offers, running `script` under `/bin/sh`.
 fn tool(name: &str, script: &str) -> Local {
     Local {
@@ -236,29 +241,6 @@ fn a_tool_that_writes_more_than_a_pipe_holds_still_answers() {
     let got = execute(&set, &call("Loud", json!({})), DEADLINE);
     assert_eq!(got.stdout.len(), 300_000);
     assert_eq!(got.exit_code, 0);
-}
-
-/// **A tool that backgrounds a helper and exits still earns its capture**
-/// (bl-6c14). The helper inherits the child's stdout and stderr write ends, so
-/// a drain that ends only when every writer has closed is a drain waiting on a
-/// stranger — and the serial loop behind it waits with it, forever. The
-/// deadline bounds the whole capture, not the child's own exit.
-///
-/// Both halves in one test, because a bounded drain that dropped the bytes
-/// would satisfy the first half alone: the tool's own output is delivered, and
-/// it is delivered without waiting on the helper.
-#[test]
-fn a_tool_that_leaves_a_helper_holding_the_pipes_still_answers() {
-    let set = [tool("Daemon", "sleep 5 & printf started")];
-    let (tx, rx) = std::sync::mpsc::channel();
-    std::thread::spawn(move || {
-        let _ = tx.send(execute(&set, &call("Daemon", json!({})), DEADLINE));
-    });
-    let got = rx
-        .recv_timeout(Duration::from_secs(2))
-        .expect("the capture, long before the helper lets the pipes go");
-    assert_eq!(got.stdout, "started", "{got:?}");
-    assert_eq!(got.exit_code, 0, "{got:?}");
 }
 
 /// The hand-off the loop takes is this executor under this box's own bound, so

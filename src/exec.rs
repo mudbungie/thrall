@@ -48,6 +48,13 @@
 //! answer, which is the one thing this file's second paragraph says cannot
 //! happen.
 //!
+//! **A capture is bounded in size as well as in time** (bl-6028). The wire
+//! carries one frame and will not carry an unbounded one, so an output past
+//! [`CAPTURE_LIMIT`] is truncated here, where the bytes are, and the capture
+//! says what was dropped — the same in-band shape a deadline earns. A foot that
+//! let the framing refuse the completion instead lost the invocation and the
+//! channel, for a fact it was holding in its own hand.
+//!
 //! **This file is the dispatch.** Which entry, whose directory, and the three
 //! facts that come back; running the child is `child`, and reading it without
 //! blocking is `pipes`.
@@ -66,6 +73,26 @@ mod pipes;
 /// answered is working, and the asking side's longer patience is what covers
 /// the case where this whole process went away.
 pub const DEADLINE: Duration = Duration::from_mins(2);
+
+/// **What one stream of a capture may grow to** (bl-6028), and the only thing
+/// about a tool's output this box enforces.
+///
+/// A capture ends as one JSON frame, and the wire will not carry a frame past
+/// [`MAX_FRAME`](crate::channel::frame::MAX_FRAME) — so a foot that read a
+/// tool's output without a bound had two failures waiting: an allocation as
+/// large as whatever the tool cared to print, and then a completion the framing
+/// refuses, which every layer above it reads as a dead channel. Neither is a
+/// thing to answer at the wire. **The size is a local fact and it is knowable
+/// here**, at the one place holding the bytes, so it is decided here and the
+/// capture says what it dropped.
+///
+/// **It is derived from the frame and never typed beside it.** Two streams, and
+/// JSON can spend up to six bytes on one input byte (a control character
+/// becomes `\u00XX`), so a capture at this bound encodes to at most twelve
+/// sixteenths of a frame whatever a tool prints — the rest is the gesture's
+/// envelope and the margin. A megabyte of tool output is already far past what
+/// any model reads; the bound is generous in the only units that matter.
+pub const CAPTURE_LIMIT: usize = crate::channel::frame::MAX_FRAME / 16;
 
 /// The verdict a child that outran its deadline earns — the shell's own
 /// convention for `timeout`, so an operator reading a transcript recognizes it.
