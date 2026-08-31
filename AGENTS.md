@@ -174,6 +174,21 @@ so one polluted body refuses every `bl` op in the checkout — `create` included
 so the defect about the wedge could not be filed. The author who writes a bad
 body is the one who should be told, at the moment of writing.
 
+**A machine layer may already be running this scan, and then the wiring below
+is a duplicate** (bl-47f5). An operator's box can carry one balls plugin named
+at machine scope — every landing, present and future — that keys OPT-IN on the
+project's own signal: a repo shipping an executable `scripts/leak-scan.sh` gets
+its store scanned before the tracker publishes it, and a repo without one
+passes silently. thrall opted in the moment that scanner landed (bl-e878), so
+on such a box the store gate is already running on every publishing op and
+`bl install`ing the plugin below seats a second copy of the same scan. **The
+recipe is the fallback for a box with no machine layer, not a step to always
+run** — check `bl conf` for what is already scheduled before wiring anything.
+What the machine layer needs to be equivalent is the SCOPE: `--commit` off the
+§7 payload's top-level `commit` field, because bare is the whole-store scan and
+the shared-checkout wedge above. That plugin is not a thrall artifact and this
+repo cannot edit it; this paragraph is the record of what it must pass.
+
 Wiring is one act per checkout, and this repo cannot perform it — the plugin
 schedule lives in the balls landing (`balls/config`), not in thrall's tree:
 
