@@ -112,6 +112,7 @@ fn a_foot_advertises_is_invoked_and_answers_with_what_ran() {
                              "input": {"command": "echo hi"}}]}),
             json!({"ok": true, "kind": "routed", "invocation": "i-1",
                    "capture": {"stdout": "", "stderr": "", "exit_code": 0}}),
+            advertised(),
             refusal("the engine is going down"),
         ],
     );
@@ -127,7 +128,16 @@ fn a_foot_advertises_is_invoked_and_answers_with_what_ran() {
         .iter()
         .filter_map(|v| v.get("op")?.as_str())
         .collect();
-    assert_eq!(ops, ["advertise", "invocations", "complete", "invocations"]);
+    assert_eq!(
+        ops,
+        [
+            "advertise",
+            "invocations",
+            "complete",
+            "advertise",
+            "invocations"
+        ]
+    );
 
     // What it presented is the document's projection: three keys, no argv.
     assert_eq!(
@@ -166,6 +176,7 @@ fn a_capture_too_big_for_the_wire_is_answered_and_the_channel_goes_on() {
                    "rows": [{"invocation": "i-1", "tool": "Echo", "input": {}}]}),
             json!({"ok": true, "kind": "routed", "invocation": "i-1",
                    "capture": {"stdout": "", "stderr": "", "exit_code": 0}}),
+            advertised(),
             refusal("the engine is going down"),
         ],
     );
@@ -181,7 +192,16 @@ fn a_capture_too_big_for_the_wire_is_answered_and_the_channel_goes_on() {
         .iter()
         .filter_map(|v| v.get("op")?.as_str())
         .collect();
-    assert_eq!(ops, ["advertise", "invocations", "complete", "invocations"]);
+    assert_eq!(
+        ops,
+        [
+            "advertise",
+            "invocations",
+            "complete",
+            "advertise",
+            "invocations"
+        ]
+    );
     let capture = &gestures[2]["capture"];
     assert_eq!(
         capture["stdout"].as_str().map(str::len),

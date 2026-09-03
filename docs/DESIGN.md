@@ -60,7 +60,11 @@ REMOTE §2's nouns, unchanged and not re-minted here:
 A thrall is a client that is a tool host and **only** a tool host. Its whole
 life is one loop:
 
-    advertise → { wait on the mailbox → execute → post the capture } → forever
+    advertise → { wait on the mailbox → execute → post the capture
+                  → advertise } → forever
+
+The trailing re-assertion is §3.7's, and it is why the loop is written with two
+advertisements rather than one.
 
 ## 2. What thrall may never become
 
@@ -389,6 +393,38 @@ The version moves in lockstep with the engine's, and the engine's corpus
 ledger is what forces a move: PROTOCOL 2 (bl-36f7) is the worktree lane's
 bump — the advertised element gained `subject_cwd` and the invocation gained
 `cwd`, both optional, both a change to a shape already in use.
+
+### 3.7 The set is keyed on the identity, and a working foot is absent
+
+REMOTE §5.1 stores one advertised set per client identity. It is a fact about a
+*machine*, so it is not scoped to a connection — which means any connection
+bearing this box's certificate may replace it, and the box that is running has
+nothing in the protocol that would tell it (there is no version on the set, no
+generation, and no receipt on the read that names which set is in force).
+
+The engine closed the half it can see (yog bl-1462, REMOTE §5.1): a second
+concurrent follow-class read under one identity is refused, and an
+advertisement that would **change** the set in force is refused while that
+client holds a parked read. That covers the whole of an idle foot's life,
+because an idle foot is parked.
+
+It cannot cover the window this foot opens itself. §3.1's dial-in shape means
+one connection per ask, held only while waiting — so while a tool runs, this
+box holds no parked read, the engine cannot tell it apart from a machine that
+has gone away, and a set replaced in that window would stand until the process
+was restarted, with every later invocation refused for a tool that plainly
+exists.
+
+**So the set is asserted again at the end of every hand-off** (bl-2d78). The
+window is bounded by one tool's runtime instead of by the process lifetime, and
+an idle foot pays nothing: no hand-off ends, so nothing is said. The engine
+writes only when the set differs, so the ordinary re-assertion is a comparison
+and no write.
+
+What this does not buy is **knowing**: `advertised` reads the same whether the
+engine wrote or compared, so a foot restoring a set some other connection
+blanked heals silently. The receipt that would distinguish them is the far
+end's to give and is asked for in yog bl-66d4.
 
 ---
 

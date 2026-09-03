@@ -11,12 +11,32 @@
 //! another act. The engine never speaks first (REMOTE §3), and the shape of
 //! this file is that invariant rather than a consequence of it.
 //!
-//! **The advertisement is presented once per channel, not once per dial.** A
-//! foot dials per ask (`channel`), so "on every connect" in the protocol's own
-//! words means each time it takes up a channel: the far end writes the set only
-//! when it differs from what is stored, so re-presenting costs nothing, while
-//! re-presenting before *every* read would double the traffic to say a thing
-//! that had not changed.
+//! **The advertisement is presented once per channel and again after every
+//! hand-off** (bl-2d78, yog bl-1462). A foot dials per ask (`channel`), so "on
+//! every connect" in the protocol's own words means each time it takes up a
+//! channel — and the far end writes the set only when it differs from what is
+//! stored, so a re-presentation of an unchanged set costs a comparison and no
+//! write.
+//!
+//! The re-assertion is there because the stored set is keyed on this box's
+//! *identity*, not on this connection, and any connection bearing the
+//! certificate may replace it. The engine refuses a replacement while this
+//! machine holds a parked read (REMOTE §5.1), which covers the whole of an idle
+//! foot's life — so the one window left open is the one this foot opens itself:
+//! it is **absent** while it executes, and a set blanked in that window would
+//! stand until the process restarted, with every later invocation refused for a
+//! tool that plainly exists. Re-asserting at the end of each hand-off bounds
+//! that window to one tool's runtime instead of forever.
+//!
+//! **It costs an idle foot nothing**, which is what makes it the right place:
+//! a foot with no work sends no extra gesture, because there is no hand-off to
+//! end. Re-presenting before *every* read would double the traffic of a foot
+//! that is protected by the engine's guard the whole time it is waiting.
+//!
+//! What it does **not** buy is knowing. A re-presentation restores the set
+//! silently, because `advertised` says the same thing whether the engine wrote
+//! or compared; a receipt that distinguished them is the far end's to give and
+//! is asked for in yog bl-66d4.
 //!
 //! **The loop is serial, and that is what makes a busy foot absent** (REMOTE
 //! §5's presence amendment). It runs one invocation at a time and holds a
@@ -59,7 +79,7 @@ pub type Handoff = fn(&[Local], &Invocation) -> Capture;
 /// can reach.
 pub fn hold(channel: &Channel, set: &[Local], handoff: Handoff) -> String {
     let presenting = gestures::advertise(&config::advertisement(set));
-    if let Err(reason) = tell(channel, &presenting) {
+    if let Err(reason) = present(channel, &presenting) {
         return reason;
     }
     loop {
@@ -72,8 +92,28 @@ pub fn hold(channel: &Channel, set: &[Local], handoff: Handoff) -> String {
             if let Err(reason) = answer(channel, &invocation, &capture) {
                 return reason;
             }
+            if let Err(reason) = present(channel, &presenting) {
+                return reason;
+            }
         }
     }
+}
+
+/// **Say what this box offers.** Once when the channel is taken up, and once
+/// more at the end of every hand-off, closing the window this foot was absent
+/// for (see this module's head).
+///
+/// It is the same value both times rather than a second projection of the
+/// config, so "the set this foot presents" has one spelling and the
+/// re-assertion cannot drift from the presentation.
+///
+/// **A refusal ends the channel**, on the terms every other gesture's does: the
+/// engine declines a set that would replace a serving machine's own, so a
+/// refusal here is another connection holding this machine's read with a
+/// different set in force — two processes claiming one name, which is the
+/// engine's sentence to say and this foot's to stop on.
+fn present(channel: &Channel, presenting: &Value) -> Result<(), String> {
+    tell(channel, presenting).map(|_| ())
 }
 
 /// **Every channel this box holds, served at once** — one thread each, and the
