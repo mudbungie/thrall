@@ -241,7 +241,11 @@ fn waited(channel: &Channel) -> Result<Vec<Invocation>, Failed> {
 /// engine's mark on a handed-out invocation is a lease, released by this
 /// client's own next read, so the redial's fresh channel is handed the same
 /// invocation under the same id and runs it again (REMOTE §5.3's at-least-once
-/// leg, yog bl-e658). Nothing here has to remember it.
+/// leg, yog bl-e658). Nothing here has to remember it — and nothing here may:
+/// the id is offered as an idempotency key and a foot declines it, because
+/// suppressing the second run without answering it would leave the engine
+/// holding a slot with no capture, which is the silence that ball was about
+/// (DESIGN §3.8, bl-9261).
 fn answer(channel: &Channel, invocation: &Invocation, capture: &Capture) -> Result<(), Failed> {
     tell(channel, &gestures::complete(&invocation.id, capture)).map(|_| ())
 }

@@ -567,7 +567,23 @@ connection, the advertisement rides the connection already, registration is
 durable engine-side, and an invocation in flight when the wire died is the
 engine's mailbox lease (REMOTE §5.3's at-least-once leg) rather than this loop's
 — so the same invocation is handed over again under the id it was first handed
-under. Three consequences, and each is deliberate:
+under. Four consequences, and each is deliberate:
+
+- **This box runs that invocation again, and thrall does not dedupe it**
+  (bl-9261). REMOTE §5.3 offers the id as an idempotency key — *"a far end that
+  must not run a thing twice has a stable name to dedupe on and needs no field
+  of its own to get it"* — and it is an offer to hosts generally, not an
+  instruction to this one. **A foot declines it**, for two reasons and the
+  second is the stronger. A remembered set of ids is memory that has to survive
+  the gap the whole of this section refuses; and suppressing the second run
+  without answering it would leave the engine holding a slot with no capture,
+  which is precisely bl-9261's silence — an invocation nobody ran and nobody
+  was told about — reintroduced by the client. Answering it instead would mean
+  keeping the capture that the wire swallowed, unbounded and for an interval
+  nothing can name, which is a foot with a world (§2). So the honest answer to
+  a redelivery is to run it: the duplicate is the price REMOTE §5.3 states it
+  is paying, and a tool that must not run twice is the operator's to make
+  idempotent, on the box where the containment already lives (§3.5).
 
 - **The disarming is not remembered.** §3.7's notice fires on a re-assertion
   that WROTE, and is silent on a channel's FIRST presentation because every
