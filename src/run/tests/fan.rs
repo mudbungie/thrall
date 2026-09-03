@@ -88,9 +88,23 @@ fn a_notice_names_the_channel_that_raised_it() {
     );
     assert_eq!(said, ["north: north stopped", "south: south stopped"]);
     let heard = notices.heard();
-    assert_eq!(heard.len(), 1, "{heard:?}");
-    assert!(heard[0].starts_with("north: "), "{heard:?}");
-    assert!(heard[0].contains("was not the set in force"), "{heard:?}");
+    let disarm: Vec<&String> = heard
+        .iter()
+        .filter(|line| line.contains("was not the set in force"))
+        .collect();
+    assert_eq!(disarm.len(), 1, "{heard:?}");
+    assert!(disarm[0].starts_with("north: "), "{heard:?}");
+    // The two ending sentences are the other two lines, each under its own
+    // name: the sink carries every channel's terminal sentence since bl-e834.
+    assert_eq!(heard.len(), 3, "{heard:?}");
+    assert!(
+        heard.contains(&"north: north stopped".to_owned()),
+        "{heard:?}"
+    );
+    assert!(
+        heard.contains(&"south: south stopped".to_owned()),
+        "{heard:?}"
+    );
 }
 
 /// **One engine's conversation does not take the others down.** An executor

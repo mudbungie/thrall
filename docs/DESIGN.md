@@ -472,13 +472,14 @@ Three properties of that reading, and each is a decision:
   *refused* re-assertion, which does end it — there the engine is telling this
   foot that another connection is serving under its name right now, and this
   one is not the machine in force. Two readings of one hazard, two answers.
-- **It goes to a sink, not to the return.** Every other sentence in `run.rs` is
-  a channel ending, returned as a value; this one has to be said with the
-  channel still up. So the sink is a parameter (`run::Notice`) for the same
-  reason the executor is, and the one effect — writing to this process's
-  stderr — lives in `src/main.rs`, where a test reads notices back as values
-  instead. In `fan` each channel's notices carry that channel's name, the same
-  prefix its ending sentence carries.
+- **It goes to a sink, not to the return.** This sentence has to be said with
+  the channel still up, and nothing that returns can say it. So the sink is a
+  parameter (`run::Notice`) for the same reason the executor is, and the one
+  effect — writing to this process's stderr — lives in `src/main.rs`, where a
+  test reads notices back as values instead. In `fan` each channel's notices
+  carry that channel's name, the same prefix its ending sentence carries.
+  **Since bl-e834 every sentence goes here**, endings included: a channel's
+  return value is read at a join, and a join waits on the siblings (§3.9).
 
 The foot cannot tell a rival from an engine that lost what it was holding, so
 the sentence names both readings rather than guessing one.
@@ -584,12 +585,11 @@ under. Three consequences, and each is deliberate:
 - **The sentence has to be said as it happens.** Under a loop the sentence that
   ended a connection is no longer returned by anything, so every retryable
   ending goes to the §3.7 notice sink with the wait beside it, under the
-  channel's own name. What `run::fan` still returns is the *terminal* sentence —
-  the ending another dial cannot improve — and a box whose every channel has
-  ended that way is a foot that cannot be a foot, which is where supervision
-  takes over. (bl-e834's complaint, that a dead channel's sentence is buffered
-  until every channel stops, is sharper under a loop and not resolved by it:
-  what this ball fixed is the retryable half.)
+  channel's own name. What `run::fan` returns is the *terminal* sentence — the
+  ending another dial cannot improve — and a box whose every channel has ended
+  that way is a foot that cannot be a foot, which is where supervision takes
+  over. That sentence is now **said as well as returned** (§3.9): the return is
+  the exit's, and the saying is the operator's.
 
 **Where the loop sits is the whole of why it is safe** (`run::redial`, between
 `Entry::open` and `run::hold`). `fan` already owns the per-channel lifetime, so
@@ -598,6 +598,45 @@ material, re-reads no config, and shares nothing with the other channels. The
 entry is opened once and not per dial, because opening reads no file and dials
 nothing — it is a fact about this box's own material, so a failure there is
 over rather than retried.
+
+### 3.9 A channel's ending is reported by that channel (bl-e834)
+
+**A return value is read where the reader gets to it, and `run::fan` reads its
+threads at a join, in filing order.** So a sentence that is only returned is a
+sentence held until every earlier-filed sibling has stopped — which for a
+healthy sibling is never. On a one-entry box the process exits at the first
+death and nothing is lost; on a multi-entry box the operator's symptom is a
+live-looking process serving one engine and silently not serving another.
+
+That is a report that does not ship, and §2 makes the sentence the whole
+product: thrall's channel does not reconnect *the process*, so a supervisor's
+log is all an operator gets. It also blunts the two refusals yog bl-1462 added,
+which are the engine telling this box that something else is presenting its
+certificate — the loudest thing the far end can say, arriving at a process that
+will not repeat it.
+
+**So each channel says its own terminal sentence the moment it stops**
+(`run::served`), through the same §3.7 sink and under the same name `fan` joins
+with, and the joined vector stays exactly what it was: the summary the exit is
+written from. Four properties are the decision:
+
+- **It is said in the channel's OWN thread**, not in the join loop. Saying it
+  at the join is the near miss and it is still buffered — the second channel's
+  sentence would wait on the first channel's thread. The suite proves the
+  difference: the sibling that is still serving is the one filed FIRST, and its
+  wait does not end until the sink has heard the other's ending.
+- **It is the same words in both places.** An operator reading a log and an
+  operator reading the exit must not have to reconcile two wordings of one
+  ending, so the notice carries the line the summary will carry.
+- **It is beside the verdict and never instead of it.** The exit code and the
+  verdict text are `cli`'s and are tested as values; nothing here changes them.
+- **It stays off the pure-function path.** `cli::run` decides and says nothing,
+  which is what keeps `src/main.rs` the one file outside the coverage floor.
+
+The one ending no channel says for itself is a **panic**, which unwinds past
+the saying: `fan` names it at the join, because a thread that broke had no
+sentence to hand over and that outcome is this program failing rather than a
+channel ending.
 
 ---
 
@@ -623,7 +662,7 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/json.rs` | The strict field reads every decoder here shares: a missing field, a mistyped one and a wrong-shaped one each refuse with the key an operator typed. |
 | `src/gestures.rs` | **The foot set** (bl-a2ea): `advertise`, `invocations`, `complete`, and the answers they can earn. The enumeration is the enforcement thrall can keep — there is no spelling here for a fourth verb. |
 | `src/invocation.rs` | What crosses the routing leg: the invocation a foot is handed and the capture it hands back, each in one strict spelling. |
-| `src/run.rs` | **The loop**, and the three seams that are parameters: what runs a command (`Handoff`), where a channel says something while it is still serving (`Notice`, §3.7) and where it waits between dials (`Pause`, §3.8). All three are effects no test can read back, so the one implementation of each is `src/main.rs`'s — which is what lets the whole conversation be tested against a real engine, a one-line executor and two recorders. This file itself is `fan`: every channel this box holds, one thread each. |
+| `src/run.rs` | **The loop**, and the three seams that are parameters: what runs a command (`Handoff`), where a channel says something while it is still serving (`Notice`, §3.7) and where it waits between dials (`Pause`, §3.8). All three are effects no test can read back, so the one implementation of each is `src/main.rs`'s — which is what lets the whole conversation be tested against a real engine, a one-line executor and two recorders. This file itself is `fan`: every channel this box holds, one thread each — and `served`, which says a channel's terminal sentence in that channel's own thread rather than at the join (§3.9). |
 | `src/run/hold.rs` | **One channel's conversation** (split from `run.rs` by bl-916d): present, wait, hand off, answer, present again — and the `Ending` that stopped it, classified by who failed and at which leg (§3.8). |
 | `src/run/redial.rs` | **One channel's lifetime** (bl-916d): the endings worth another dial, the backoff that settles, and the sentence said in the meantime. It is a separate file because it is a separate question — what happened, against what to do about it — and because its whole decision is three numbers and one line of arithmetic, testable as values. |
 | `src/exec.rs` | **The executor's dispatch** (bl-4cda): which entry an invocation names, whose working directory it may run in (§3.4's `subject_cwd`), and the three facts that come back. Every outcome is a capture — a tool that ran, one that overran, a name this box does not carry, a command that would not start. |

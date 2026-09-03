@@ -18,9 +18,15 @@
 //! reaches this file is the ending that asking again cannot improve — and a box
 //! whose every channel has ended that way is a foot that cannot be a foot,
 //! which is where the supervision the operator's machine already has takes
-//! over. The sentence it exits with is what that supervisor's log will carry;
-//! everything a channel said while it was still trying went to `notice` as it
-//! happened.
+//! over.
+//!
+//! **The exit sentence is a summary and never the report** (bl-e834). Every
+//! channel says its own ending through `notice` at the moment it ends — the
+//! retryable ones with the wait beside them, the terminal one under the same
+//! name and in the same words this file joins — so an operator hears the first
+//! death when it happens rather than when the last sibling stops. What is
+//! joined here is what the process exits with, which is a different question
+//! from what it says while it is alive.
 
 use std::path::Path;
 

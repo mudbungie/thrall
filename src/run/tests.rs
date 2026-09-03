@@ -150,3 +150,5 @@ mod ending;
 mod fan;
 /// One channel's lifetime: dropped, waited out, dialled again.
 mod redial;
+/// When a box says a channel has stopped.
+mod report;
