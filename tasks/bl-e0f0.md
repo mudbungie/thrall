@@ -1,7 +1,8 @@
 +++
 title = "the protocol pin is 2 while the engine speaks 8, so a foot cannot dial a current engine — and the stand-in engine writes its preface from this crate's own constant, so nothing can catch it"
 created = 1788399973
-updated = 1788399973
+updated = 1788400720
+claimant = "Preface"
 priority = 1
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
 +++
