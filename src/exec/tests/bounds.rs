@@ -17,16 +17,39 @@ use std::time::Duration;
 /// Both halves in one test, because a bounded drain that dropped the bytes
 /// would satisfy the first half alone: the tool's own output is delivered, and
 /// it is delivered without waiting on the helper.
+///
+/// **The claim is a RELATION, not a stopwatch reading** (bl-2532). This test
+/// used to hand `execute` the stock deadline and give the whole capture two
+/// seconds on the test's own clock — and that clock starts before the worker
+/// thread is scheduled, so what it measured was how long this test queues
+/// behind 164 others, most of which fork, under coverage instrumentation.
+/// Measured on a loaded box it read 1503ms, 2018ms and 2112ms against that 2s
+/// wall while answering in 0.07s when run alone: a red about the machine, on
+/// the gate that every close in this repository runs.
+///
+/// So the helper now OUTLIVES the deadline handed to the run. A drain that
+/// waited on the stranger can no longer finish early enough to look correct on
+/// a fast box — it earns a `TIMED_OUT` capture, deterministically, on every
+/// box — while the honest drive answers in milliseconds after its own thread
+/// starts. The deadline is measured inside `execute`, from its own first
+/// instant, so contention moves nothing; the `recv_timeout` is only the outer
+/// bound on a drive that hangs outright, and it sits far above both.
 #[test]
 fn a_tool_that_leaves_a_helper_holding_the_pipes_still_answers() {
-    let set = [tool("Daemon", "sleep 5 & printf started")];
+    // One home for the relation: the helper holds the pipes for longer than
+    // the run is given, so the script is written from the same number.
+    let held = Duration::from_secs(30);
+    let deadline = Duration::from_secs(10);
+    assert!(held > deadline, "the helper must outlive the deadline");
+    let script = format!("sleep {} & printf started", held.as_secs());
+    let set = [tool("Daemon", &script)];
     let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
-        let _ = tx.send(execute(&set, &call("Daemon", json!({})), DEADLINE));
+        let _ = tx.send(execute(&set, &call("Daemon", json!({})), deadline));
     });
     let got = rx
-        .recv_timeout(Duration::from_secs(2))
-        .expect("the capture, long before the helper lets the pipes go");
+        .recv_timeout(DEADLINE)
+        .expect("a capture at all: the drain never let go of the pipes");
     assert_eq!(got.stdout, "started", "{got:?}");
     assert_eq!(got.exit_code, 0, "{got:?}");
 }
