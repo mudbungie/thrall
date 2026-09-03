@@ -34,6 +34,22 @@ pub fn opt_str_of(o: &Map<String, Value>, key: &str) -> Result<Option<String>, S
     }
 }
 
+/// One boolean field, required.
+///
+/// Required rather than defaulted, because the fields that wear this shape are
+/// *readings* — `wrote` on the advertisement's receipt says whether the far end
+/// changed anything (REMOTE §5.1) — and a reading defaulted to `false` is a
+/// foot inventing the reassuring answer for an engine that said nothing. An
+/// optional flag the operator may leave out is a different thing and is read
+/// where it is declared (`tools::of_one`'s `subject_cwd`).
+pub fn bool_of(o: &Map<String, Value>, key: &str) -> Result<bool, String> {
+    match o.get(key) {
+        Some(Value::Bool(b)) => Ok(*b),
+        Some(_) => Err(format!("field {key:?} is not a boolean")),
+        None => Err(format!("missing field {key:?}")),
+    }
+}
+
 /// One array-of-strings field. An element that is not a string refuses the
 /// whole field: an argv with a number in it is not an argv with a gap.
 pub fn strings_of(o: &Map<String, Value>, key: &str) -> Result<Vec<String>, String> {

@@ -390,9 +390,30 @@ naming both versions**. A foot and an engine that disagree about the wire must
 not discover it one field at a time.
 
 The version moves in lockstep with the engine's, and the engine's corpus
-ledger is what forces a move: PROTOCOL 2 (bl-36f7) is the worktree lane's
-bump — the advertised element gained `subject_cwd` and the invocation gained
-`cwd`, both optional, both a change to a shape already in use.
+ledger is what forces a move. **The pin is 8** (bl-e0f0), and a foot's own
+surface moved exactly twice on the way there: PROTOCOL 2 (bl-36f7) is the
+worktree lane's bump — the advertised element gained `subject_cwd` and the
+invocation gained `cwd`, both optional, both a change to a shape already in
+use — and PROTOCOL 8 (yog bl-66d4) is the `wrote` receipt §3.7 consumes. The
+five bumps between are seat-facing shapes this crate never decodes: a
+conversation row's `failure` (3), the queue row's `flag` (4),
+`reply/governing`'s lineage keys (5), `reply/providers`' `effort` and
+`priority` (6), `reply/help`'s `surface` (7). **A foot could dial across none
+of them**, because the preface is one integer compared for equality — the
+version states the engine's *build*, never which frames this end reads.
+
+**And the number is the engine's, so the suite states it as the engine's.**
+`src/corpus.rs` (§4) holds the protocol number and the frames of every shape a
+foot speaks as literal text copied from yog, and the stand-in engine dials at
+that. It has to: while the stand-in wrote its preface from
+`channel::hello::PROTOCOL`, both ends of every test were one constant wearing
+two names, agreeing at any value — so the pin sat five versions behind a live
+engine, unable to open one real channel, with the whole suite green (bl-e0f0).
+A fixture built out of the thing it stands in for cannot fail the one way that
+matters. Vendoring the corpus as `.rs` rather than as yog's `.json` files is
+`Cargo.toml`'s doing: JSON would have to be ruled into the `include` allowlist
+to survive a build from the registry, and would then ship a test fixture inside
+a released crate.
 
 ### 3.7 The set is keyed on the identity, and a working foot is absent
 
@@ -421,10 +442,34 @@ an idle foot pays nothing: no hand-off ends, so nothing is said. The engine
 writes only when the set differs, so the ordinary re-assertion is a comparison
 and no write.
 
-What this does not buy is **knowing**: `advertised` reads the same whether the
-engine wrote or compared, so a foot restoring a set some other connection
-blanked heals silently. The receipt that would distinguish them is the far
-end's to give and is asked for in yog bl-66d4.
+**And since PROTOCOL 8 it buys knowing too** (yog bl-66d4, consumed in
+bl-e0f0). `advertised` carries `wrote`: false when the engine compared, true
+when it changed the document. So a re-assertion that WROTE is this box learning
+it was disarmed while it was absent — the set it presented was not the set in
+force — and the foot **says so** instead of healing in silence, which was the
+whole of what bl-2d78 could not close from this end.
+
+Three properties of that reading, and each is a decision:
+
+- **A `true` on the FIRST presentation of a channel says nothing.** Every fresh
+  channel presents into whatever the engine happens to hold, and the ordinary
+  first presentation writes. Only a presentation made after a hand-off this
+  foot just performed can tell a rival from a beginning.
+- **It does not end the channel.** The set is back and the tools work; a foot
+  that exited here would hand the box to the rival by leaving. Compare the
+  *refused* re-assertion, which does end it — there the engine is telling this
+  foot that another connection is serving under its name right now, and this
+  one is not the machine in force. Two readings of one hazard, two answers.
+- **It goes to a sink, not to the return.** Every other sentence in `run.rs` is
+  a channel ending, returned as a value; this one has to be said with the
+  channel still up. So the sink is a parameter (`run::Notice`) for the same
+  reason the executor is, and the one effect — writing to this process's
+  stderr — lives in `src/main.rs`, where a test reads notices back as values
+  instead. In `fan` each channel's notices carry that channel's name, the same
+  prefix its ending sentence carries.
+
+The foot cannot tell a rival from an engine that lost what it was holding, so
+the sentence names both readings rather than guessing one.
 
 ---
 
@@ -450,7 +495,7 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/json.rs` | The strict field reads every decoder here shares: a missing field, a mistyped one and a wrong-shaped one each refuse with the key an operator typed. |
 | `src/gestures.rs` | **The foot set** (bl-a2ea): `advertise`, `invocations`, `complete`, and the answers they can earn. The enumeration is the enforcement thrall can keep — there is no spelling here for a fourth verb. |
 | `src/invocation.rs` | What crosses the routing leg: the invocation a foot is handed and the capture it hands back, each in one strict spelling. |
-| `src/run.rs` | **The loop**: present, wait, hand off, answer — and the fan that serves every channel at once. Execution is a parameter (`Handoff`), which is what lets the whole conversation be tested against a real engine and a one-line executor. |
+| `src/run.rs` | **The loop**: present, wait, hand off, answer — and the fan that serves every channel at once. Execution is a parameter (`Handoff`), and so is where a channel says something while it is still serving (`Notice`, §3.7) — which is what lets the whole conversation be tested against a real engine, a one-line executor and a sink that records. |
 | `src/exec.rs` | **The executor's dispatch** (bl-4cda): which entry an invocation names, whose working directory it may run in (§3.4's `subject_cwd`), and the three facts that come back. Every outcome is a capture — a tool that ran, one that overran, a name this box does not carry, a command that would not start. |
 | `src/exec/child.rs` | One child, from the fork to the capture: the spawn, the poll that is also the drain, and the cascade that stops a tool which will not stop itself. Split from `exec.rs` when the drain moved into the poll (bl-6c14) — the seam is *deciding what to run* against *running it*. |
 | `src/exec/pipes.rs` | The child's three pipes, pumped without blocking and read within a bound (bl-6c14, bl-6028; §3.5). A read answers with what the pipe holds now, so a write end a helper still holds cannot outlast the invocation — and the drains and the input feed stop being threads, because none of them can block any more. Past `exec::CAPTURE_LIMIT` it keeps reading and stops keeping, counting what it dropped so the capture can say so. |
@@ -459,7 +504,8 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/spawn.rs` | **The spawn boundary.** Every child process is built AND forked here — nowhere else builds a `Command`, and nowhere else spends one. It decides three things a spawn site could forget: the git-environment scrub, the **process group** the child is born leading (bl-a78e, §3.5), and the fork lock the suite needs. **Founded by bl-a4a5**, before it had a production tenant, which is the point of the row: a boundary rule that arrives after the first spawn site is a rule that has to be argued with. |
 | `src/sys.rs` | **The confined `unsafe` file**, and it holds two things, both raw process effects `std` does not wrap. Signalling a process GROUP, which `std` has no spelling for at all (`Child::kill` is `SIGKILL` to one process, and there is no `Child::terminate`); the sign guard did not move when the group arrived (§3.5) — the negation is this file's, the callers pass a positive id. And putting a pipe into non-blocking mode (bl-6c14), which `std` spells for sockets and for nothing else — a `ChildStdout` has no `set_nonblocking`, and borrowing the socket one by wrapping the descriptor in a `UnixStream` would read the pipe with `recv(2)`, which a pipe refuses. Both are declared rather than depended on: `kill(2)` and `fcntl(2)` are in the libc `std` already links, so neither costs a crate, a build script or a lockfile line. |
 | `src/state.rs` | **The lock chokepoint.** Every `Mutex`/`RwLock` in the crate. Unbuilt, and it stayed that way: the only cross-thread hand-offs thrall has are a `JoinHandle`'s own answer (the pipes a child writes, the sentence a channel ends with), which need no lock. The suite's fork lock is **not** a tenant — a test's serialization lock is scaffolding, and the rule's own text sends it to `src/test_support.rs`. |
-| `src/test_support.rs` | `cfg(test)` only. The scratch directory, the fork lock, the stand-in engine, and the certificate mint the suite performs on the operator's behalf. |
+| `src/corpus.rs` | `cfg(test)` only. **The engine's conformance corpus, vendored as literal text** (REMOTE §3, bl-e0f0): the protocol number and the frames of every shape a foot speaks, copied from yog rather than derived from anything here. `corpus/tests.rs` pays what §3 says a client owes them — decode every frame, and round-trip every request byte for byte. It is the crate's one statement of what the FAR end says, which is why the stand-in engine reads its version from here and not from the pin it is testing. |
+| `src/test_support.rs` | `cfg(test)` only. The scratch directory, the fork lock, the stand-in engine, the recording notice sink (§3.7 — a serving foot writes to stderr, and a test cannot read that back), and the certificate mint the suite performs on the operator's behalf. |
 | `src/packaged_tests.rs` | `cfg(test)` only. **The publication guard** (bl-d25a): what `cargo publish` would upload, read off the real `cargo package --list` and judged against the classes `Cargo.toml`'s `include` allowlist rules in — both directions, since a shape guard dies by matching nothing. It is in `src` rather than a `tests/` crate because it forks a child and the spawn boundary is `pub(crate)`; an integration crate could only reach a bare `Command::new`, which the confinement rules refuse. |
 
 **There is no flat material root, and its absence is a simplification rather

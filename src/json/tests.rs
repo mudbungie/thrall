@@ -1,6 +1,6 @@
 //! Strict reads: every refusal names the key the operator typed.
 
-use super::{opt_str_of, str_of, strings_of};
+use super::{bool_of, opt_str_of, str_of, strings_of};
 use serde_json::{Map, Value, json};
 
 /// The object a test reads fields out of.
@@ -24,6 +24,28 @@ fn a_mistyped_string_field_refuses_rather_than_stringifying_it() {
     assert_eq!(
         str_of(&o, "name"),
         Err("field \"name\" is not a string".to_owned())
+    );
+}
+
+/// **A required boolean has three answers and only one of them is a value.**
+/// Absent refuses rather than reading false, because the fields wearing this
+/// shape are readings off the far end (`wrote`), and a reading defaulted to
+/// false is the reassuring answer invented for an engine that said nothing.
+#[test]
+fn a_required_boolean_refuses_absence_rather_than_reading_false() {
+    let o = object(json!({"wrote": true}));
+    assert_eq!(bool_of(&o, "wrote"), Ok(true));
+    assert_eq!(
+        bool_of(&object(json!({"wrote": false})), "wrote"),
+        Ok(false)
+    );
+    assert_eq!(
+        bool_of(&object(json!({})), "wrote"),
+        Err("missing field \"wrote\"".to_owned())
+    );
+    assert_eq!(
+        bool_of(&object(json!({"wrote": "true"})), "wrote"),
+        Err("field \"wrote\" is not a boolean".to_owned())
     );
 }
 

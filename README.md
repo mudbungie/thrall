@@ -51,7 +51,12 @@ Two honesty clauses ride with that, and neither is decoration:
 for: it dials each engine over mTLS with the protocol version stated by both
 ends before either reads, refuses to open at all on a certificate that is not
 foot-grade, presents what the operator's tool document enables, waits on its
-mailbox, runs what comes back and posts the capture. It does not return while a
+mailbox, runs what comes back and posts the capture. It presents its set again
+at the end of every hand-off, and **says so on stderr when that presentation
+actually changed anything**: the engine's receipt distinguishes a comparison
+from a write, so a write there means something replaced this box's advertised
+set while a tool was running. It restores it and carries on — the notice is the
+part a person needs. It does not return while a
 channel is up, and it never reconnects — a channel that fails is an exit naming
 it, because restart policy belongs to this machine's own supervision.
 

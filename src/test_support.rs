@@ -1,8 +1,13 @@
 //! Scaffolding the suite shares, and nothing production reads. Compiled only
 //! under `cfg(test)`.
 //!
-//! Two things live here that live nowhere else in the crate, and both are
-//! deliberate:
+//! Three things live here that live nowhere else in the crate, and all three
+//! are deliberate:
+//!
+//! - **The notice sink** ([`Notices`]). A serving foot says one thing without
+//!   ending anything — that it was disarmed while a tool ran (DESIGN §3.7) —
+//!   and writes it to stderr, which no test can read back. So the effect is
+//!   `src/main.rs`'s and the suite hands channels a recorder instead.
 //!
 //! - **The fork lock** the spawn boundary takes ([`fork_lock`]). It is the
 //!   `Mutex` the lock-confinement rule would otherwise send to `src/state.rs`,
@@ -19,7 +24,7 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 /// The stand-in for the far end of the wire.
 pub(crate) mod engine;
@@ -36,6 +41,58 @@ static FORK: Mutex<()> = Mutex::new(());
 /// turn one failure into a suite.
 pub(crate) fn fork_lock() -> MutexGuard<'static, ()> {
     FORK.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// **The notice sink, recording.** A serving foot writes what it has to say
+/// mid-channel to stderr (`src/main.rs`), which no test can read back — so the
+/// suite hands it this instead and reads the sentences as values.
+///
+/// One sink for the whole suite rather than one per test module, because an
+/// empty closure written in five files is five code locations the coverage
+/// floor then owes a caller apiece.
+#[derive(Default)]
+pub(crate) struct Notices(Arc<Mutex<Vec<String>>>);
+
+impl Notices {
+    /// A recorder, and the sink to hand a channel.
+    ///
+    /// The sink's body is [`record`] rather than a block, so the closure is one
+    /// expression: a braced body puts a region on its closing line that
+    /// llvm-cov reports uncovered however many times the closure runs.
+    pub(crate) fn new() -> (Self, crate::run::Notice) {
+        let said = Self::default();
+        let into = Arc::clone(&said.0);
+        (said, Arc::new(move |line: &str| record(&into, line)))
+    }
+
+    /// Everything it was told, in order.
+    pub(crate) fn heard(&self) -> Vec<String> {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+}
+
+/// One notice, kept.
+///
+/// The line is owned before the lock is taken rather than inside the `push`,
+/// which is the shape [`engine`]'s recorder already uses: a temporary built
+/// inside the locked call earns a drop region llvm-cov reports uncovered on
+/// however many times the line runs.
+fn record(said: &Arc<Mutex<Vec<String>>>, line: &str) {
+    let line = line.to_owned();
+    said.lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .push(line);
+}
+
+/// A sink for a test whose subject is not what the channel said. It records
+/// into a recorder nobody reads, which is cheaper than a second empty closure:
+/// an unread `Notices` is one code location the coverage floor already owes a
+/// caller, and five hand-written `|_| {}` sinks would be five more.
+pub(crate) fn aside() -> crate::run::Notice {
+    Notices::new().1
 }
 
 /// How many scratch directories this process has minted, so two tests running

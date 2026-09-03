@@ -12,6 +12,15 @@
 //! and holds a connection only while it is waiting. So a test says what the
 //! engine answers the first dial, the second, and so on.
 //!
+//! **It states the engine's protocol number, not this crate's** (bl-e0f0).
+//! Every fixture here dials at [`crate::corpus::PROTOCOL`], a literal copied
+//! from yog's `src/wire/hello.rs`. While it wrote its preface from
+//! `channel::hello::PROTOCOL` the two ends of every test were one constant
+//! wearing two names, so they agreed at any value — and the pin sat five
+//! versions behind a live engine, unable to open a single real channel, with
+//! the whole suite green. A stand-in built out of the thing it stands in for
+//! cannot fail the one way that matters.
+//!
 //! **It records every frame it is handed, in order** — the version preface and
 //! then the request, per connection. That is how a test asserts what thrall
 //! *said* rather than only what it did with the reply, and it is the only
@@ -76,13 +85,7 @@ impl Engine {
         let recorded = Arc::clone(&seen);
         std::thread::spawn(move || {
             let (tcp, _) = listener.accept().expect("a dial");
-            serve(
-                &config,
-                tcp,
-                crate::channel::hello::PROTOCOL,
-                None,
-                &recorded,
-            );
+            serve(&config, tcp, crate::corpus::PROTOCOL, None, &recorded);
         });
         Self { seen }
     }

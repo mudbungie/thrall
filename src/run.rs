@@ -33,10 +33,18 @@
 //! end. Re-presenting before *every* read would double the traffic of a foot
 //! that is protected by the engine's guard the whole time it is waiting.
 //!
-//! What it does **not** buy is knowing. A re-presentation restores the set
-//! silently, because `advertised` says the same thing whether the engine wrote
-//! or compared; a receipt that distinguished them is the far end's to give and
-//! is asked for in yog bl-66d4.
+//! **And since PROTOCOL 8 it also buys knowing** (yog bl-66d4). The receipt
+//! carries `wrote`: false when the engine compared, true when it changed the
+//! document. So a re-assertion that WROTE is this machine being told it was
+//! disarmed while it was absent — the set it presented was not the set in
+//! force — and that is said out loud rather than healed in silence, which was
+//! the whole complaint bl-2d78 could not close from this end.
+//!
+//! **A true on the FIRST presentation of a channel says nothing** and is not
+//! reported: every fresh channel presents into whatever the engine holds, and
+//! the ordinary first one writes. Only a re-assertion — a presentation this
+//! foot made after a hand-off it just performed — can distinguish a rival from
+//! a beginning.
 //!
 //! **The loop is serial, and that is what makes a busy foot absent** (REMOTE
 //! §5's presence amendment). It runs one invocation at a time and holds a
@@ -53,6 +61,8 @@
 //! **It never reconnects.** A channel that fails is the sentence that failed
 //! it, handed back. Restart policy belongs to the supervision the operator's
 //! machine already has (DESIGN §2).
+
+use std::sync::Arc;
 
 use serde_json::Value;
 
@@ -71,14 +81,47 @@ use crate::invocation::{Capture, Invocation};
 /// executor to every channel without a lock or a clone.
 pub type Handoff = fn(&[Local], &Invocation) -> Capture;
 
+/// **Where a foot says something while it is still serving.**
+///
+/// Every other thing this file has to say is the sentence a channel ends with,
+/// returned as a value the caller renders. A disarming is the one fact that
+/// must be said *without* ending anything — the foot has already healed it and
+/// carries on — so it needs somewhere to go that is not a return.
+///
+/// It is injected for [`Handoff`]'s reason, one register down: what a running
+/// foot writes to is stderr, which is an effect no test can read back, so the
+/// effect lives in `src/main.rs` (the one coverage exclusion, and the file that
+/// already owns serving) and every test reads the notices back as values. It is
+/// `Arc<dyn Fn>` rather than a bare `fn` because a recording sink has to
+/// capture where it records, and shared across [`fan`]'s threads because a box
+/// with several engines has one place to say things.
+pub type Notice = Arc<dyn Fn(&str) + Send + Sync>;
+
+/// **What this machine says when a re-assertion actually wrote.**
+///
+/// The engine writes only a set that differs, so a `true` here means the set in
+/// force was not the set this foot presents — something replaced it while this
+/// box was executing and could not be told apart from a machine that had gone
+/// away (REMOTE §5.1). The restoration is automatic; being told is not, and it
+/// is the telling this whole chain was for.
+///
+/// It names both readings an operator can act on, because the foot cannot tell
+/// them apart and guessing would be worse than saying so.
+const DISARMED: &str = "this box's advertised set was not the set in force and has just been \
+    restored: it was replaced while a tool was running. Either another connection is bearing \
+    this box's identity, or the engine lost the set it was holding.";
+
 /// **One channel, served** — until it fails, and then the sentence that failed
 /// it.
 ///
 /// There is no success return and none is spelled: the only way out is a
 /// gesture that did not land, so an `Ok` arm would be one no state of the world
 /// can reach.
-pub fn hold(channel: &Channel, set: &[Local], handoff: Handoff) -> String {
+pub fn hold(channel: &Channel, set: &[Local], handoff: Handoff, notice: &Notice) -> String {
     let presenting = gestures::advertise(&config::advertisement(set));
+    // The first presentation's reading is discarded on purpose: a fresh channel
+    // writes whenever the engine held something else, and there is no rival in
+    // that. Only a re-assertion below can mean one.
     if let Err(reason) = present(channel, &presenting) {
         return reason;
     }
@@ -92,8 +135,10 @@ pub fn hold(channel: &Channel, set: &[Local], handoff: Handoff) -> String {
             if let Err(reason) = answer(channel, &invocation, &capture) {
                 return reason;
             }
-            if let Err(reason) = present(channel, &presenting) {
-                return reason;
+            match present(channel, &presenting) {
+                Err(reason) => return reason,
+                Ok(true) => notice(DISARMED),
+                Ok(false) => {}
             }
         }
     }
@@ -112,8 +157,23 @@ pub fn hold(channel: &Channel, set: &[Local], handoff: Handoff) -> String {
 /// refusal here is another connection holding this machine's read with a
 /// different set in force — two processes claiming one name, which is the
 /// engine's sentence to say and this foot's to stop on.
-fn present(channel: &Channel, presenting: &Value) -> Result<(), String> {
-    tell(channel, presenting).map(|_| ())
+///
+/// **It answers the engine's reading**: whether that presentation WROTE the
+/// stored set or found it identical and compared (REMOTE §5.1's `wrote`,
+/// PROTOCOL 8). What that means depends on which presentation it was, so the
+/// judgement is the caller's and this is only the reading.
+///
+/// **And it is strict about the kind.** An engine that answered the
+/// advertisement with something other than the advertisement's receipt has not
+/// said the set landed, and a foot that read on regardless would be waiting for
+/// work under a set nobody confirmed.
+fn present(channel: &Channel, presenting: &Value) -> Result<bool, String> {
+    match tell(channel, presenting)? {
+        Reply::Advertised { wrote } => Ok(wrote),
+        other => Err(format!(
+            "the engine answered {other:?}, not that the advertisement landed"
+        )),
+    }
 }
 
 /// **Every channel this box holds, served at once** — one thread each, and the
@@ -128,14 +188,15 @@ fn present(channel: &Channel, presenting: &Value) -> Result<(), String> {
 /// An empty set of entries stops instantly with nothing to say, which is
 /// correct and is not this function's sentence to write: the caller is the one
 /// that knows where entries would have been filed.
-pub fn fan(entries: Vec<Entry>, set: Vec<Local>, handoff: Handoff) -> Vec<String> {
+pub fn fan(entries: Vec<Entry>, set: Vec<Local>, handoff: Handoff, notice: &Notice) -> Vec<String> {
     let running: Vec<(String, std::thread::JoinHandle<String>)> = entries
         .into_iter()
         .map(|entry| {
             let set = set.clone();
             let leaf = entry.leaf.clone();
+            let under = named(notice, &leaf);
             let running = std::thread::spawn(move || match entry.open() {
-                Ok(channel) => hold(&channel, &set, handoff),
+                Ok(channel) => hold(&channel, &set, handoff, &under),
                 Err(reason) => reason,
             });
             (leaf, running)
@@ -153,6 +214,16 @@ pub fn fan(entries: Vec<Entry>, set: Vec<Local>, handoff: Handoff) -> Vec<String
             Err(_) => format!("{leaf}: the channel ended by panicking"),
         })
         .collect()
+}
+
+/// One channel's notices, under the name that channel was filed as — the same
+/// prefix its ending sentence carries. A box holding two engines that was told
+/// it had been disarmed, and not by which one, has been told nothing it can
+/// act on.
+fn named(notice: &Notice, leaf: &str) -> Notice {
+    let notice = Arc::clone(notice);
+    let leaf = leaf.to_owned();
+    Arc::new(move |line: &str| notice(&format!("{leaf}: {line}")))
 }
 
 /// **The follow-class read**: this machine's next work, or the empty answer of

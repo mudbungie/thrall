@@ -28,7 +28,7 @@
 use serde_json::{Value, json};
 
 use crate::invocation::{Capture, Invocation, capture_of, capture_value, invocation_of};
-use crate::json::str_of;
+use crate::json::{bool_of, str_of};
 use crate::tools::{self, Tool};
 
 /// **Present what this box offers** (REMOTE §5.1): one field, `tools`, an array
@@ -59,8 +59,16 @@ pub fn complete(invocation: &str, capture: &Capture) -> Value {
 /// (see [`run`](crate::run)), not the decoder's.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Reply {
-    /// The advertisement landed.
-    Advertised,
+    /// The advertisement landed, and **whether the engine wrote it** (REMOTE
+    /// §5.1, PROTOCOL 8): `false` when it found the stored set identical and
+    /// compared, `true` when the document changed.
+    ///
+    /// It is required rather than absent-reads-false, which is the far end's
+    /// ruling and the right one: absent would read as *"nothing was restored"*
+    /// — the reassuring answer — on exactly the build too old to tell. So a
+    /// receipt in the pre-8 shape refuses here rather than decoding to a
+    /// comforting `false`.
+    Advertised { wrote: bool },
     /// This machine's work, which is ordinarily empty: the engine holds the
     /// read for its own bound and then answers with what it has.
     Invocations(Vec<Invocation>),
@@ -92,7 +100,9 @@ pub fn decode(v: &Value) -> Result<Result<Reply, String>, String> {
     };
     let kind = kind.as_str().ok_or("reply: non-string field \"kind\"")?;
     match kind {
-        "advertised" => Ok(Reply::Advertised),
+        "advertised" => bool_of(o, "wrote")
+            .map(|wrote| Reply::Advertised { wrote })
+            .map_err(|e| format!("reply: {e}")),
         "invocations" => rows(o).map(Reply::Invocations),
         "routed" => routed(o),
         other => Err(format!("reply: unusable kind {other:?}")),

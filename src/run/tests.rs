@@ -10,7 +10,7 @@ use crate::channel::material::read_dir;
 use crate::config::Local;
 use crate::invocation::{Capture, Invocation};
 use crate::test_support::engine::Engine;
-use crate::test_support::{Scratch, mint};
+use crate::test_support::{Scratch, aside, mint};
 use crate::tools::Tool;
 use serde_json::{Value, json};
 use std::path::Path;
@@ -46,8 +46,16 @@ fn boom(_: &[Local], _: &Invocation) -> Capture {
     panic!("an executor that died");
 }
 
+/// The ordinary receipt: the engine compared and found the set in force
+/// identical, so it wrote nothing (REMOTE §5.1's `wrote`, PROTOCOL 8).
 fn advertised() -> Value {
-    json!({"ok": true, "kind": "advertised"})
+    json!({"ok": true, "kind": "advertised", "wrote": false})
+}
+
+/// The receipt that says the engine CHANGED the document. On a re-assertion
+/// that is this box learning it was disarmed while a tool ran.
+fn restored() -> Value {
+    json!({"ok": true, "kind": "advertised", "wrote": true})
 }
 
 fn work(rows: Vec<Value>) -> Value {
@@ -73,7 +81,7 @@ fn engine_at(dir: &Path, script: Vec<Value>) -> Engine {
     mint::material(dir);
     Engine::start(
         dir,
-        crate::channel::hello::PROTOCOL,
+        crate::corpus::PROTOCOL,
         script.into_iter().map(|v| vec![v]).collect(),
     )
 }
@@ -110,5 +118,7 @@ fn gesture(engine: &Engine, n: usize) -> Value {
 
 /// One conversation with one engine.
 mod channel;
+/// What a channel says while it is still serving.
+mod disarm;
 /// Every channel this box holds, at once.
 mod fan;

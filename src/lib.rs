@@ -42,6 +42,14 @@ pub(crate) mod spawn;
 /// **The confined `unsafe` file** — every raw process effect in the crate.
 pub(crate) mod sys;
 
+/// **The engine's conformance corpus, vendored as literal text** (REMOTE §3):
+/// the protocol number and the frames of every shape a foot speaks, copied from
+/// yog rather than derived from anything here. It is what the stand-in engine
+/// states and what the decoders are judged against, so a drift on the far end
+/// is a red test rather than a channel that will not open (bl-e0f0).
+#[cfg(test)]
+pub(crate) mod corpus;
+
 /// Scaffolding the suite shares. Never compiled into a released binary.
 #[cfg(test)]
 pub(crate) mod test_support;

@@ -36,7 +36,23 @@ use super::frame;
 /// decode) — the boundary correcting itself, not two protocols meeting. The
 /// integer moves when the *existing* shape changes meaning: the framing, the
 /// envelope, or what a spelling already in use is taken to say.
-pub const PROTOCOL: u32 = 2;
+///
+/// **The number is the engine's and there is nothing here to version.** It must
+/// read whatever yog's own `src/wire/hello.rs` reads, so it is stated a second
+/// time — as a literal copied from that file — in `crate::corpus`, which is
+/// what the suite's stand-in engine dials at. The two agreeing is a test
+/// (`corpus::tests`) rather than a tautology, and that is the whole of the
+/// defence: while the stand-in wrote its preface from *this* constant, both
+/// ends of every test agreed by construction and the pin sat five versions
+/// behind a live engine with the suite green (bl-e0f0).
+///
+/// **Most bumps between here and 2 were not a foot's business, and it could
+/// still not dial across any of them.** 3 through 7 moved seat-facing shapes
+/// this crate never decodes; 8 (yog bl-66d4) is the one that touched the foot's
+/// own surface, adding the required `wrote` to `reply/advertised`. The preface
+/// is one integer compared for equality, so the version states the engine's
+/// *build* and never which frames this end happens to read.
+pub const PROTOCOL: u32 = 8;
 
 /// The preface's one key, and the whole of its shape.
 const KEY: &str = "protocol";

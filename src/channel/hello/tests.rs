@@ -29,9 +29,13 @@ fn this_end_states_one_integer_in_one_frame() {
 }
 
 /// An engine speaking this version is admitted, and says nothing about it.
+///
+/// It states the number the way the far end states it — `corpus::PROTOCOL`, a
+/// literal copied from yog — rather than the pin this file is about, so the two
+/// have different sources here as they do on the wire.
 #[test]
 fn an_engine_of_this_version_is_confirmed() {
-    let wire = stated(&json!({ "protocol": PROTOCOL }));
+    let wire = stated(&json!({ "protocol": crate::corpus::PROTOCOL }));
     assert_eq!(confirm(&mut wire.as_slice()), Ok(()));
 }
 

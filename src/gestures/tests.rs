@@ -80,8 +80,8 @@ fn the_only_ops_this_crate_can_spell_are_the_foot_set() {
 #[test]
 fn an_advertised_receipt_reads_back() {
     assert_eq!(
-        decode(&json!({"ok": true, "kind": "advertised"})),
-        Ok(Ok(Reply::Advertised))
+        decode(&json!({"ok": true, "kind": "advertised", "wrote": false})),
+        Ok(Ok(Reply::Advertised { wrote: false }))
     );
 }
 

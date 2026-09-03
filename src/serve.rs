@@ -25,8 +25,14 @@ use crate::channel::material::{ADDRESS, ANCHORS, CHAIN, KEY, REMEDY};
 use crate::cli::Verdict;
 use crate::{config, exec, run};
 
-/// Serve the box rooted at `root`.
-pub fn serve(root: &Path) -> Verdict {
+/// Serve the box rooted at `root`, saying anything a channel raises while it
+/// is still serving through `notice`.
+///
+/// **The sink is a parameter for the same reason the executor is** (`run`): a
+/// serving foot's notices go to this process's stderr, which is an effect and
+/// not a value, so the effect is `src/main.rs`'s and every test here reads the
+/// notices back instead.
+pub fn serve(root: &Path, notice: &run::Notice) -> Verdict {
     let set = match config::read(&config::path(root)) {
         Ok(set) => set,
         Err(reason) => return Verdict::failed(reason),
@@ -35,7 +41,7 @@ pub fn serve(root: &Path) -> Verdict {
     if held.is_empty() {
         return Verdict::failed(unprovisioned(root));
     }
-    Verdict::failed(run::fan(held, set, exec::handoff).join("\n"))
+    Verdict::failed(run::fan(held, set, exec::handoff, notice).join("\n"))
 }
 
 /// What a box with a tool document and no channel is told.

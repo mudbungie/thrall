@@ -2,8 +2,11 @@
 //! real mTLS handshake, a real version preface, real frames.
 
 use super::hello::PROTOCOL;
+// The version the FAR end states, got from the engine rather than from this
+// crate's own pin: two sources, as on the wire (`crate::corpus`).
 use super::material::{CHAIN, KEY, Material, read_dir};
 use super::{Channel, server_name};
+use crate::corpus::PROTOCOL as ENGINE;
 use crate::test_support::engine::Engine;
 use crate::test_support::{Scratch, mint};
 use serde_json::{Value, json};
@@ -22,7 +25,7 @@ fn wired(protocol: u32, script: Vec<Vec<Value>>) -> (Scratch, Engine, Material) 
 
 /// An answer of one frame: the ordinary shape.
 fn advertised() -> Value {
-    json!({"ok": true, "kind": "advertised"})
+    json!({"ok": true, "kind": "advertised", "wrote": false})
 }
 
 /// **Nothing is dialled when a channel opens**, and what it answers about
@@ -54,7 +57,7 @@ fn a_channel_refuses_to_open_on_a_leaf_that_is_not_a_foot() {
 /// value it sent.
 #[test]
 fn one_ask_states_a_version_carries_the_request_and_answers_the_reply() {
-    let (_scratch, engine, held) = wired(PROTOCOL, vec![vec![advertised()]]);
+    let (_scratch, engine, held) = wired(ENGINE, vec![vec![advertised()]]);
     let channel = Channel::open(&held).expect("opened");
     let request = json!({"op": "advertise", "tools": []});
     assert_eq!(channel.ask(&request), Ok(vec![advertised()]));
@@ -70,7 +73,7 @@ fn one_ask_states_a_version_carries_the_request_and_answers_the_reply() {
 #[test]
 fn an_answer_of_many_frames_reads_back_through_the_same_ask() {
     let rows = vec![json!({"n": 1}), json!({"n": 2}), json!({"n": 3})];
-    let (_scratch, _engine, held) = wired(PROTOCOL, vec![rows.clone()]);
+    let (_scratch, _engine, held) = wired(ENGINE, vec![rows.clone()]);
     let channel = Channel::open(&held).expect("opened");
     assert_eq!(channel.ask(&json!({"op": "invocations"})), Ok(rows));
 }
@@ -79,7 +82,7 @@ fn an_answer_of_many_frames_reads_back_through_the_same_ask() {
 /// requests — which is what makes a busy foot absent at the far end.
 #[test]
 fn each_ask_is_its_own_connection() {
-    let (_scratch, engine, held) = wired(PROTOCOL, vec![vec![advertised()], vec![advertised()]]);
+    let (_scratch, engine, held) = wired(ENGINE, vec![vec![advertised()], vec![advertised()]]);
     let channel = Channel::open(&held).expect("opened");
     for op in ["advertise", "invocations"] {
         assert!(channel.ask(&json!({ "op": op })).is_ok());
@@ -97,7 +100,7 @@ fn each_ask_is_its_own_connection() {
 /// gesture above, which is the only layer that knows what it asked for.
 #[test]
 fn an_engine_that_answers_nothing_ends_the_stream() {
-    let (_scratch, _engine, held) = wired(PROTOCOL, vec![vec![]]);
+    let (_scratch, _engine, held) = wired(ENGINE, vec![vec![]]);
     let channel = Channel::open(&held).expect("opened");
     assert_eq!(channel.ask(&json!({"op": "invocations"})), Ok(Vec::new()));
 }
@@ -106,7 +109,7 @@ fn an_engine_that_answers_nothing_ends_the_stream() {
 /// before a frame of the answer is decoded.
 #[test]
 fn an_engine_of_another_protocol_refuses_and_names_both_versions() {
-    let (_scratch, _engine, held) = wired(PROTOCOL + 1, vec![vec![advertised()]]);
+    let (_scratch, _engine, held) = wired(ENGINE + 1, vec![vec![advertised()]]);
     let channel = Channel::open(&held).expect("opened");
     let refusal = channel
         .ask(&json!({"op": "advertise"}))
@@ -116,7 +119,7 @@ fn an_engine_of_another_protocol_refuses_and_names_both_versions() {
         "{refusal}"
     );
     assert!(
-        refusal.contains(&format!("engine speaks {}", PROTOCOL + 1)),
+        refusal.contains(&format!("engine speaks {}", ENGINE + 1)),
         "{refusal}"
     );
 }
@@ -140,7 +143,7 @@ fn an_engine_that_is_not_there_names_the_address_it_dialled() {
 /// the gesture is ever read by anyone.
 #[test]
 fn an_engine_the_anchors_do_not_cover_never_reaches_the_boundary() {
-    let (_scratch, engine, mut held) = wired(PROTOCOL, vec![vec![advertised()]]);
+    let (_scratch, engine, mut held) = wired(ENGINE, vec![vec![advertised()]]);
     let elsewhere = Scratch::new();
     mint::material(elsewhere.path());
     held.anchors = elsewhere.join(super::material::ANCHORS);
@@ -154,7 +157,7 @@ fn an_engine_the_anchors_do_not_cover_never_reaches_the_boundary() {
 /// chain the engine's verifier cannot chain to its anchors.
 #[test]
 fn a_leaf_the_engine_will_not_accept_never_reaches_the_boundary() {
-    let (scratch, engine, mut held) = wired(PROTOCOL, vec![vec![advertised()]]);
+    let (scratch, engine, mut held) = wired(ENGINE, vec![vec![advertised()]]);
     let elsewhere = Scratch::new();
     mint::material(elsewhere.path());
     held.chain = elsewhere.join(CHAIN);

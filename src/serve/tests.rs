@@ -5,7 +5,7 @@ use super::serve;
 use crate::channel::entries;
 use crate::config;
 use crate::test_support::engine::Engine;
-use crate::test_support::{Scratch, mint};
+use crate::test_support::{Scratch, aside, mint};
 use serde_json::{Value, json};
 use std::path::Path;
 
@@ -31,13 +31,13 @@ fn channel(root: &Path, leaf: &str, script: Vec<Value>) -> Engine {
     mint::material(&dir);
     Engine::start(
         &dir,
-        crate::channel::hello::PROTOCOL,
+        crate::corpus::PROTOCOL,
         script.into_iter().map(|v| vec![v]).collect(),
     )
 }
 
 fn advertised() -> Value {
-    json!({"ok": true, "kind": "advertised"})
+    json!({"ok": true, "kind": "advertised", "wrote": false})
 }
 
 fn refusal(said: &str) -> Value {
@@ -49,7 +49,7 @@ fn refusal(said: &str) -> Value {
 #[test]
 fn a_box_with_no_tool_document_refuses_before_it_dials() {
     let scratch = Scratch::new();
-    let said = serve(scratch.path());
+    let said = serve(scratch.path(), &aside());
     assert_eq!(said.code, 1);
     assert!(said.text.contains("tools.json"), "{}", said.text);
     assert!(said.text.contains("no tool config"), "{}", said.text);
@@ -64,7 +64,7 @@ fn a_box_with_no_tool_document_refuses_before_it_dials() {
 fn a_box_with_no_channel_is_told_the_shape_of_one() {
     let scratch = Scratch::new();
     offering(scratch.path());
-    let said = serve(scratch.path());
+    let said = serve(scratch.path(), &aside());
     assert_eq!(said.code, 1);
     assert!(said.text.contains("holds no channel"), "{}", said.text);
     assert!(said.text.contains("ca.pem"), "{}", said.text);
@@ -86,7 +86,7 @@ fn every_channel_that_stopped_answers_under_its_own_name() {
     offering(scratch.path());
     let _north = channel(scratch.path(), "north", vec![refusal("north stopped")]);
     let _south = channel(scratch.path(), "south", vec![refusal("south stopped")]);
-    let said = serve(scratch.path());
+    let said = serve(scratch.path(), &aside());
     assert_eq!(said.code, 1);
     assert_eq!(
         said.text,
@@ -116,7 +116,7 @@ fn a_foot_advertises_is_invoked_and_answers_with_what_ran() {
             refusal("the engine is going down"),
         ],
     );
-    let said = serve(scratch.path());
+    let said = serve(scratch.path(), &aside());
     assert_eq!(said.text, "thrall: engine: the engine is going down");
 
     let gestures: Vec<Value> = engine
@@ -180,7 +180,7 @@ fn a_capture_too_big_for_the_wire_is_answered_and_the_channel_goes_on() {
             refusal("the engine is going down"),
         ],
     );
-    let said = serve(scratch.path());
+    let said = serve(scratch.path(), &aside());
     assert_eq!(said.text, "thrall: engine: the engine is going down");
 
     let gestures: Vec<Value> = engine
