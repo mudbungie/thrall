@@ -1,7 +1,8 @@
 +++
 title = "arm the release pipeline: a CI workflow to gate it, a trusted publisher, and the push trigger"
 created = 1788146102
-updated = 1788146102
+updated = 1788398896
+claimant = "Thrallship"
 priority = 2
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
 +++
