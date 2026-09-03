@@ -87,12 +87,20 @@ by name and `.containerignore` keeps the rest from being sent at all — so the
 one question a publication checklist asks is now asked once per channel, and
 `make image-scan` is the container half's answer to `cargo package --list`.
 
-**What no hook can promise.** This scans one tree. Old commits, other refs,
-and anything published elsewhere are outside it — and thrall now HAS published
-refs (bl-006e's remote half landed; the trunk and the task store go to the same
-remote), while the late half (a scan of what is actually public) still does not
-exist: bl-e95a. So thrall has prevention only: local, and bypassable by whoever
-runs it.
+**What no hook can promise, and what the late half now does.** A hook scans one
+tree, on the author's box, before a push — so old commits, other refs and
+anything already published are outside it. Two refs publish to this remote
+(bl-006e): `main`, which CI judges with the same `make leak-scan` on every pull
+request and on every push, and `balls/tasks`, which until bl-e95a nothing read
+after the fact. `.github/workflows/store-scan.yml` is that reading: the repo's
+own `scripts/leak-scan.sh` and rule table — never a copy — over the published
+store ref, daily, on `workflow_dispatch`, and on any push to `main` that touches
+the scanner, the rule table or the mode table, because an edited rule re-judges
+a store that has not moved. It DETECTS rather than prevents: by the time it runs
+the material is on the remote and the remedy is a history rewrite. What it buys
+is that it is the one check the agent writing a ball cannot switch off.
+Prevention stays local and bypassable; a published crate version is a third
+surface neither half reaches, and it belongs to the publication checklist.
 
 ### The confinement rules, and the three files they name
 
@@ -231,9 +239,12 @@ severable: `bl conf remove <op>.post thrall-leak-gate` deletes config, not code.
 `git commit --no-verify` defeats the source hook. There is no unbypassable
 preventive placement to move it to — a git hook inside the store clone is
 strictly worse (untracked, per-clone, re-founded by `bl prime`, absent on every
-other box and silently so). Upstream's answer to that residual is a scheduled
-scan of the PUBLISHED ref, which detects rather than prevents; thrall now has
-the remote that check needs and not yet the check itself (bl-e95a).
+other box and silently so). The answer to that residual is a scheduled scan of
+the PUBLISHED ref, which detects rather than prevents, and thrall now has it:
+`.github/workflows/store-scan.yml` (bl-e95a) runs this same scanner over
+`balls/tasks` daily, on dispatch, and whenever the rule table changes.
+Prevention is local and bypassable, enforcement is remote and late, and stating
+that is worth more than a gate that implies otherwise.
 
 ## Never
 

@@ -515,22 +515,25 @@ work that has not started.
 
 ### 5.2 What is deliberately absent from the gate
 
-- **The late half of the disclosure gate.** The scanner landed (bl-e878): the
-  tree, the commit message and the task store are all read by one rule table
-  before anything is written. What does not exist is the check that runs
-  *after* publication — a scan of the published ref, which is the only one an
-  author cannot switch off. It needed a remote, and **that reason has expired**:
-  bl-006e's remote half landed, so both the trunk and the task store now
-  publish, and the gap is now a gap rather than a wait (bl-e95a). bl-006e's
-  publish half widened it: a crate on a registry is a **third** published
-  surface, and the only one where a hit has no remedy at all — a git ref can be
-  rewritten, a published version cannot, and yanking it leaves it downloadable.
-  What stands between a leak and that surface is the `include` allowlist and
-  `src/packaged_tests.rs`, which judge file CLASSES; the CONTENT of a shipped
-  `src` file is read by the tree scan before it is committed and by nothing
-  after. Until the late half is filled thrall's disclosure posture is prevention
-  only: local, and bypassable by whoever runs it. That is worth stating plainly
-  rather than implying a gate that reaches further than it does.
+- **A post-publication scan of the crate on the registry.** The two halves of
+  the disclosure gate have both landed and neither reaches this. The early half
+  is the scanner (bl-e878): the tree, the commit message and the store op's own
+  commit are read by one rule table before anything is written, on the author's
+  box, bypassably. The late half is `.github/workflows/store-scan.yml`
+  (bl-e95a), which runs that same scanner over the published `balls/tasks` ref
+  daily, on dispatch and on a rule-table change — the only check an author
+  cannot switch off, detecting rather than preventing, since by then the remedy
+  is a history rewrite. `main` needs no such job: CI runs `make leak-scan` over
+  that tree on every pull request and every push. What remains absent is the
+  **third** published surface bl-006e's publish half opened, and it is the one
+  where a hit has no remedy at all — a git ref can be rewritten, a published
+  version cannot, and yanking it leaves it downloadable. What stands between a
+  leak and that surface is the `include` allowlist and `src/packaged_tests.rs`,
+  which judge file CLASSES; the CONTENT of a shipped `src` file is read by the
+  tree scan before it is committed and by nothing after. No workflow can close
+  that — a scan after the fact would find what cannot be withdrawn — so it is
+  the publication checklist's, run by a person, every time. That is worth
+  stating plainly rather than implying a gate that reaches further than it does.
 Nothing else. The confinement rules that stood here — `unsafe`, the lock
 chokepoint, the spawn boundary — landed in bl-1827, ahead of the surfaces they
 govern, and §4 says where each one points and why that order is the right one.

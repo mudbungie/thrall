@@ -1,0 +1,88 @@
+name: store-scan
+
+# **The late half of the disclosure gate** (bl-e95a; the early half is bl-e878's
+# scanner). Everything else in this repository judges a tree BEFORE it is
+# written: `make leak-scan` reads the index the commit hook is about to seal,
+# `.githooks/commit-msg` reads the message, and `scripts/thrall-leak-gate` reads
+# the store op's own commit. All three are PREVENTION, all three run on the
+# author's box, and all three are one `--no-verify` or one `bl conf remove`
+# away. This job is the one check the author cannot switch off, and it is
+# DETECTION rather than prevention: by the time it runs the material is on the
+# remote, and the remedy for a hit is a history rewrite.
+#
+# WHAT IT SCANS, AND WHY THAT IS THE WHOLE OF WHAT IS MISSING. Two refs publish
+# to this remote (bl-006e set it): `main` and `balls/tasks`.
+#
+#   * `main` is already judged, in both directions, by a machine. `ci.yml` runs
+#     `make ci` → `make leak-scan`, which is `--self-test` (every rule must
+#     still flag its own fixture) and then the tree scan. It runs on every pull
+#     request and — as the instance `release-plz.yml` CALLS inside its own run —
+#     on every push to `main`. So no tip of the trunk reaches this remote
+#     unjudged, and re-judging it here would be a second definition of the same
+#     verdict.
+#   * `balls/tasks` is judged by nothing. `bl` keeps this project's balls in a
+#     SEPARATE git repository locally and pushes it here, so ball bodies publish
+#     beside the crate while living in no tree `make leak-scan` has ever read.
+#     That is this job's subject.
+#
+# WHY THIS IS NOT A `push` TRIGGER ON THAT BRANCH. For a push event GitHub
+# resolves the workflow files from the pushed ref's OWN tree, and `balls/tasks`
+# holds `tasks/*.md` and nothing else — `bl` writes task files there and will
+# never write a workflow. So nothing can run at the moment the store is pushed.
+#
+# WHAT NEITHER HALF REACHES. A published crate version is a third public
+# surface and the only one with no remedy at all: a ref can be rewritten, a
+# version cannot, and yanking it leaves it downloadable. That surface is the
+# publication checklist's (DESIGN §5.2), not a workflow's.
+on:
+  schedule:
+    # Daily. GitHub disables cron in a repository with no activity for 60 days;
+    # `workflow_dispatch` is the hand path, and the publication checklist runs
+    # it once by hand rather than trusting the schedule was alive.
+    - cron: "23 6 * * *"
+  workflow_dispatch:
+  # And whenever the JUDGEMENT changes: a new or edited rule re-judges a store
+  # that has not moved. Nothing else about `main` can change this verdict — the
+  # store's content is not in this tree.
+  push:
+    branches: [main]
+    paths:
+      - scripts/leak-rules.sh
+      - scripts/leak-scan.sh
+      - scripts/leak-modes.sh
+      - .github/workflows/store-scan.yml
+
+# Reads two refs, writes nothing back. Every action is pinned to a full commit
+# SHA with its tag in the trailing comment, as everywhere else here: a tag can
+# be repointed at new code by its owner between two runs, a commit SHA cannot.
+permissions:
+  contents: read
+
+jobs:
+  tasks:
+    runs-on: ubuntu-latest
+    steps:
+      # The scanner and its rule table, from the source ref.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # Nothing here pushes, so leave no credential in .git/config.
+          persist-credentials: false
+      # The store, checked out beside it. `balls/tasks` is this checkout's
+      # `task-branch` (`bl conf`); a re-pointed task branch has to be renamed
+      # here too, and the scan failing loudly on a missing ref is the signal.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: balls/tasks
+          path: store
+          persist-credentials: false
+      # The same script and the same table the local gate runs — never a copy;
+      # two copies of a disclosure rule table drift within a week — against the
+      # store's own index, because the scanner scans the tree it is run IN.
+      # Bare, so it is the TREE scope: the standing-state question ("what does
+      # the published store carry in total, including whatever predates the
+      # gate"), which is the one scope `--commit` cannot answer. Findings are
+      # truncated to 12 characters by the scanner itself, because an Actions log
+      # outlives its run and is public the moment the repository is.
+      - name: Scan the task store
+        working-directory: store
+        run: "$GITHUB_WORKSPACE/scripts/leak-scan.sh"

@@ -46,17 +46,18 @@
 # `--commit` mode asks "does this OP publish a finding", which is the author's
 # own text at the moment of writing, and it is what a store gate wants.
 #
-# THE LATE HALF DOES NOT EXIST HERE YET, and saying so is the point. Upstream
-# the standing-state question — what the store carries in TOTAL, including
-# whatever predates the gate — is asked daily by a workflow over the published
-# ref, where a hit's remedy (a history rewrite) belongs anyway. thrall now HAS
-# the published refs that check needs — bl-006e set the remote, and the trunk
-# and the task store both ride to it — and, since bl-bbb3, CI to run it on; what
-# is still missing is the workflow itself: that is bl-e95a. Until it lands
-# thrall has PREVENTION only,
-# which is local and bypassable by whoever runs it; there is no enforcement
-# behind it. Note what the gap now covers: a crate published to a registry is a
-# third public surface, and a published version cannot be rewritten at all.
+# THE LATE HALF IS `.github/workflows/store-scan.yml` (bl-e95a). Every caller
+# above runs on the author's box, before a push, and is one `--no-verify` or one
+# `bl conf remove` away. The standing-state question — what the published store
+# carries in TOTAL, including whatever predates the gate — is asked by that
+# workflow instead: this script, this table, the TREE scope, over the
+# `balls/tasks` ref, daily and on dispatch and whenever a rule here changes. It
+# DETECTS rather than prevents (by then the material is on the remote and the
+# remedy is a history rewrite), and that is exactly what it buys — the one check
+# the author writing the ball cannot switch off. `main` is not its subject: CI
+# runs `make leak-scan` over that tree on every pull request and every push.
+# What no half reaches: a crate published to a registry is a third public
+# surface, and a published version cannot be rewritten at all.
 #
 # THE TREE MODE READS INDEX BLOBS, NOT THE WORKTREE. That is the whole of
 # bl-167d's headline: this scan used to enumerate `git ls-files` and then hand
