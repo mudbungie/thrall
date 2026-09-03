@@ -2,9 +2,11 @@
         line-cap leak-scan rules-audit deny install-hooks install uninstall \
         image image-scan mac-artifact clean
 
-# The build authority. Every gate step has ONE home here, and the pre-commit
-# hook calls the same targets — so the hook, a hand-run `make check` and any
-# future CI cannot drift into three different definitions of "green".
+# The build authority. Every gate step has ONE home here, and every caller
+# calls the same targets — the pre-commit hook, a hand-run `make check`, and
+# `.github/workflows/ci.yml`, which readies a runner and then runs `make ci` and
+# restates not one step of it. So the three cannot drift into three different
+# definitions of "green".
 
 # Install location for `make install`. Defaults to the XDG-ish user-local
 # convention; override for system-wide installs or packaging:
@@ -251,10 +253,11 @@ uninstall:
 # never a moving `latest`; the `:latest` applied below is LOCAL, a convenience
 # on one box nobody else can pull.
 #
-# thrall publishes nothing yet (bl-006e): `.github/workflows/release-plz.yml`
-# carries the release shape but has no automatic trigger and no image job, so
-# nothing here or there can push today whatever the ruling says. The image push
-# belongs in that workflow at tag time, and is the slot its header names. The
+# thrall now publishes, and only the CRATE does: bl-bbb3 armed
+# `.github/workflows/release-plz.yml`, which tags and publishes to the registry
+# behind its build gate, and it still carries NO image job — so nothing here or
+# there pushes an image today whatever the ruling says. The image push belongs
+# in that workflow at tag time, and is the slot its header names. The
 # gate below still lands first,
 # for the reason the confinement rules landed ahead of the surfaces they govern
 # (DESIGN §5.2): a rule installed after the first site is a rule that has to be

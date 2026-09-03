@@ -24,9 +24,15 @@ third answer.
 
 `make check` is the complete gate: `fmt-check → lint → coverage`, where `lint`
 is `line-cap → leak-scan → clippy -D warnings → rules-audit → cargo deny
-check`. The pre-commit hook runs the same targets via `scripts/pre-commit`;
-neither restates a step the Makefile defines. Run `make install-hooks` once per
-clone — it seats `pre-commit` **and** `commit-msg`.
+check`. The pre-commit hook runs the same targets via `scripts/pre-commit`, and
+so does `.github/workflows/ci.yml`, which readies a runner and then runs
+`make ci`; none of the three restates a step the Makefile defines. Run
+`make install-hooks` once per clone — it seats `pre-commit` **and**
+`commit-msg`.
+
+CI runs on every pull request, and on `main` as the workflow `release-plz.yml`
+CALLS inside its own run — which is where a release is gated (bl-bbb3, and that
+file's header says why a called workflow and never a `workflow_run`).
 
 **All tests must pass and coverage must be 100% before anything merges.** It
 does not matter who broke the test.
@@ -244,9 +250,14 @@ the remote that check needs and not yet the check itself (bl-e95a).
   missing `include` entry costs a build and a missing `exclude` entry costs a
   publication that cannot be recalled — and `src/packaged_tests.rs` judges the
   real `cargo package --list` against it in both directions on every gate run.
-  `.github/workflows/release-plz.yml` still publishes nothing: it has no
-  automatic trigger and a first job that refuses, standing where its build gate
-  goes. Arming it is bl-bbb3 and its checklist is that file's header.
+  `.github/workflows/release-plz.yml` is ARMED as of bl-bbb3, which MOVES the
+  operator's act rather than removing it: a push to `main` keeps one release PR
+  open that bumps the version and nothing else, and **merging that PR is the
+  control point** — the release job then tags, releases and publishes, behind
+  `needs: ci`, so only a green tree ever ships. So do not merge a release PR on
+  your own initiative either, and never reach for `cargo publish` by hand: the
+  registry accepts a trusted publisher, the workflow performs the OIDC exchange
+  itself, and no long-lived registry credential is stored in this repository.
 - Never add a dependency that is not on the approved set. **`Cargo.toml`'s
   `[dependencies]` comment is that set** (bl-e5ba, approved 2026-08-29): rustls
   with `ring` and no default features, `serde_json`, `thiserror` — each landing

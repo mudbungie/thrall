@@ -51,8 +51,9 @@
 # whatever predates the gate — is asked daily by a workflow over the published
 # ref, where a hit's remedy (a history rewrite) belongs anyway. thrall now HAS
 # the published refs that check needs — bl-006e set the remote, and the trunk
-# and the task store both ride to it — and still has no CI to run it on and no
-# workflow to run: that is bl-e95a. Until it lands thrall has PREVENTION only,
+# and the task store both ride to it — and, since bl-bbb3, CI to run it on; what
+# is still missing is the workflow itself: that is bl-e95a. Until it lands
+# thrall has PREVENTION only,
 # which is local and bypassable by whoever runs it; there is no enforcement
 # behind it. Note what the gap now covers: a crate published to a registry is a
 # third public surface, and a published version cannot be rewritten at all.

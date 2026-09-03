@@ -1,0 +1,50 @@
+# Release policy (bl-bbb3). `.github/workflows/release-plz.yml` is the
+# mechanism; this file is the three decisions that mechanism reads, and nothing
+# else. It exists because arming the workflow without it would have made the
+# workflow's own header false: that header promises a release PR which "bumps
+# the version in Cargo.toml/Cargo.lock and nothing else", and release-plz's
+# DEFAULT is to generate and commit a CHANGELOG.md as well.
+
+[workspace]
+
+# THE TAG SPELLING. `v0.0.3` — bare, no crate prefix.
+#
+# This is also release-plz's default for a single-crate repository, and it is
+# written out anyway because the workflow header names the spelling in prose:
+# a fact two files state must be a fact one file DECIDES, or the prose is free
+# to drift from the behaviour. This repository holds exactly one crate, was
+# founded for it, and will never carry another, so `v<version>` names one thing
+# here and always will.
+git_tag_name = "v{{ version }}"
+
+# NO GENERATED CHANGELOG, and this repository has no hand-written one either —
+# so the record of what changed is the git history and the balls behind it.
+#
+# Generation is refused on evidence rather than taste. Every commit here is a
+# prose subject plus a `[bl-xxxx]` trailer, not Conventional Commits, and the
+# sibling repositories measured what git-cliff does to exactly that shape: its
+# parser strips a leading `word:` token from any subject that happens to parse
+# as a conventional type, and release-plz runs each commit through the
+# processing TWICE, so the obvious compensation — duplicate the token and let
+# the parser eat the copy — doubles instead. This tree's subjects open with
+# prose that reads like a type more often than not (`adjudication: …`,
+# `cwd is read by nothing: …`), which is the same input that produced that
+# defect there.
+#
+# The consequence is stated so nobody later reads it as a bug: the GitHub
+# Release body is EMPTY, because release-plz fills it from the changelog only
+# when it manages the changelog. The tagged tree is the record.
+changelog_update = false
+
+# THE BUMP POLICY for every release after the hand-run ones (0.0.1, bl-d2be;
+# 0.0.2, bl-88e1). Non-conventional subjects take release-plz's default
+# increment, which is PATCH — the release PR should always propose the smallest
+# step, because a version is spent the moment it is published and a bump nobody
+# asked for spends one. A bigger bump is opted into by putting `[minor]` or
+# `[major]` as a standalone bracketed token in any commit message landing in the
+# release window: preceded by start-of-string or whitespace, followed by
+# end-of-string or whitespace. Prose mentions like `[minor]/[major]`
+# (slash-joined, no boundary whitespace) do not match, which is what keeps a
+# commit DESCRIBING this convention from bumping itself.
+custom_minor_increment_regex = '(^|\s)\[minor\](\s|$)'
+custom_major_increment_regex = '(^|\s)\[major\](\s|$)'

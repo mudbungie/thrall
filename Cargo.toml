@@ -21,9 +21,10 @@ repository = "https://github.com/mudbungie/thrall"
 # `main` that had passed the publication checklist in full.
 #
 # What the flip does NOT do, and the distinction is the whole of why `true` is
-# safe here. It does not make a publication automatic: this repository's release
-# workflow has no automatic trigger and a first job that refuses outright, and
-# arming it is a separate, severable operator act. It does not make a
+# safe here. It does not make a publication UNGATED: the release workflow was
+# armed separately and severably (bl-bbb3), and what it publishes is whatever
+# version this key holds after a human merges the release PR that proposed it —
+# behind `needs: ci`, so a red tree ships nothing. It does not make a
 # publication cheap either — `cargo publish` stays irreversible, and a yanked
 # version stays downloadable — but the irreversibility left is now per VERSION
 # rather than per CRATE, and the two things that guard a version's CONTENT are

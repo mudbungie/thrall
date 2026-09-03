@@ -70,8 +70,13 @@ whether, when and as what it first ships was open: `Cargo.toml` carried
 a note is not a gate. That decision has been made and 0.0.1 shipped, so what is
 left is the part the flag never covered — `cargo publish` is irreversible and a
 yanked version stays downloadable, so **a publication is a deliberate operator
-act every time**. The repository's release workflow still has no automatic
-trigger and a first job that refuses; nothing publishes on a push.
+act every time**. The release workflow is armed and that is still true, because
+arming MOVED the act rather than removing it: a push to `main` only keeps one
+release PR open proposing the next version, and **merging that PR is the
+deliberate act**. The release then runs behind the same gate this README
+describes, so nothing untested ships, and it authenticates to the registry by a
+trusted publisher — a short-lived token minted per run for one workflow file in
+one repository — so this repository stores no registry credential at all.
 
 What guards a version's CONTENT was built before the first flip and stands
 unchanged. `Cargo.toml` declares an anchored `include` **allowlist** — never an
@@ -105,6 +110,11 @@ Every tool is pinned, or the gate is not reproducible: rustc 1.95.0
 (`deny.toml`), cargo-tarpaulin 0.35.2 (`tarpaulin.toml`).
 
 Run `make install-hooks` once per clone to seat the pre-commit hook.
+
+`.github/workflows/ci.yml` is the same gate on a runner: it installs those pins
+and runs `make ci`, restating no step. It fires on every pull request, and on
+`main` as the instance `release-plz.yml` calls inside its own run — so a push to
+`main` runs the gate exactly once, and a release is gated on that run.
 
 ## The image
 
