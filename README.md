@@ -57,8 +57,21 @@ actually changed anything**: the engine's receipt distinguishes a comparison
 from a write, so a write there means something replaced this box's advertised
 set while a tool was running. It restores it and carries on — the notice is the
 part a person needs. It does not return while a
-channel is up, and it never reconnects — a channel that fails is an exit naming
-it, because restart policy belongs to this machine's own supervision.
+channel is up.
+
+**A channel that drops is dialled again.** A laptop that sleeps, changes
+network or crosses a relay switch loses TCP, and until this landed that
+engine's tools were silently gone for the life of the process — a live-looking
+foot offering nothing, because supervision restarts a *process* and a dropped
+channel does not kill one. So each channel takes itself up again, with a wait
+that starts at a second, doubles, and stops at a minute, so a box in airplane
+mode settles to a slow cadence rather than burning a core. Two refusals are
+told apart and never collapsed: the engine declining this box's *read* is its
+own predecessor's connection still dying, which frees within one hold's width
+and is waited past; the engine declining what this box *offers* is another
+connection serving under its name, and that ends the channel. **Restarting the
+process is still this machine's own supervision** — a foot that cannot be a
+foot at all exits and says why.
 
 Two files, both put there by the operator's hand and neither ever written by
 thrall: `<data root>/tools.json` and one directory per channel under `<data
@@ -246,10 +259,11 @@ $ echo $?
 - **No `cargo`, no compiler, no source, no `target/`.** The build stage is
   discarded whole; only the binary crosses.
 - **No supervisor, no restart wrapper, and no entrypoint script.** `thrall run`
-  never reconnects — a channel that fails is an exit naming it, because restart
-  policy belongs to this machine's own supervision, and putting a retry loop in
-  the image would take that decision away from the operator who has to live
-  with it.
+  dials its own channels again when they drop, but it never restarts its own
+  process: a foot that cannot be a foot at all is an exit naming why, because
+  restart policy belongs to this machine's own supervision, and putting a
+  process-level retry loop in the image would take that decision away from the
+  operator who has to live with it.
 - **No bootstrap of any kind.** thrall mints nothing (REMOTE §1.4, DESIGN
   §3.3); an image that could provision itself would be exactly the flow that
   must never exist.

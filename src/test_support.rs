@@ -4,10 +4,14 @@
 //! Three things live here that live nowhere else in the crate, and all three
 //! are deliberate:
 //!
-//! - **The notice sink** ([`Notices`]). A serving foot says one thing without
-//!   ending anything — that it was disarmed while a tool ran (DESIGN §3.7) —
-//!   and writes it to stderr, which no test can read back. So the effect is
-//!   `src/main.rs`'s and the suite hands channels a recorder instead.
+//! - **The notice sink** ([`Notices`]) and **the pause sink** ([`Waits`]). A
+//!   serving foot says things without ending anything — that it was disarmed
+//!   while a tool ran (DESIGN §3.7), that a channel dropped and is about to be
+//!   dialled again (DESIGN §3.8) — and it sleeps between those dials. Writing
+//!   to stderr and sleeping are both effects no test can read back, so both
+//!   live in `src/main.rs` and the suite hands channels recorders instead. The
+//!   pause recorder is also the only way to assert that a loop waited the
+//!   *right* amount rather than merely that it waited.
 //!
 //! - **The fork lock** the spawn boundary takes ([`fork_lock`]). It is the
 //!   `Mutex` the lock-confinement rule would otherwise send to `src/state.rs`,
@@ -24,7 +28,9 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::time::Duration;
 
 /// The stand-in for the far end of the wire.
 pub(crate) mod engine;
@@ -85,6 +91,56 @@ fn record(said: &Arc<Mutex<Vec<String>>>, line: &str) {
     said.lock()
         .unwrap_or_else(PoisonError::into_inner)
         .push(line);
+}
+
+/// **The pause sink, recording.** A foot's wait between dials is a real sleep
+/// (`src/main.rs`), so the suite hands it this instead and reads back the
+/// durations the redial *decided* on — which is the assertion that matters,
+/// and the reason the whole suite proves a minute-long backoff in no time at
+/// all.
+///
+/// **It is a channel where [`Notices`] is a `Mutex`, and that is a coverage
+/// fact rather than a taste.** A `MutexGuard` dropped at the end of a
+/// statement earns a cleanup region llvm-cov reports uncovered however often
+/// the function runs, unless the enclosing function has some other value to
+/// drop at its closing brace for the region to land on. [`record`] has one —
+/// the `String` it owns first — and a duration recorder cannot, `Duration`
+/// being `Copy`. Measured twice, at 831/832. A `Sender` has nothing to drop
+/// per send, so the hazard is dissolved rather than dodged.
+pub(crate) struct Waits(Receiver<Duration>);
+
+impl Waits {
+    /// A recorder, and the pause to hand a channel.
+    pub(crate) fn new() -> (Self, crate::run::Pause) {
+        let (into, waited) = mpsc::channel();
+        (
+            Self(waited),
+            Arc::new(move |wait: Duration| keep(&into, wait)),
+        )
+    }
+
+    /// Every wait it was asked for since the last time it was asked, in order.
+    /// It **drains**, which no caller here needs twice and every caller here
+    /// makes after the channel it was watching has stopped.
+    pub(crate) fn heard(&self) -> Vec<Duration> {
+        self.0.try_iter().collect()
+    }
+}
+
+/// One wait, kept. A free function for [`record`]'s reason: a braced closure
+/// body earns a region llvm-cov reports uncovered however often it runs.
+///
+/// The send's failure is ignored because [`unwaited`] is exactly the case that
+/// produces it — the recorder is dropped and only the pause is kept — and a
+/// test that kept no recorder is a test asking for no waits.
+fn keep(into: &Sender<Duration>, wait: Duration) {
+    let _ = into.send(wait);
+}
+
+/// A pause for a test whose subject is not how long the foot waited. It is
+/// [`aside`]'s twin, and never sleeps.
+pub(crate) fn unwaited() -> crate::run::Pause {
+    Waits::new().1
 }
 
 /// A sink for a test whose subject is not what the channel said. It records

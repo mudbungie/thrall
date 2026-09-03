@@ -5,7 +5,7 @@ use super::serve;
 use crate::channel::entries;
 use crate::config;
 use crate::test_support::engine::Engine;
-use crate::test_support::{Scratch, aside, mint};
+use crate::test_support::{Scratch, aside, mint, unwaited};
 use serde_json::{Value, json};
 use std::path::Path;
 
@@ -49,7 +49,7 @@ fn refusal(said: &str) -> Value {
 #[test]
 fn a_box_with_no_tool_document_refuses_before_it_dials() {
     let scratch = Scratch::new();
-    let said = serve(scratch.path(), &aside());
+    let said = serve(scratch.path(), &aside(), &unwaited());
     assert_eq!(said.code, 1);
     assert!(said.text.contains("tools.json"), "{}", said.text);
     assert!(said.text.contains("no tool config"), "{}", said.text);
@@ -64,7 +64,7 @@ fn a_box_with_no_tool_document_refuses_before_it_dials() {
 fn a_box_with_no_channel_is_told_the_shape_of_one() {
     let scratch = Scratch::new();
     offering(scratch.path());
-    let said = serve(scratch.path(), &aside());
+    let said = serve(scratch.path(), &aside(), &unwaited());
     assert_eq!(said.code, 1);
     assert!(said.text.contains("holds no channel"), "{}", said.text);
     assert!(said.text.contains("ca.pem"), "{}", said.text);
@@ -86,7 +86,7 @@ fn every_channel_that_stopped_answers_under_its_own_name() {
     offering(scratch.path());
     let _north = channel(scratch.path(), "north", vec![refusal("north stopped")]);
     let _south = channel(scratch.path(), "south", vec![refusal("south stopped")]);
-    let said = serve(scratch.path(), &aside());
+    let said = serve(scratch.path(), &aside(), &unwaited());
     assert_eq!(said.code, 1);
     assert_eq!(
         said.text,
@@ -112,11 +112,10 @@ fn a_foot_advertises_is_invoked_and_answers_with_what_ran() {
                              "input": {"command": "echo hi"}}]}),
             json!({"ok": true, "kind": "routed", "invocation": "i-1",
                    "capture": {"stdout": "", "stderr": "", "exit_code": 0}}),
-            advertised(),
             refusal("the engine is going down"),
         ],
     );
-    let said = serve(scratch.path(), &aside());
+    let said = serve(scratch.path(), &aside(), &unwaited());
     assert_eq!(said.text, "thrall: engine: the engine is going down");
 
     let gestures: Vec<Value> = engine
@@ -128,16 +127,7 @@ fn a_foot_advertises_is_invoked_and_answers_with_what_ran() {
         .iter()
         .filter_map(|v| v.get("op")?.as_str())
         .collect();
-    assert_eq!(
-        ops,
-        [
-            "advertise",
-            "invocations",
-            "complete",
-            "advertise",
-            "invocations"
-        ]
-    );
+    assert_eq!(ops, ["advertise", "invocations", "complete", "advertise"]);
 
     // What it presented is the document's projection: three keys, no argv.
     assert_eq!(
@@ -176,11 +166,10 @@ fn a_capture_too_big_for_the_wire_is_answered_and_the_channel_goes_on() {
                    "rows": [{"invocation": "i-1", "tool": "Echo", "input": {}}]}),
             json!({"ok": true, "kind": "routed", "invocation": "i-1",
                    "capture": {"stdout": "", "stderr": "", "exit_code": 0}}),
-            advertised(),
             refusal("the engine is going down"),
         ],
     );
-    let said = serve(scratch.path(), &aside());
+    let said = serve(scratch.path(), &aside(), &unwaited());
     assert_eq!(said.text, "thrall: engine: the engine is going down");
 
     let gestures: Vec<Value> = engine
@@ -192,16 +181,7 @@ fn a_capture_too_big_for_the_wire_is_answered_and_the_channel_goes_on() {
         .iter()
         .filter_map(|v| v.get("op")?.as_str())
         .collect();
-    assert_eq!(
-        ops,
-        [
-            "advertise",
-            "invocations",
-            "complete",
-            "advertise",
-            "invocations"
-        ]
-    );
+    assert_eq!(ops, ["advertise", "invocations", "complete", "advertise"]);
     let capture = &gestures[2]["capture"];
     assert_eq!(
         capture["stdout"].as_str().map(str::len),

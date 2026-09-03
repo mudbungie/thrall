@@ -13,10 +13,13 @@
 //! engine does not treat presence as the routing predicate (REMOTE §5's
 //! amendment: the mailbox queue is).
 //!
-//! **It never reconnects** (DESIGN §2). A channel that fails answers the
-//! sentence that failed it and the loop above ends. Restart policy belongs to
-//! the supervision the operator's machine already has, and inventing one here
-//! would be thrall deciding how a box it does not administer runs a program.
+//! **It knows nothing about being dialled again** (DESIGN §3.8). A channel
+//! that fails answers the sentence that failed it, and what happens next is
+//! `run::redial`'s: a dropped wire is taken up again after a wait, and a foot
+//! that cannot be a foot at all still exits, because restarting a *process*
+//! belongs to the supervision the operator's machine already has. Nothing here
+//! holds a connection or a retry, which is why re-dialling costs this file no
+//! state at all — [`Channel::ask`] already dials per ask.
 //!
 //! **The engine's name comes from the address and from nowhere else.** A dotted
 //! quad or a bracketed v6 literal is verified as an IP address — the engine's
@@ -115,23 +118,29 @@ impl Channel {
 
     /// **A channel that failed, in this box's own words** (bl-52ba).
     ///
-    /// The sentence IS the product on this path: a foot never reconnects
-    /// (DESIGN §2), so what a supervisor's log carries is the whole of what an
-    /// operator gets — and what they need from it is which engine went away and
-    /// whether anything is going to happen next. A library's own diagnosis
-    /// answers neither: it names no address, and "peer closed connection
-    /// without sending TLS close_notify" is a fact about TLS rather than about
-    /// what to do. **It follows the sentence rather than replacing it**, because
-    /// it is the right text for the one reader who wants it and the wrong text
-    /// for the one who has to act.
+    /// The sentence IS the product on this path: what a supervisor's log or an
+    /// operator's terminal carries is the whole of what they get — and what
+    /// they need from it is which engine went away and whether anything is
+    /// going to happen next. A library's own diagnosis answers neither: it
+    /// names no address, and "peer closed connection without sending TLS
+    /// close_notify" is a fact about TLS rather than about what to do. **It
+    /// follows the sentence rather than replacing it**, because it is the right
+    /// text for the one reader who wants it and the wrong text for the one who
+    /// has to act.
+    ///
+    /// **This half says WHICH engine and WHAT happened; the other half — what
+    /// this box will do next — moved out** (bl-916d). It used to be stated
+    /// here, as *"thrall does not reconnect"*, and a file that dials per ask
+    /// and holds nothing cannot know that any more: a dropped wire is dialled
+    /// again, and how soon is `run::redial`'s to say in the same breath as this
+    /// sentence.
     ///
     /// `leg` is the half that failed, so this reads like the connect refusals
     /// beside it: the act, the address, then what happened.
     fn failed(&self, leg: &str, e: &std::io::Error) -> String {
         format!(
-            "{leg} {}: the channel to the engine failed, and thrall does not \
-             reconnect — bringing this foot back is the supervision this machine \
-             already has. What the {leg} reported: {e}",
+            "{leg} {}: the channel to the engine failed. What the {leg} \
+             reported: {e}",
             self.address
         )
     }

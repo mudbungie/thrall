@@ -79,16 +79,27 @@ to add and would dissolve the reason thrall exists.
 - **It holds no world.** No conversations, no tasks, no transcript. It has an
   entry per workspace and a config saying what this box offers, and that is the
   whole of its durable state.
-- **It never reconnects on its own.** A channel that fails is an exit naming
-  the failure. Restart policy belongs to the supervision the operator's machine
-  already has, and inventing one here would be thrall deciding how a box it
-  does not administer runs a program.
+- **It never restarts its own process.** A foot that cannot be a foot at all —
+  no tool document, no channel, a leaf that is not foot-grade, an engine
+  refusing the set this box offers — is an exit naming the failure. Restart
+  policy belongs to the supervision the operator's machine already has, and
+  inventing one here would be thrall deciding how a box it does not administer
+  runs a program.
+
+  **A dropped CHANNEL is not that, and it is dialled again** (§3.8, bl-916d).
+  This bullet once covered both, and the conclusion did not follow from the
+  premise: supervision restarts a *process*, and a channel dropping does not
+  kill one. What is left above is the half that was always right.
 
   **Which makes the sentence the product, and it is written for the operator**
-  (bl-52ba). A supervisor's log is the whole of what an operator gets on this
-  path, so every refusal here names the address that failed and says what this
-  box will and will not do next — the same shape the connect refusals already
-  had, held for the one an engine going away actually produces. A library's own
+  (bl-52ba). A supervisor's log, or a terminal, is the whole of what an operator
+  gets on this path, so every refusal here names the address that failed — the
+  same shape the connect refusals already had, held for the one an engine going
+  away actually produces. **What this box will do next is said too, and since
+  bl-916d it is said by the redial rather than by the channel**: a file that
+  dials per ask and holds nothing cannot know whether anything is going to
+  happen next, so `channel::failed` names the leg and the address and
+  `run::redial` adds the wait in the same breath. A library's own
   diagnosis answers neither question: it names no address, and "peer closed
   connection without sending TLS close_notify", with a crate documentation URL
   after it, is a fact about TLS rather than about what to do. **It follows
@@ -301,8 +312,9 @@ helper the same stdout and stderr write ends. So a foot that bounded the child
 and then drained the pipes bounded nothing — the drain waited on a stranger it
 never started, the invocation earned no capture, and the serial loop behind it
 waited too, which is the hang §1's whole leg exists to exclude. Nothing
-recovered it: a foot never reconnects, so the wedge was the channel's for the
-process's remaining life.
+recovered it, and §3.8's redial would not have: the wedge was inside the
+hand-off, where the channel is neither failing nor waiting on an engine — a
+thread stuck in an executor never reaches an ending for anything to act on.
 
 The half that had to give is the *waiting*, not the reading:
 
@@ -471,6 +483,122 @@ Three properties of that reading, and each is a decision:
 The foot cannot tell a rival from an engine that lost what it was holding, so
 the sentence names both readings rather than guessing one.
 
+### 3.8 The redial, and what does not cross one (bl-916d)
+
+REMOTE §5.3 ***reverses the no-reconnect ruling at the channel and keeps it at
+the process***: *"a foot **redials its own channels**, with a backoff that
+settles rather than spins ... and still **exits when it cannot be a foot at
+all**, which is the part supervision was always the right owner of."*
+
+The old ruling's premise was sound and its conclusion did not follow.
+**Supervision restarts a process, and this failure does not kill one.** REMOTE
+§1's canonical box sleeps, changes network and crosses a relay switch; TCP
+drops; the channel's conversation ends with its sentence; and the foot process
+stays healthy, serving whatever other engines it holds. A multi-entry box loses
+one channel of several and there is no exit code for a supervisor to see. From
+that moment the engine believes this box is gone — presence is connection RAM,
+correctly — and the box believes it is serving. The operator's symptom is tools
+that silently stopped being offered by a live-looking process.
+
+**The trigger is an ending, and there are two kinds** (`run::hold`). The
+classification is structural — *who* failed, at *which* leg — and never
+textual, because a foot that decided its own lifetime by reading the engine's
+prose would be a foot the far end could rewrite by rewording.
+
+| What ended it | Leg | Answer |
+|---|---|---|
+| The wire | any | dial again |
+| The engine refused | the `invocations` read | dial again, past one hold's width |
+| The engine refused | `advertise`, `complete` | over |
+| An answer no foot gesture can earn | any | over |
+| This box's own material | before any dial | over |
+
+**The two refusals are two animals and must never be collapsed.** A refused
+READ is REMOTE §5.1's one-reader guard, and after a drop it names *this very
+machine*: the predecessor's read does not leave until the engine tries to
+answer it, so a redial inside that window is refused by a connection that is
+already dying. REMOTE §5.1 states the bound as a contract — *"Its life is the
+hold and not the connection's ... `Mailbox::take` drops the claim on the way
+out, before the caller writes the answer, so a peer that vanished without a FIN
+frees the slot within one hold's width — thirty seconds"* — so the answer is to
+wait past that width and ask again. A foot that took the sentence as final
+would make the first network blip permanent, which is the failure the reversal
+exists to end. A refused ADVERTISEMENT is the opposite reading and keeps
+bl-2d78's answer: the engine declines a set that would replace a *serving*
+machine's own, so a refusal there is another connection holding this machine's
+read with a different set in force. Dialling again would hand it the box by
+pretending otherwise.
+
+**The wait is three numbers** (`run::redial`), and each answers one way the
+loop could be wrong. It starts at **one second**, because the ordinary case is
+a blip already over by the time it is noticed. It **doubles**, and stops at
+**sixty-four seconds**, so a box in airplane mode reaches a dial a minute on
+its seventh attempt and stays there rather than burning a core. A one-reader
+refusal **floors** at thirty-two seconds — one hold's width and two seconds of
+margin — while the series advances underneath it, so a refusal that is a
+genuine rival rather than a predecessor backs off like anything else instead of
+polling at one fixed cadence forever. And a channel that **served** — that had
+a read answered, which is the engine having parked this foot for its own hold —
+returns the series to its floor: without that, a laptop sleeping nightly would
+creep to the cap and stay there for the life of the process, which is the delay
+this whole loop exists to shorten. A hammering loop cannot manufacture that
+evidence without the engine handing out work, and a foot already dials as fast
+as an engine answers reads.
+
+**The loop imposes no deadline of its own, and must not.** The engine side has
+no socket timeouts (yog bl-1421, filed and unbuilt), so a dead peer can wedge an
+engine thread for a long time and the first dial after a flap may be answered
+slowly — by an engine still working out that the previous connection is gone.
+The only deadline in the path is the transport one the channel already had
+(`channel::READ_TIMEOUT`, two minutes), which sits comfortably above the
+engine's thirty-second hold and is a bound on the *socket* rather than on the
+wait; and if it does fire it is the wire, which is retryable, so a slow engine
+costs this box one more dial rather than the channel. **Nothing here depends on
+bl-1421 landing**, and the predecessor floor is the other half of that: a foot
+that hammered an engine which has not yet noticed the dead peer would pile dials
+into exactly the party that is busy — where the refusal it earns is answered
+immediately and parks nothing, but the handshake is spent for a sentence whose
+expiry is already known.
+
+**Nothing crosses a redial, and that is the decision rather than an omission.**
+A redial makes a NEW channel. Presence re-forms as it does for any fresh
+connection, the advertisement rides the connection already, registration is
+durable engine-side, and an invocation in flight when the wire died is the
+engine's mailbox lease (REMOTE §5.3's at-least-once leg) rather than this loop's
+— so the same invocation is handed over again under the id it was first handed
+under. Three consequences, and each is deliberate:
+
+- **The disarming is not remembered.** §3.7's notice fires on a re-assertion
+  that WROTE, and is silent on a channel's FIRST presentation because every
+  fresh channel presents into whatever the engine happens to hold. A redial's
+  presentation is a first presentation, so it stays silent — and a foot that
+  remembered having been disarmed and read the next one as a rival would cry
+  rival on the most ordinary redial there is: the engine restarted, or this
+  box's own dying predecessor wrote last. That is the noise that gets the real
+  notice ignored. **The healing crosses a redial and the knowing does not**, and
+  the healing is the half that matters: the re-presentation restores the set on
+  every new connection whether or not anything says so, which REMOTE §5.3 calls
+  a coarser instance of the same self-heal.
+- **It is not a session resume, and there is nothing to resume.** A foot that
+  carried state across the gap would be a foot with a world, which §2 refuses.
+- **The sentence has to be said as it happens.** Under a loop the sentence that
+  ended a connection is no longer returned by anything, so every retryable
+  ending goes to the §3.7 notice sink with the wait beside it, under the
+  channel's own name. What `run::fan` still returns is the *terminal* sentence —
+  the ending another dial cannot improve — and a box whose every channel has
+  ended that way is a foot that cannot be a foot, which is where supervision
+  takes over. (bl-e834's complaint, that a dead channel's sentence is buffered
+  until every channel stops, is sharper under a loop and not resolved by it:
+  what this ball fixed is the retryable half.)
+
+**Where the loop sits is the whole of why it is safe** (`run::redial`, between
+`Entry::open` and `run::hold`). `fan` already owns the per-channel lifetime, so
+the loop is above one conversation and below the box: a redial re-opens no
+material, re-reads no config, and shares nothing with the other channels. The
+entry is opened once and not per dial, because opening reads no file and dials
+nothing — it is a fact about this box's own material, so a failure there is
+over rather than retried.
+
 ---
 
 ## 4. Module map
@@ -495,7 +623,9 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/json.rs` | The strict field reads every decoder here shares: a missing field, a mistyped one and a wrong-shaped one each refuse with the key an operator typed. |
 | `src/gestures.rs` | **The foot set** (bl-a2ea): `advertise`, `invocations`, `complete`, and the answers they can earn. The enumeration is the enforcement thrall can keep — there is no spelling here for a fourth verb. |
 | `src/invocation.rs` | What crosses the routing leg: the invocation a foot is handed and the capture it hands back, each in one strict spelling. |
-| `src/run.rs` | **The loop**: present, wait, hand off, answer — and the fan that serves every channel at once. Execution is a parameter (`Handoff`), and so is where a channel says something while it is still serving (`Notice`, §3.7) — which is what lets the whole conversation be tested against a real engine, a one-line executor and a sink that records. |
+| `src/run.rs` | **The loop**, and the three seams that are parameters: what runs a command (`Handoff`), where a channel says something while it is still serving (`Notice`, §3.7) and where it waits between dials (`Pause`, §3.8). All three are effects no test can read back, so the one implementation of each is `src/main.rs`'s — which is what lets the whole conversation be tested against a real engine, a one-line executor and two recorders. This file itself is `fan`: every channel this box holds, one thread each. |
+| `src/run/hold.rs` | **One channel's conversation** (split from `run.rs` by bl-916d): present, wait, hand off, answer, present again — and the `Ending` that stopped it, classified by who failed and at which leg (§3.8). |
+| `src/run/redial.rs` | **One channel's lifetime** (bl-916d): the endings worth another dial, the backoff that settles, and the sentence said in the meantime. It is a separate file because it is a separate question — what happened, against what to do about it — and because its whole decision is three numbers and one line of arithmetic, testable as values. |
 | `src/exec.rs` | **The executor's dispatch** (bl-4cda): which entry an invocation names, whose working directory it may run in (§3.4's `subject_cwd`), and the three facts that come back. Every outcome is a capture — a tool that ran, one that overran, a name this box does not carry, a command that would not start. |
 | `src/exec/child.rs` | One child, from the fork to the capture: the spawn, the poll that is also the drain, and the cascade that stops a tool which will not stop itself. Split from `exec.rs` when the drain moved into the poll (bl-6c14) — the seam is *deciding what to run* against *running it*. |
 | `src/exec/pipes.rs` | The child's three pipes, pumped without blocking and read within a bound (bl-6c14, bl-6028; §3.5). A read answers with what the pipe holds now, so a write end a helper still holds cannot outlast the invocation — and the drains and the input feed stop being threads, because none of them can block any more. Past `exec::CAPTURE_LIMIT` it keeps reading and stops keeping, counting what it dropped so the capture can say so. |

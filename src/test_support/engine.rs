@@ -12,6 +12,15 @@
 //! and holds a connection only while it is waiting. So a test says what the
 //! engine answers the first dial, the second, and so on.
 //!
+//! **An entry may also be an engine that goes AWAY on that dial** — the `None`
+//! of [`Engine::flapping`], which reads the foot's frames and then drops the
+//! stream where it stands, with no answer and no TLS `close_notify`. That is
+//! the failure a roaming box actually hits, and it is the one a script of
+//! answers cannot produce: every answer ends in a terminator, which is an
+//! engine finishing rather than an engine disappearing. It is what lets the
+//! redial (`run::redial`) be driven over a real wire — drop, dial again, and
+//! be answered on the next connection.
+//!
 //! **It states the engine's protocol number, not this crate's** (bl-e0f0).
 //! Every fixture here dials at [`crate::corpus::PROTOCOL`], a literal copied
 //! from yog's `src/wire/hello.rs`. While it wrote its preface from
@@ -61,31 +70,34 @@ impl Engine {
     /// `protocol` is what the engine states as its version, so a test can make
     /// the two ends disagree without a second code path.
     pub(crate) fn start(dir: &Path, protocol: u32, script: Vec<Vec<Value>>) -> Self {
+        Self::scripted(dir, protocol, script.into_iter().map(Some).collect())
+    }
+
+    /// An engine that states its version, takes what the foot says — and then
+    /// **goes away mid-conversation**, with no answer and no TLS
+    /// `close_notify`. One connection, and then the port is gone too.
+    pub(crate) fn vanishes(dir: &Path) -> Self {
+        Self::scripted(dir, crate::corpus::PROTOCOL, vec![None])
+    }
+
+    /// **An engine that drops some dials and answers others**: `None` is the
+    /// connection it disappears on, `Some(frames)` the connection it answers.
+    /// A foot dials per ask, so this is how a test writes a wire that flaps
+    /// under a conversation and comes back.
+    pub(crate) fn flapping(dir: &Path, script: Vec<Option<Vec<Value>>>) -> Self {
+        Self::scripted(dir, crate::corpus::PROTOCOL, script)
+    }
+
+    /// The one listener: serve one connection per script entry, in order.
+    fn scripted(dir: &Path, protocol: u32, script: Vec<Option<Vec<Value>>>) -> Self {
         let config = server_config(dir);
         let (listener, seen) = bound(dir);
         let recorded = Arc::clone(&seen);
         std::thread::spawn(move || {
             for answer in script {
                 let (tcp, _) = listener.accept().expect("a dial");
-                serve(&config, tcp, protocol, Some(&answer), &recorded);
+                serve(&config, tcp, protocol, answer.as_deref(), &recorded);
             }
-        });
-        Self { seen }
-    }
-
-    /// An engine that states its version, takes what the foot says — and then
-    /// **goes away mid-conversation**, with no answer and no TLS `close_notify`.
-    ///
-    /// It is the failure a running foot will actually hit, and the one the
-    /// scripted form cannot produce: every answer there ends in a terminator,
-    /// which is an engine finishing rather than an engine disappearing.
-    pub(crate) fn vanishes(dir: &Path) -> Self {
-        let config = server_config(dir);
-        let (listener, seen) = bound(dir);
-        let recorded = Arc::clone(&seen);
-        std::thread::spawn(move || {
-            let (tcp, _) = listener.accept().expect("a dial");
-            serve(&config, tcp, crate::corpus::PROTOCOL, None, &recorded);
         });
         Self { seen }
     }

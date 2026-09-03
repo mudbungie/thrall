@@ -2,13 +2,15 @@
 //! in what order, and what stops it.
 //!
 //! Split on the seam the code is: [`channel`] is one conversation with one
-//! engine, and [`fan`] is every channel a box holds, served at once. The
-//! fixtures they share live here.
+//! engine, [`ending`] is what that conversation's failure means for the
+//! channel's lifetime, [`redial`] is that lifetime, and [`fan`] is every
+//! channel a box holds, served at once. The fixtures they share live here.
 
 use crate::channel::Channel;
 use crate::channel::material::read_dir;
 use crate::config::Local;
 use crate::invocation::{Capture, Invocation};
+use crate::run::hold::Ending;
 use crate::test_support::engine::Engine;
 use crate::test_support::{Scratch, aside, mint};
 use crate::tools::Tool;
@@ -86,6 +88,28 @@ fn engine_at(dir: &Path, script: Vec<Value>) -> Engine {
     )
 }
 
+/// The same, where a `None` is the dial the engine **goes away on** instead of
+/// answering — a wire that flaps under a conversation and comes back.
+fn flapping_at(dir: &Path, script: Vec<Option<Value>>) -> Engine {
+    mint::material(dir);
+    Engine::flapping(
+        dir,
+        script.into_iter().map(|v| v.map(|v| vec![v])).collect(),
+    )
+}
+
+/// The sentence an ending carries, whichever ending it is.
+///
+/// It is a test's helper and not a method on [`Ending`], because the crate
+/// proper has no use for the sentence of an ending it has not already decided
+/// what to do about — `redial` reads the sentence out of the variant it
+/// matched.
+fn said(ending: Ending) -> String {
+    match ending {
+        Ending::Again { said, .. } | Ending::Over(said) => said,
+    }
+}
+
 /// A box with one channel, and the engine standing at it.
 fn wired(script: Vec<Value>) -> (Scratch, Engine, Channel) {
     let scratch = Scratch::new();
@@ -120,5 +144,9 @@ fn gesture(engine: &Engine, n: usize) -> Value {
 mod channel;
 /// What a channel says while it is still serving.
 mod disarm;
+/// What a failure means for the channel's lifetime.
+mod ending;
 /// Every channel this box holds, at once.
 mod fan;
+/// One channel's lifetime: dropped, waited out, dialled again.
+mod redial;

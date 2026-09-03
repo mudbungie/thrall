@@ -1,12 +1,8 @@
 //! One channel: present, wait, hand off, answer — and every sentence that ends
 //! it.
 
-use super::super::hold;
-use super::{advertised, aside, echo, gesture, ops, receipt, refusal, row, set, wired, work};
-use crate::channel::Channel;
-use crate::channel::material::read_dir;
-use crate::test_support::engine::Engine;
-use crate::test_support::{Scratch, mint};
+use super::super::hold::hold;
+use super::{advertised, aside, echo, gesture, ops, receipt, refusal, row, said, set, wired, work};
 use serde_json::json;
 
 /// **The whole loop, once around**: present, wait, hand off, answer, present
@@ -22,7 +18,7 @@ fn the_loop_presents_waits_hands_off_and_answers() {
         refusal("the engine is going down"),
     ]);
     assert_eq!(
-        hold(&channel, &set(), echo, &aside()),
+        said(hold(&channel, &set(), echo, &aside())),
         "the engine is going down",
         "the channel ends with the sentence that ended it"
     );
@@ -57,7 +53,7 @@ fn the_loop_presents_waits_hands_off_and_answers() {
 fn a_refused_advertisement_ends_the_channel_before_any_read() {
     let (_scratch, engine, channel) = wired(vec![refusal("this leaf is not registered here")]);
     assert_eq!(
-        hold(&channel, &set(), echo, &aside()),
+        said(hold(&channel, &set(), echo, &aside())),
         "this leaf is not registered here"
     );
     assert_eq!(ops(&engine), ["advertise"]);
@@ -79,7 +75,7 @@ fn an_empty_answer_is_waited_through_and_not_an_ending() {
         refusal("the engine is going down"),
     ]);
     assert_eq!(
-        hold(&channel, &set(), echo, &aside()),
+        said(hold(&channel, &set(), echo, &aside())),
         "the engine is going down"
     );
     assert_eq!(
@@ -102,7 +98,7 @@ fn work_in_one_answer_is_run_one_at_a_time_in_order() {
         advertised(),
         refusal("stop"),
     ]);
-    assert_eq!(hold(&channel, &set(), echo, &aside()), "stop");
+    assert_eq!(said(hold(&channel, &set(), echo, &aside())), "stop");
     assert_eq!(
         ops(&engine),
         [
@@ -134,7 +130,7 @@ fn the_set_is_asserted_again_at_the_end_of_every_hand_off() {
         advertised(),
         refusal("stop"),
     ]);
-    assert_eq!(hold(&channel, &set(), echo, &aside()), "stop");
+    assert_eq!(said(hold(&channel, &set(), echo, &aside())), "stop");
     assert_eq!(
         gesture(&engine, 3),
         gesture(&engine, 0),
@@ -147,17 +143,18 @@ fn the_set_is_asserted_again_at_the_end_of_every_hand_off() {
 /// replace a *serving* machine's own, so a refusal here means another
 /// connection is holding this machine's read under a different set — two
 /// processes claiming one name, which is exactly what this foot must not keep
-/// serving through.
+/// serving through. `ending` proves it is not collapsed into the retryable
+/// refusal beside it.
 #[test]
 fn a_refused_re_assertion_ends_the_channel() {
-    let said = "another connection is holding this engine's follow-class read";
+    let refused = "another connection is holding this engine's follow-class read";
     let (_scratch, engine, channel) = wired(vec![
         advertised(),
         work(vec![row("i-1", "Bash")]),
         receipt("i-1"),
-        refusal(said),
+        refusal(refused),
     ]);
-    assert_eq!(hold(&channel, &set(), echo, &aside()), said);
+    assert_eq!(said(hold(&channel, &set(), echo, &aside())), refused);
     assert_eq!(
         ops(&engine),
         ["advertise", "invocations", "complete", "advertise"],
@@ -176,7 +173,7 @@ fn a_refused_completion_ends_the_channel() {
         refusal("no invocation \"i-1\" is in flight"),
     ]);
     assert_eq!(
-        hold(&channel, &set(), echo, &aside()),
+        said(hold(&channel, &set(), echo, &aside())),
         "no invocation \"i-1\" is in flight"
     );
 }
@@ -187,7 +184,7 @@ fn a_refused_completion_ends_the_channel() {
 #[test]
 fn an_answer_that_is_not_this_machine_s_work_ends_the_channel() {
     let (_scratch, _engine, channel) = wired(vec![advertised(), advertised()]);
-    let said = hold(&channel, &set(), echo, &aside());
+    let said = said(hold(&channel, &set(), echo, &aside()));
     assert!(said.contains("not this machine's work"), "{said}");
     assert!(said.contains("Advertised"), "{said}");
 }
@@ -199,23 +196,7 @@ fn an_answer_no_foot_gesture_can_earn_ends_the_channel() {
     let (_scratch, _engine, channel) =
         wired(vec![json!({"ok": true, "kind": "board", "rows": []})]);
     assert_eq!(
-        hold(&channel, &set(), echo, &aside()),
+        said(hold(&channel, &set(), echo, &aside())),
         "reply: unusable kind \"board\""
-    );
-}
-
-/// A stream that ends with no frame in it is not an answer, and says so.
-#[test]
-fn an_engine_that_ends_the_stream_without_answering_ends_the_channel() {
-    let scratch = Scratch::new();
-    mint::material(scratch.path());
-    let _engine = Engine::start(scratch.path(), crate::corpus::PROTOCOL, vec![vec![]]);
-    let held = read_dir(scratch.path())
-        .expect("readable")
-        .expect("provisioned");
-    let channel = Channel::open(&held).expect("opened");
-    assert_eq!(
-        hold(&channel, &set(), echo, &aside()),
-        "the engine ended the stream without answering"
     );
 }

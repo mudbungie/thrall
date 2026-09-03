@@ -13,10 +13,14 @@
 //! that returned zero would be saying it had finished, and a foot is never
 //! finished — it is either serving or stopped.
 //!
-//! **And it never reconnects** (DESIGN §2). Restart policy belongs to the
-//! supervision the operator's machine already has, and inventing one here would
-//! be thrall deciding how a box it does not administer runs a program. The
-//! sentence it exits with is what that supervisor's log will carry.
+//! **A channel is dialled again; a process is not restarted** (DESIGN §3.8,
+//! REMOTE §5.3). Each channel takes itself up again after a drop, so what
+//! reaches this file is the ending that asking again cannot improve — and a box
+//! whose every channel has ended that way is a foot that cannot be a foot,
+//! which is where the supervision the operator's machine already has takes
+//! over. The sentence it exits with is what that supervisor's log will carry;
+//! everything a channel said while it was still trying went to `notice` as it
+//! happened.
 
 use std::path::Path;
 
@@ -28,11 +32,11 @@ use crate::{config, exec, run};
 /// Serve the box rooted at `root`, saying anything a channel raises while it
 /// is still serving through `notice`.
 ///
-/// **The sink is a parameter for the same reason the executor is** (`run`): a
-/// serving foot's notices go to this process's stderr, which is an effect and
-/// not a value, so the effect is `src/main.rs`'s and every test here reads the
-/// notices back instead.
-pub fn serve(root: &Path, notice: &run::Notice) -> Verdict {
+/// **The sink and the pause are parameters for the same reason the executor
+/// is** (`run`): a serving foot's notices go to this process's stderr and its
+/// waits are real sleeps, both effects and neither a value, so both live in
+/// `src/main.rs` and every test here reads them back instead.
+pub fn serve(root: &Path, notice: &run::Notice, pause: &run::Pause) -> Verdict {
     let set = match config::read(&config::path(root)) {
         Ok(set) => set,
         Err(reason) => return Verdict::failed(reason),
@@ -41,7 +45,7 @@ pub fn serve(root: &Path, notice: &run::Notice) -> Verdict {
     if held.is_empty() {
         return Verdict::failed(unprovisioned(root));
     }
-    Verdict::failed(run::fan(held, set, exec::handoff, notice).join("\n"))
+    Verdict::failed(run::fan(held, set, exec::handoff, notice, pause).join("\n"))
 }
 
 /// What a box with a tool document and no channel is told.

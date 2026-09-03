@@ -99,10 +99,11 @@ usage: thrall run
 
   run             serve every channel this box is provisioned for: present
                   what it offers, wait for work, run it, post the captures
-                  back. It does not return while a channel is up, and it
-                  never reconnects: a channel that fails is an exit naming
-                  it, and restarting belongs to this machine's own
-                  supervision.
+                  back. It does not return while a channel is up. A channel
+                  that drops is dialled again, with a backoff that settles;
+                  a channel that cannot be served at all is an exit naming
+                  it, and restarting the process belongs to this machine's
+                  own supervision.
   -V, --version   print the name and version
   -h, --help      print this
 
@@ -183,7 +184,7 @@ mod tests {
         assert!(text.contains("thrall run"), "{text}");
         assert!(text.contains("tools.json"), "{text}");
         assert!(text.contains("wire/workspaces/"), "{text}");
-        assert!(text.contains("never reconnects"), "{text}");
+        assert!(text.contains("dialled again"), "{text}");
     }
 
     #[test]

@@ -6,19 +6,22 @@
 //! library, where a test reads it back as a value. That is what earns this file
 //! its place as the single exclusion in `tarpaulin.toml`.
 //!
-//! Three things are the entry point's rather than the library's, and all three
+//! Four things are the entry point's rather than the library's, and all four
 //! are the reason the exclusion is honest: **this process's own environment**,
 //! folded once into the data root; **serving**, which is not a value a test can
-//! read back but a program dialling engines until they stop; and **where a
-//! serving foot's notices go**, which is this process's stderr — an effect, and
-//! the one thing `serve` cannot answer as a `Verdict` because it has to be said
-//! while the channels are still up rather than after they have all stopped.
+//! read back but a program dialling engines until they stop; **where a serving
+//! foot's notices go**, which is this process's stderr — an effect, and the one
+//! thing `serve` cannot answer as a `Verdict` because it has to be said while
+//! the channels are still up rather than after they have all stopped; and
+//! **the real sleep between dials**, which is the same kind of thing one
+//! register down (`run::Pause`): a suite that slept a redial's backoff out
+//! would spend a minute proving arithmetic.
 
 use std::process::ExitCode;
 use std::sync::Arc;
 
 use thrall::cli::{Decided, Verdict};
-use thrall::run::Notice;
+use thrall::run::{Notice, Pause};
 
 fn main() -> ExitCode {
     let verdict = match thrall::cli::run(std::env::args().skip(1).collect()) {
@@ -26,7 +29,8 @@ fn main() -> ExitCode {
         Decided::Serve => match thrall::paths::data_root() {
             Ok(root) => {
                 let notice: Notice = Arc::new(|line: &str| eprintln!("{line}"));
-                thrall::serve::serve(&root, &notice)
+                let pause: Pause = Arc::new(std::thread::sleep);
+                thrall::serve::serve(&root, &notice, &pause)
             }
             Err(reason) => Verdict::failed(reason),
         },

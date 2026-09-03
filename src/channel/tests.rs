@@ -170,12 +170,14 @@ fn a_leaf_the_engine_will_not_accept_never_reaches_the_boundary() {
 
 /// **An engine that goes away mid-conversation is thrall's own sentence, not
 /// its TLS library's** (bl-52ba). It is the failure a running foot will
-/// actually hit, and the one place a supervisor's log is the only thing an
-/// operator gets — so it names the address that went away and what this box
-/// will and will not do about it, exactly as the connect refusals beside it do.
-/// The library's account follows; it does not stand in for the sentence.
+/// actually hit, and what an operator needs from it first is WHICH engine went
+/// away — so it names the leg and the address, exactly as the connect refusals
+/// beside it do, and the library's account follows rather than standing in for
+/// it. **What happens next is no longer this file's to say** (bl-916d): a
+/// dropped wire is dialled again, and `run::redial` says so in the same breath
+/// as this sentence.
 #[test]
-fn an_engine_that_vanishes_names_the_address_and_says_what_happens_next() {
+fn an_engine_that_vanishes_names_the_leg_and_the_address() {
     let scratch = Scratch::new();
     mint::material(scratch.path());
     let engine = Engine::vanishes(scratch.path());
@@ -188,8 +190,14 @@ fn an_engine_that_vanishes_names_the_address_and_says_what_happens_next() {
         .expect_err("the engine went away");
     assert!(said.starts_with("receive "), "the leg comes first: {said}");
     assert!(said.contains(&held.address), "no address: {said}");
-    assert!(said.contains("does not reconnect"), "{said}");
-    assert!(said.contains("supervision"), "no remedy: {said}");
+    assert!(
+        said.contains("the channel to the engine failed"),
+        "no diagnosis: {said}"
+    );
+    assert!(
+        !said.contains("reconnect"),
+        "what happens next is the redial's to say, not this file's: {said}"
+    );
     assert_eq!(engine.heard().len(), 2, "the foot did speak first");
 }
 
