@@ -62,7 +62,10 @@ name: Release-plz
 #     timestamped branch each time it refreshes the release PR, and pushes it
 #     BEFORE opening the PR, so superseded and orphaned branches pile up one per
 #     push to `main`; the repository's "automatically delete head branches"
-#     setting only fires on MERGE and never sees them.
+#     setting only fires on MERGE and never sees them. It runs when that job
+#     FAILED as well as when it succeeded, because the branch is pushed before
+#     the PR is opened and a failure there is precisely how a branch is left
+#     with nothing to close it — see the job's own condition.
 #
 # So the flow is: land work on `main` -> the gate runs and the release PR is
 # kept fresh; merge the release PR -> the gate runs again -> on green the new
@@ -201,10 +204,27 @@ jobs:
 
   prune-release-branches:
     name: prune superseded release branches
-    # `needs` with no `if`: only after the release-PR job actually ran and
-    # succeeded, so pruning only ever follows a PR refresh. On a dispatch that
-    # job is skipped and so is this one.
+    # Runs after the release-PR job RAN — succeeded or failed — and after
+    # nothing else. `needs` alone would not do it: a bare `needs` carries an
+    # implicit `success()`, so a FAILED PR job skips this one, and that is
+    # exactly the path that strands a branch. release-plz pushes the timestamped
+    # branch BEFORE it opens the PR, so the window in which a branch exists with
+    # no PR is the window in which the PR step can still fail; the first armed
+    # run failed there (the repository's create-PR setting was not yet enabled)
+    # and left a branch nothing would ever collect.
+    #
+    # The condition names the two outcomes rather than saying `always()`,
+    # because the other two results must still skip. A `workflow_dispatch` skips
+    # the PR job by its own `github.event_name == 'push'` guard, and a fork
+    # skips it by the owner guard: in both the branch was never pushed, so there
+    # is nothing to collect and this job must stay skipped too. `!cancelled()`
+    # is what drops the implicit `success()` — an `if` with no status function
+    # keeps it, which is the trap this comment exists to hold shut.
     needs: release-plz-pr
+    if: >-
+      ${{ !cancelled()
+      && (needs.release-plz-pr.result == 'success'
+      || needs.release-plz-pr.result == 'failure') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
