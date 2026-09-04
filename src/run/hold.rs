@@ -59,11 +59,12 @@
 
 use serde_json::Value;
 
+use super::held::{self, Held};
 use super::{Handoff, Notice};
 use crate::channel::Channel;
 use crate::config::{self, Local};
 use crate::gestures::{self, Reply};
-use crate::invocation::{Capture, Invocation};
+use crate::invocation::Invocation;
 
 /// **What this machine says when a re-assertion actually wrote.**
 ///
@@ -101,6 +102,11 @@ pub(crate) enum Ending {
         /// hold, which is the evidence that this channel was real — and a
         /// hammering loop cannot manufacture it.
         served: bool,
+        /// **The capture the wire swallowed on the way out**, when this ending
+        /// is carrying one: the next dial posts it first, ahead of the read
+        /// that releases the engine's lease (REMOTE §5.6 ruling 1, [`Held`]).
+        /// `None` is the ordinary ending, which has nothing in flight.
+        held: Option<Held>,
     },
     /// **This channel is over.** This box's own material, an engine refusing
     /// what this box offers or what it captured, or an answer no foot gesture
@@ -112,7 +118,7 @@ pub(crate) enum Ending {
 /// **A gesture that did not land, by who failed** — which is the whole of what
 /// the ending turns on, and the one thing the engine's own sentence cannot be
 /// asked for.
-enum Failed {
+pub(super) enum Failed {
     /// **The wire.** It carries no opinion of this foot at all, so it is worth
     /// dialling again whichever leg it struck.
     Wire(String),
@@ -147,11 +153,13 @@ impl Failed {
                 said,
                 predecessor: false,
                 served,
+                held: None,
             },
             (Self::Refused(said), Leg::Read) => Ending::Again {
                 said,
                 predecessor: true,
                 served,
+                held: None,
             },
             (Self::Refused(said) | Self::Unusable(said), _) => Ending::Over(said),
         }
@@ -163,7 +171,19 @@ impl Failed {
 /// There is no success return and none is spelled: the only way out is a
 /// gesture that did not land, so an `Ok` arm would be one no state of the world
 /// can reach.
-pub(crate) fn hold(channel: &Channel, set: &[Local], handoff: Handoff, notice: &Notice) -> Ending {
+///
+/// **A capture a previous channel could not post is this one's first act**
+/// ([`Held`], REMOTE §5.6 ruling 1) — after the advertisement and before the
+/// first read, because the read is what releases the engine's lease, so a
+/// capture posted ahead of it lands on a slot still held with no capture and
+/// the driver collects a result this box computed once.
+pub(crate) fn hold(
+    channel: &Channel,
+    set: &[Local],
+    handoff: Handoff,
+    notice: &Notice,
+    held: Option<Held>,
+) -> Ending {
     let presenting = gestures::advertise(&config::advertisement(set));
     let mut served = false;
     // The first presentation's reading is discarded on purpose: a fresh channel
@@ -171,6 +191,9 @@ pub(crate) fn hold(channel: &Channel, set: &[Local], handoff: Handoff, notice: &
     // that. Only a re-assertion below can mean one.
     if let Err(failed) = present(channel, &presenting) {
         return failed.at(Leg::Advertisement, served);
+    }
+    if let Some(ending) = held.and_then(|held| held.post(channel)) {
+        return ending;
     }
     loop {
         let work = match waited(channel) {
@@ -180,8 +203,9 @@ pub(crate) fn hold(channel: &Channel, set: &[Local], handoff: Handoff, notice: &
         served = true;
         for invocation in work {
             let capture = handoff(set, &invocation);
-            if let Err(failed) = answer(channel, &invocation, &capture) {
-                return failed.at(Leg::Completion, served);
+            if let Err(failed) = held::answer(channel, &invocation, &capture) {
+                let ending = failed.at(Leg::Completion, served);
+                return Held::of(&invocation, capture).carried_by(ending);
             }
             match present(channel, &presenting) {
                 Err(failed) => return failed.at(Leg::Advertisement, served),
@@ -229,27 +253,6 @@ fn waited(channel: &Channel) -> Result<Vec<Invocation>, Failed> {
     }
 }
 
-/// Post one capture back.
-///
-/// **The receipt is read rather than discarded.** An engine that refused the
-/// completion — an expired handle, a slot addressed to another machine — is
-/// saying that this foot and that engine disagree about what is in flight, and
-/// a foot that kept answering into that would be posting captures nobody is
-/// waiting for.
-///
-/// **A capture the WIRE swallowed is a different thing and is not lost**: the
-/// engine's mark on a handed-out invocation is a lease, released by this
-/// client's own next read, so the redial's fresh channel is handed the same
-/// invocation under the same id and runs it again (REMOTE §5.3's at-least-once
-/// leg, yog bl-e658). Nothing here has to remember it — and nothing here may:
-/// the id is offered as an idempotency key and a foot declines it, because
-/// suppressing the second run without answering it would leave the engine
-/// holding a slot with no capture, which is the silence that ball was about
-/// (DESIGN §3.8, bl-9261).
-fn answer(channel: &Channel, invocation: &Invocation, capture: &Capture) -> Result<(), Failed> {
-    tell(channel, &gestures::complete(&invocation.id, capture)).map(|_| ())
-}
-
 /// One gesture over the channel, read back with the one decoder — so this foot
 /// speaks exactly what the boundary speaks and can add nothing to it.
 ///
@@ -263,7 +266,7 @@ fn answer(channel: &Channel, invocation: &Invocation, capture: &Capture) -> Resu
 /// can earn. A stream that terminated with no frame in it belongs to the last
 /// of those: the terminator is a zero-length frame the engine deliberately
 /// wrote, where a peer that went away is a read error instead.
-fn tell(channel: &Channel, request: &Value) -> Result<Reply, Failed> {
+pub(super) fn tell(channel: &Channel, request: &Value) -> Result<Reply, Failed> {
     let stream = channel.ask(request).map_err(Failed::Wire)?;
     let last = stream.last().ok_or_else(|| {
         Failed::Unusable("the engine ended the stream without answering".to_owned())

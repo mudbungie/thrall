@@ -110,6 +110,15 @@ fn said(ending: Ending) -> String {
     }
 }
 
+/// The entry standing at `dir`, where an engine has been provisioned — the
+/// same fact a channel is opened from, wearing the name a box files it under.
+fn entry_at(dir: &Path) -> crate::channel::entries::Entry {
+    crate::channel::entries::Entry {
+        leaf: "engine".to_owned(),
+        channel: Ok(read_dir(dir).expect("readable").expect("provisioned")),
+    }
+}
+
 /// A box with one channel, and the engine standing at it.
 fn wired(script: Vec<Value>) -> (Scratch, Engine, Channel) {
     let scratch = Scratch::new();
@@ -152,3 +161,5 @@ mod fan;
 mod redial;
 /// When a box says a channel has stopped.
 mod report;
+/// The capture the wire swallowed, and the dial that posts it.
+mod swallowed;

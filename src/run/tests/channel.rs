@@ -18,7 +18,7 @@ fn the_loop_presents_waits_hands_off_and_answers() {
         refusal("the engine is going down"),
     ]);
     assert_eq!(
-        said(hold(&channel, &set(), echo, &aside())),
+        said(hold(&channel, &set(), echo, &aside(), None)),
         "the engine is going down",
         "the channel ends with the sentence that ended it"
     );
@@ -53,7 +53,7 @@ fn the_loop_presents_waits_hands_off_and_answers() {
 fn a_refused_advertisement_ends_the_channel_before_any_read() {
     let (_scratch, engine, channel) = wired(vec![refusal("this leaf is not registered here")]);
     assert_eq!(
-        said(hold(&channel, &set(), echo, &aside())),
+        said(hold(&channel, &set(), echo, &aside(), None)),
         "this leaf is not registered here"
     );
     assert_eq!(ops(&engine), ["advertise"]);
@@ -75,7 +75,7 @@ fn an_empty_answer_is_waited_through_and_not_an_ending() {
         refusal("the engine is going down"),
     ]);
     assert_eq!(
-        said(hold(&channel, &set(), echo, &aside())),
+        said(hold(&channel, &set(), echo, &aside(), None)),
         "the engine is going down"
     );
     assert_eq!(
@@ -98,7 +98,7 @@ fn work_in_one_answer_is_run_one_at_a_time_in_order() {
         advertised(),
         refusal("stop"),
     ]);
-    assert_eq!(said(hold(&channel, &set(), echo, &aside())), "stop");
+    assert_eq!(said(hold(&channel, &set(), echo, &aside(), None)), "stop");
     assert_eq!(
         ops(&engine),
         [
@@ -130,7 +130,7 @@ fn the_set_is_asserted_again_at_the_end_of_every_hand_off() {
         advertised(),
         refusal("stop"),
     ]);
-    assert_eq!(said(hold(&channel, &set(), echo, &aside())), "stop");
+    assert_eq!(said(hold(&channel, &set(), echo, &aside(), None)), "stop");
     assert_eq!(
         gesture(&engine, 3),
         gesture(&engine, 0),
@@ -154,7 +154,7 @@ fn a_refused_re_assertion_ends_the_channel() {
         receipt("i-1"),
         refusal(refused),
     ]);
-    assert_eq!(said(hold(&channel, &set(), echo, &aside())), refused);
+    assert_eq!(said(hold(&channel, &set(), echo, &aside(), None)), refused);
     assert_eq!(
         ops(&engine),
         ["advertise", "invocations", "complete", "advertise"],
@@ -173,7 +173,7 @@ fn a_refused_completion_ends_the_channel() {
         refusal("no invocation \"i-1\" is in flight"),
     ]);
     assert_eq!(
-        said(hold(&channel, &set(), echo, &aside())),
+        said(hold(&channel, &set(), echo, &aside(), None)),
         "no invocation \"i-1\" is in flight"
     );
 }
@@ -184,7 +184,7 @@ fn a_refused_completion_ends_the_channel() {
 #[test]
 fn an_answer_that_is_not_this_machine_s_work_ends_the_channel() {
     let (_scratch, _engine, channel) = wired(vec![advertised(), advertised()]);
-    let said = said(hold(&channel, &set(), echo, &aside()));
+    let said = said(hold(&channel, &set(), echo, &aside(), None));
     assert!(said.contains("not this machine's work"), "{said}");
     assert!(said.contains("Advertised"), "{said}");
 }
@@ -196,7 +196,7 @@ fn an_answer_no_foot_gesture_can_earn_ends_the_channel() {
     let (_scratch, _engine, channel) =
         wired(vec![json!({"ok": true, "kind": "board", "rows": []})]);
     assert_eq!(
-        said(hold(&channel, &set(), echo, &aside())),
+        said(hold(&channel, &set(), echo, &aside(), None)),
         "reply: unusable kind \"board\""
     );
 }

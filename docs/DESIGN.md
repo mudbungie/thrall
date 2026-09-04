@@ -570,20 +570,38 @@ engine's mailbox lease (REMOTE §5.3's at-least-once leg) rather than this loop'
 under. Four consequences, and each is deliberate:
 
 - **This box runs that invocation again, and thrall does not dedupe it**
-  (bl-9261). REMOTE §5.3 offers the id as an idempotency key — *"a far end that
-  must not run a thing twice has a stable name to dedupe on and needs no field
-  of its own to get it"* — and it is an offer to hosts generally, not an
-  instruction to this one. **A foot declines it**, for two reasons and the
-  second is the stronger. A remembered set of ids is memory that has to survive
-  the gap the whole of this section refuses; and suppressing the second run
-  without answering it would leave the engine holding a slot with no capture,
-  which is precisely bl-9261's silence — an invocation nobody ran and nobody
-  was told about — reintroduced by the client. Answering it instead would mean
-  keeping the capture that the wire swallowed, unbounded and for an interval
-  nothing can name, which is a foot with a world (§2). So the honest answer to
-  a redelivery is to run it: the duplicate is the price REMOTE §5.3 states it
-  is paying, and a tool that must not run twice is the operator's to make
-  idempotent, on the box where the containment already lives (§3.5).
+  (bl-9261) — **except that a capture it is still holding is posted rather than
+  recomputed** (REMOTE §5.6 ruling 1, bl-f9d2). REMOTE §5.3 offers the id as an
+  idempotency key — *"a far end that must not run a thing twice has a stable
+  name to dedupe on and needs no field of its own to get it"* — and it is an
+  offer to hosts generally, not an instruction to this one. **A foot declines
+  it**, for two reasons and the second is the stronger. A remembered set of ids
+  is memory that has to survive the gap the whole of this section refuses; and
+  suppressing the second run without answering it would leave the engine
+  holding a slot with no capture, which is precisely bl-9261's silence — an
+  invocation nobody ran and nobody was told about — reintroduced by the client.
+  So the honest answer to a redelivery is to run it: the duplicate is the price
+  REMOTE §5.3 states it is paying, and a tool that must not run twice is the
+  operator's to make idempotent, on the box where the containment already lives
+  (§3.5).
+
+  **What that refusal did not reach is the capture already on this process's
+  stack.** bl-9261's second reason was that keeping it would mean holding it
+  *"for an interval nothing can name"*, and that is answered rather than
+  contradicted: it is not held and waited on, it is **posted as the first act
+  of the next dial** — after the advertisement and before that channel's first
+  follow-class read, because the read is what releases the lease (REMOTE §5.3),
+  so a capture posted ahead of it lands on a slot the engine still holds with no
+  capture and the driver collects a result this box computed once. The interval
+  is named by that act: until the next channel's first gesture is answered,
+  landed or refused. A refusal of the re-post is dropped and the channel reads
+  on — the engine has swept, restarted, or already answered the driver, and none
+  of those is terminal — and a completion the ENGINE refused carries nothing at
+  all, because a refusal says the two ends disagree about what is in flight.
+  **This is one capture, on the loop's own stack, and it is not a ledger**
+  (`run::held`): no id set, no comparison, no suppression, and nothing that
+  outlives the process — an invocation redelivered with no held capture is run
+  again, undeduped, exactly as the paragraph above says.
 
 - **The disarming is not remembered.** §3.7's notice fires on a re-assertion
   that WROTE, and is silent on a channel's FIRST presentation because every
@@ -680,6 +698,7 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/invocation.rs` | What crosses the routing leg: the invocation a foot is handed and the capture it hands back, each in one strict spelling. |
 | `src/run.rs` | **The loop**, and the three seams that are parameters: what runs a command (`Handoff`), where a channel says something while it is still serving (`Notice`, §3.7) and where it waits between dials (`Pause`, §3.8). All three are effects no test can read back, so the one implementation of each is `src/main.rs`'s — which is what lets the whole conversation be tested against a real engine, a one-line executor and two recorders. This file itself is `fan`: every channel this box holds, one thread each — and `served`, which says a channel's terminal sentence in that channel's own thread rather than at the join (§3.9). |
 | `src/run/hold.rs` | **One channel's conversation** (split from `run.rs` by bl-916d): present, wait, hand off, answer, present again — and the `Ending` that stopped it, classified by who failed and at which leg (§3.8). |
+| `src/run/held.rs` | **The capture going back** (bl-f9d2): the ordinary post at the moment it is computed, and the one this process is still holding when that post fails on the wire — carried out with the ending and posted first on the next dial, ahead of the read that releases the engine's lease (§3.8, REMOTE §5.6 ruling 1). |
 | `src/run/redial.rs` | **One channel's lifetime** (bl-916d): the endings worth another dial, the backoff that settles, and the sentence said in the meantime. It is a separate file because it is a separate question — what happened, against what to do about it — and because its whole decision is three numbers and one line of arithmetic, testable as values. |
 | `src/exec.rs` | **The executor's dispatch** (bl-4cda): which entry an invocation names, whose working directory it may run in (§3.4's `subject_cwd`), and the three facts that come back. Every outcome is a capture — a tool that ran, one that overran, a name this box does not carry, a command that would not start. |
 | `src/exec/child.rs` | One child, from the fork to the capture: the spawn, the poll that is also the drain, and the cascade that stops a tool which will not stop itself. Split from `exec.rs` when the drain moved into the poll (bl-6c14) — the seam is *deciding what to run* against *running it*. |

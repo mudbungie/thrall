@@ -28,7 +28,7 @@ fn a_re_assertion_that_wrote_says_the_box_was_disarmed() {
         restored(),
         refusal("stop"),
     ]);
-    assert_eq!(said(hold(&channel, &set(), echo, &sink)), "stop");
+    assert_eq!(said(hold(&channel, &set(), echo, &sink, None)), "stop");
     let said = notices.heard();
     assert_eq!(said.len(), 1, "{said:?}");
     assert!(said[0].contains("was not the set in force"), "{said:?}");
@@ -53,7 +53,7 @@ fn a_disarming_is_said_and_the_channel_goes_on() {
         work(vec![]),
         refusal("stop"),
     ]);
-    assert_eq!(said(hold(&channel, &set(), echo, &sink)), "stop");
+    assert_eq!(said(hold(&channel, &set(), echo, &sink, None)), "stop");
     assert_eq!(
         super::ops(&engine),
         [
@@ -82,7 +82,7 @@ fn a_re_assertion_that_compared_is_silent() {
         advertised(),
         refusal("stop"),
     ]);
-    assert_eq!(said(hold(&channel, &set(), echo, &sink)), "stop");
+    assert_eq!(said(hold(&channel, &set(), echo, &sink, None)), "stop");
     assert_eq!(notices.heard(), Vec::<String>::new());
 }
 
@@ -95,7 +95,7 @@ fn a_re_assertion_that_compared_is_silent() {
 fn a_write_on_the_first_presentation_is_ordinary_and_silent() {
     let (notices, sink) = Notices::new();
     let (_scratch, _engine, channel) = wired(vec![restored(), refusal("stop")]);
-    assert_eq!(said(hold(&channel, &set(), echo, &sink)), "stop");
+    assert_eq!(said(hold(&channel, &set(), echo, &sink, None)), "stop");
     assert_eq!(notices.heard(), Vec::<String>::new());
 }
 
@@ -107,7 +107,13 @@ fn a_write_on_the_first_presentation_is_ordinary_and_silent() {
 #[test]
 fn an_answer_that_is_not_the_receipt_ends_the_channel() {
     let (_scratch, _engine, channel) = wired(vec![work(vec![])]);
-    let said = said(hold(&channel, &set(), echo, &crate::test_support::aside()));
+    let said = said(hold(
+        &channel,
+        &set(),
+        echo,
+        &crate::test_support::aside(),
+        None,
+    ));
     assert!(said.contains("not that the advertisement landed"), "{said}");
     assert!(said.contains("Invocations"), "{said}");
 }

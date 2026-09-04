@@ -6,20 +6,12 @@
 //! wire** that really drops, with the waits read back out of a recording pause.
 
 use super::super::redial::{CAP, FIRST, PREDECESSOR, next, redial};
-use super::{advertised, aside, echo, flapping_at, receipt, refusal, restored, row, set, work};
+use super::{
+    advertised, aside, echo, entry_at, flapping_at, receipt, refusal, restored, row, set, work,
+};
 use crate::channel::entries::Entry;
-use crate::channel::material::read_dir;
 use crate::test_support::{Notices, Scratch, Waits, unwaited};
-use std::path::Path;
 use std::time::Duration;
-
-/// The entry standing at `dir`, where a flapping engine has been provisioned.
-fn entry_at(dir: &Path) -> Entry {
-    Entry {
-        leaf: "engine".to_owned(),
-        channel: Ok(read_dir(dir).expect("readable").expect("provisioned")),
-    }
-}
 
 /// **The series doubles and it stops**, so a box whose network is not coming
 /// back for hours settles to a dial a minute rather than burning a core.

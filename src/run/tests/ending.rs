@@ -18,8 +18,10 @@ use super::super::hold::{Ending, hold};
 use super::{advertised, aside, echo, ops, refusal, row, set, wired, work};
 use crate::channel::Channel;
 use crate::channel::material::read_dir;
+use crate::invocation::Invocation;
 use crate::test_support::engine::Engine;
 use crate::test_support::{Scratch, mint};
+use serde_json::json;
 
 /// **The one-reader refusal is retryable, and it names this box's own
 /// predecessor.** A read parked when its connection died does not leave until
@@ -32,11 +34,12 @@ fn a_refused_read_is_this_box_s_own_predecessor_and_is_dialled_again() {
     let refused = "client \"foot-1\" already holds a read on this engine";
     let (_scratch, engine, channel) = wired(vec![advertised(), refusal(refused)]);
     assert_eq!(
-        hold(&channel, &set(), echo, &aside()),
+        hold(&channel, &set(), echo, &aside(), None),
         Ending::Again {
             said: refused.to_owned(),
             predecessor: true,
             served: false,
+            held: None,
         }
     );
     assert_eq!(ops(&engine), ["advertise", "invocations"]);
@@ -52,7 +55,7 @@ fn a_refused_advertisement_is_over_and_not_a_predecessor() {
     let refused = "this box's set is held by a serving connection";
     let (_scratch, _engine, channel) = wired(vec![refusal(refused)]);
     assert_eq!(
-        hold(&channel, &set(), echo, &aside()),
+        hold(&channel, &set(), echo, &aside(), None),
         Ending::Over(refused.to_owned())
     );
 }
@@ -68,7 +71,7 @@ fn a_refused_completion_is_over() {
         refusal(refused),
     ]);
     assert_eq!(
-        hold(&channel, &set(), echo, &aside()),
+        hold(&channel, &set(), echo, &aside(), None),
         Ending::Over(refused.to_owned())
     );
 }
@@ -78,7 +81,7 @@ fn a_refused_completion_is_over() {
 #[test]
 fn an_unusable_answer_is_over() {
     let (_scratch, _engine, channel) = wired(vec![advertised(), advertised()]);
-    let Ending::Over(said) = hold(&channel, &set(), echo, &aside()) else {
+    let Ending::Over(said) = hold(&channel, &set(), echo, &aside(), None) else {
         panic!("an unusable answer must end the channel");
     };
     assert!(said.contains("not this machine's work"), "{said}");
@@ -101,7 +104,8 @@ fn a_wire_that_goes_away_is_dialled_again() {
         said,
         predecessor,
         served,
-    } = hold(&channel, &set(), echo, &aside())
+        ..
+    } = hold(&channel, &set(), echo, &aside(), None)
     else {
         panic!("a dropped wire must be worth another dial");
     };
@@ -125,7 +129,7 @@ fn an_answered_read_marks_the_channel_as_having_served() {
         .expect("readable")
         .expect("provisioned");
     let channel = Channel::open(&held).expect("opened");
-    let Ending::Again { served, .. } = hold(&channel, &set(), echo, &aside()) else {
+    let Ending::Again { served, .. } = hold(&channel, &set(), echo, &aside(), None) else {
         panic!("a dropped wire must be worth another dial");
     };
     assert!(served, "the engine answered a read before the wire dropped");
@@ -144,15 +148,15 @@ fn a_stream_that_answered_nothing_is_over() {
         .expect("provisioned");
     let channel = Channel::open(&held).expect("opened");
     assert_eq!(
-        hold(&channel, &set(), echo, &aside()),
+        hold(&channel, &set(), echo, &aside(), None),
         Ending::Over("the engine ended the stream without answering".to_owned())
     );
 }
 
-/// A completion the WIRE swallowed is a dropped wire like any other, and the
-/// invocation is not lost: the engine's mark is a lease its own next read
-/// releases, so the redial's fresh channel is handed the same id again
-/// (REMOTE §5.3, yog bl-e658). Nothing in this crate has to remember it.
+/// A completion the WIRE swallowed is a dropped wire like any other — and the
+/// capture leaves WITH the ending (REMOTE §5.6 ruling 1). It is not a memory:
+/// the next dial posts it as its first act and is done with it, which is what
+/// keeps the engine's lease from re-running a tool this box already ran.
 #[test]
 fn a_completion_the_wire_swallowed_is_dialled_again() {
     let scratch = Scratch::new();
@@ -169,8 +173,50 @@ fn a_completion_the_wire_swallowed_is_dialled_again() {
         .expect("readable")
         .expect("provisioned");
     let channel = Channel::open(&held).expect("opened");
-    let Ending::Again { predecessor, .. } = hold(&channel, &set(), echo, &aside()) else {
+    let Ending::Again {
+        predecessor, held, ..
+    } = hold(&channel, &set(), echo, &aside(), None)
+    else {
         panic!("a dropped completion must be worth another dial");
     };
     assert!(!predecessor, "the wire is nobody's refusal");
+    let held = held.expect("the capture the wire swallowed");
+    assert_eq!(held.id, "i-1");
+    assert_eq!(
+        held.capture,
+        echo(
+            &set(),
+            &Invocation {
+                id: "i-1".to_owned(),
+                tool: "Bash".to_owned(),
+                input: json!({"command": "echo hi"}),
+                cwd: None,
+            }
+        ),
+        "it is the capture this box computed, verbatim"
+    );
+}
+
+/// **A completion the ENGINE refused carries nothing**, and no later dial ever
+/// posts it. The refusal says the two ends disagree about what is in flight —
+/// the slot is swept, or was never this box's — so re-posting would ask the
+/// same question. `Ending::Over` has nowhere to put a capture, which is that
+/// ruling being structural rather than a branch (REMOTE §5.6 ruling 1).
+#[test]
+fn a_completion_the_engine_refused_carries_nothing() {
+    let refused = "no invocation \"i-1\" is in flight";
+    let (_scratch, engine, channel) = wired(vec![
+        advertised(),
+        work(vec![row("i-1", "Bash")]),
+        refusal(refused),
+    ]);
+    assert_eq!(
+        hold(&channel, &set(), echo, &aside(), None),
+        Ending::Over(refused.to_owned())
+    );
+    assert_eq!(
+        ops(&engine),
+        ["advertise", "invocations", "complete"],
+        "the capture was posted once and then dropped"
+    );
 }

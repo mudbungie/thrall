@@ -1,11 +1,13 @@
 //! **The loop** (yog's `docs/REMOTE.md` §5.3, §5.4): the whole of what a foot
 //! does, for as long as it does anything.
 //!
-//! It is three files and they are three questions, kept apart because a channel
-//! that is dialled again has a lifetime that is not its conversation:
+//! It is three questions, kept apart because a channel that is dialled again
+//! has a lifetime that is not its conversation:
 //!
 //! - [`hold`] — **one channel's conversation**: present, wait, hand off,
 //!   answer, present again, and the [`Ending`](hold::Ending) that stopped it.
+//!   Beside it, [`held`] is the capture going back — posted as it is computed,
+//!   or carried to the next dial when the wire swallowed it (REMOTE §5.6).
 //! - [`redial`] — **one channel's lifetime**: an ending that is worth another
 //!   dial, the wait before it, and the sentence said in the meantime.
 //! - this file — **every channel this box holds**, one thread each, and the
@@ -27,6 +29,8 @@ use crate::channel::entries::Entry;
 use crate::config::Local;
 use crate::invocation::{Capture, Invocation};
 
+/// The capture going back: posted as it is computed, or held to the next dial.
+pub(crate) mod held;
 /// One channel's conversation, and how it ended.
 pub(crate) mod hold;
 /// One channel's lifetime: the ending that is dialled again, and the wait.

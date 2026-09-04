@@ -17,8 +17,15 @@
 //! makes a *new* channel: presence re-forms as it does for any fresh
 //! connection, the advertisement rides the connection already, registration is
 //! durable engine-side, and an invocation in flight when the wire died is the
-//! engine's mailbox lease rather than this loop's. Nothing crosses the gap —
-//! DESIGN §3.8 states what that costs and why it is the right price.
+//! engine's mailbox lease rather than this loop's. DESIGN §3.8 states what
+//! that costs and why it is the right price.
+//!
+//! **One thing crosses, and it is an act rather than a memory** (REMOTE §5.6
+//! ruling 1, `run::held`): a capture this box computed and the wire swallowed
+//! on the way back. The next dial posts it first and is done with it — landed,
+//! refused or dropped — before it reads. That is not a resumed session and not
+//! a ledger: one capture, on this loop's stack, spent on the next channel's
+//! first act.
 //!
 //! **It must not hammer, so the wait is the whole of this file's decision.**
 //! Three numbers and one line of arithmetic ([`next`]), kept apart from the
@@ -84,14 +91,22 @@ pub(crate) fn redial(
         Err(reason) => return reason,
     };
     let mut series = FIRST;
+    // The one thing that crosses a redial, and it crosses forward rather than
+    // being remembered: a capture the wire swallowed, posted by the next dial
+    // before its first read (REMOTE §5.6 ruling 1, `run::held`). It is at most
+    // one, it is this loop's stack and nowhere else, and it goes no further
+    // than the next channel's first act.
+    let mut held = None;
     loop {
-        match hold(&channel, set, handoff, notice) {
+        match hold(&channel, set, handoff, notice, held.take()) {
             Ending::Over(said) => return said,
             Ending::Again {
                 said,
                 predecessor,
                 served,
+                held: carried,
             } => {
+                held = carried;
                 let (wait, then) = next(series, predecessor, served);
                 series = then;
                 notice(&waiting(&said, predecessor, wait));
