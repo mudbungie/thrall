@@ -63,7 +63,26 @@ Four properties are load-bearing and none is decoration:
   rule owns a fixture in `scripts/leak-fixtures/` where every non-comment line
   must be flagged *by that rule* and must carry the `notreal` marker, plus
   near-misses that must NOT be flagged. A leak gate dies by matching nothing
-  and passing everything forever; a noisy one dies by being bypassed.
+  and passing everything forever; a noisy one dies by being bypassed. A fixture
+  that does not read as **text** in this locale is reported as an
+  infrastructure fault in its own sentence, never as a dead rule (bl-da2a):
+  `scan_rule` greps with `-I`, which reports no hits for a file grep judges
+  binary and says nothing about why, so without that arm the box's fault and
+  the gate's fault arrive as the same sentence.
+- **A `grep -q` reads from a herestring, never from a pipe** (bl-da2a), and the
+  self-test holds every tracked bash script under `scripts/` and `.githooks/`
+  to it — `scripts/thrall-leak-gate` is POSIX `/bin/sh`, which has neither the
+  option that makes the shape wrong nor the herestring that fixes it, and is
+  skipped by its `#!`; a file with **no** `#!` is a sourced bash fragment and
+  is in scope. A piped `grep -q` exits the moment it matches and closes the
+  read end; the writer dies of SIGPIPE mid-write, and `pipefail` reports the
+  pipeline failed *because the pattern matched* (`PIPESTATUS` reads `141 0`).
+  It flaked the self-test into calling a live rule dead, and at `scan_paths` —
+  where the shape is `&& report` — it would have dropped a real finding
+  instead. The ban is on the shape, not on the option, because a sourced file
+  cannot see whether its caller set `pipefail`; and enumerating **zero**
+  scripts fails outright, because a check that matches nothing is broken, never
+  a clean tree. Measured on yog bl-e33a, the original.
 - **`.githooks/commit-msg` runs the same scanner over the commit MESSAGE**,
   which no pre-commit step can see.
 

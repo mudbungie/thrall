@@ -164,10 +164,16 @@ scan_rule() {
 }
 
 # scan_paths PATH... -> findings for the path rule.
+#
+# The subject is a herestring and not a pipe, and here that is the gate's own
+# correctness rather than a style (bl-da2a, reasoned in full at the head of
+# `leak-selftest.sh`, which enforces it): a piped `grep -q` dies of SIGPIPE when
+# it MATCHES, and under this file's `pipefail` the `&&` would then DROP the
+# finding — a real forbidden path reported by nobody.
 scan_paths() {
   local p
   for p in "$@"; do
-    printf '%s\n' "$p" | grep -qE "$FORBIDDEN_PATH" && printf '  %s  [forbidden-path]\n' "$p"
+    grep -qE "$FORBIDDEN_PATH" <<<"$p" && printf '  %s  [forbidden-path]\n' "$p"
   done
   return 0
 }
@@ -179,7 +185,7 @@ scan_binary() {
   for f in "$@"; do
     [ -s "$f" ] || continue
     grep -qI '' "$f" 2>/dev/null && continue
-    printf '%s\n' "$f" | grep -qE "$BINARY_ALLOWED" && continue
+    grep -qE "$BINARY_ALLOWED" <<<"$f" && continue
     printf '  %s  [binary-content]\n' "$f"
   done
   return 0
