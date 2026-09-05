@@ -87,14 +87,18 @@ whether, when and as what it first ships was open: `Cargo.toml` carried
 `publish = false` and the flag was the enforcement rather than a note, because
 a note is not a gate. That decision has been made and 0.0.1 shipped, so what is
 left is the part the flag never covered — `cargo publish` is irreversible and a
-yanked version stays downloadable, so **a publication is a deliberate operator
-act every time**. The release workflow is armed and that is still true, because
-arming MOVED the act rather than removing it: a push to `main` only keeps one
-release PR open proposing the next version, and **merging that PR is the
-deliberate act**. The release then runs behind the same gate this README
-describes, so nothing untested ships, and it authenticates to the registry by a
-trusted publisher — a short-lived token minted per run for one workflow file in
-one repository — so this repository stores no registry credential at all.
+yanked version stays downloadable, so **what ships is decided deliberately**
+— but the deliberate act is the work, not a click. Arming the release workflow
+first MOVED the act to merging a release PR; the standing ruling of 2026-09-03
+then took that click away too, on the ground that the PR asks a question the
+merged work already answered. So a push to `main` keeps one release PR open
+proposing the next version and **merges it in the same run, once the gate is
+green** (`merge-release-pr` in `release-plz.yml`, whose header carries the
+derivation). Nothing untested ships: the merge waits on the very `ci` job the
+release job waits on, and the merged bump is published by a second run of the
+same gated workflow. Publication authenticates to the registry by a trusted
+publisher — a short-lived token minted per run for one workflow file in one
+repository — so this repository stores no registry credential at all.
 
 What guards a version's CONTENT was built before the first flip and stands
 unchanged. `Cargo.toml` declares an anchored `include` **allowlist** — never an
