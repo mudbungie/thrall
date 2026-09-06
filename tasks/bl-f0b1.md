@@ -1,7 +1,7 @@
 +++
 title = "DUPLICATE of bl-f88f — the protocol pin is 8 while the engine speaks 13 (devadmin lane's independent sighting; close unworked)"
 created = 1788673497
-updated = 1788673504
+updated = 1788673505
 priority = 1
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
 tags = ["usability-r1"]
@@ -49,3 +49,7 @@ Two things to decide, and the second is the real one:
    and the cost falls on the operator as a box that dials forever.
 
 Severity p1: a shipped foot cannot connect to a shipped engine.
+
+---
+
+Filed before searching returned bl-f88f, which the swdev lane had filed four minutes earlier. Close this one unworked; the extra datum it carried has been added to bl-f88f as a note.
