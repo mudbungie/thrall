@@ -1,0 +1,27 @@
+# When to look for a new thrall (bl-6c98).
+#
+# Hourly. It is well inside any useful latency for a release and far below the
+# registry's rate limits, and the tick is cheap when nothing changed — one small
+# index fetch and one `--version`. The interval is also the retry cadence, and
+# that is the whole of the reconciler's retry mechanism: it never sleeps and
+# looks again, it answers once and exits, and a deferred restart is simply
+# re-asked here. So an hour is additionally how long an upgrade waits after the
+# invocation that deferred it finishes.
+[Unit]
+Description=hourly check for a new thrall release
+Documentation=https://github.com/mudbungie/thrall
+
+[Timer]
+# Not at boot exactly: the foot should come up and dial first, and a box that
+# was off overnight should not race its own network.
+OnBootSec=5min
+OnUnitActiveSec=1h
+# A missed window — the box was asleep, or logged out — runs ONCE on resume
+# rather than being skipped to the next hour. On a laptop that is most of them.
+Persistent=true
+# Nothing depends on the minute, and a fleet seated from one checkout would
+# otherwise ask the registry the same question at the same second forever.
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

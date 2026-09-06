@@ -441,3 +441,99 @@ Tasks are tracked with `bl`. Run `bl --skill` before using it.
 ## License
 
 MIT.
+
+## Deployment
+
+A foot is a long-running program on somebody's box, and until bl-6c98 there was
+no recipe for making it one: `make install` put a binary on the box and that
+was the whole story, so a foot was whatever somebody last started in a terminal.
+It stopped at the next logout, never came back from a crash, and never picked up
+a release. Observed on a live box: a data root provisioned by hand, an engine on
+the far end of one of its channels holding a foot certificate issued for it, and
+no thrall process running at all — an engine with no live foot, with nothing
+anywhere saying so.
+
+    make deploy-local        # seat THIS box: unit, reconciler, timer, first pass
+    make deploy-status       # what this box runs and when it next looks
+
+**No parameter and no ssh.** Every fact about the box is the box's own — the
+tool document and the channel directories are already there, put by the
+operator's hand and never by thrall — so pointing this at a second box is a
+different checkout, not an edit, and a box that should stop tracking releases is
+one `systemctl --user disable` away with no file in this tree to change. No
+address, account or machine name is committed anywhere here.
+
+It **refuses a box that is not provisioned**. `tools.json` and at least one
+channel are the two things thrall reads, and a foot without them refuses at
+every start; seating over that would be a unit crash-looping into `failed`
+behind a report of success.
+
+| what | where it lands |
+|---|---|
+| `scripts/deploy/thrall.service` | `~/.config/systemd/user/` — `ExecStart=%h/.local/bin/thrall run`, `Restart=always`, five failures in five minutes then `failed` |
+| `scripts/deploy/reconcile.sh` | `~/.local/bin/thrall-reconcile` |
+| `scripts/deploy/thrall-reconcile.service` | `~/.config/systemd/user/` — oneshot, `Nice=19`, idle IO and CPU |
+| `scripts/deploy/thrall-reconcile.timer` | `~/.config/systemd/user/` — hourly, `Persistent=true` |
+
+Nothing is compiled by the seating and nothing is carried onto the box: it
+installs from crates.io on its own schedule from then on. A foot's unit of
+install is a **published version**, and the registry already serves it.
+
+**What supervision is and is not for.** A channel that drops is dialled again by
+the process itself, with a backoff that starts at a second and stops at a
+minute — restarting a *process* was never the answer to a dropped channel. The
+unit is for the other exit: a foot that cannot be a foot at all, which exits and
+says why.
+
+**What one pass does.** Read the newest live version off the crates.io sparse
+index; if it differs from what `~/.local/bin/thrall --version` says, `cargo
+install thrall --root ~/.local --locked --version <v> --force`. Then decide
+whether to restart, from four facts and one rule — *the foot should be running
+the newest live version, unless an invocation is executing or the operator
+stopped it*:
+
+- **the unit is `inactive`** — stopped on purpose, not ours to move.
+- **the unit is `failed`** — no invocation to protect, and no point retrying the
+  version that just failed; a version it has NOT run is the one useful act.
+- **the running foot already IS the installed binary** — nothing to do, read as
+  a kernel fact (`/proc/<pid>/exe`'s inode against the installed file's) rather
+  than a flag anybody writes.
+- **an invocation is executing** — defer. thrall runs every tool as a child
+  process (`src/spawn.rs`) and its own concurrency is threads, so an idle foot
+  is exactly one process in the unit's cgroup and an invocation in flight is a
+  child beside it. No thrall-side API, no new wire act: thrall's whole wire
+  surface is three acts by design and none of them is "are you busy".
+- **anything unreadable** — defer. A fact we could not read is never grounds for
+  killing work we cannot see.
+
+A killed invocation is worse than a killed turn on the engine, and that is why
+the deferral is here rather than left to luck: the command already ran half, its
+side effects on this box stand, the capture never comes back, and nothing
+settles that the way the engine's litany settles an unanswered tool window —
+because the act was not a message.
+
+**A yank is the rollback lever.** Yanked versions are filtered in the reconciler
+rather than left to cargo, so yanking a bad release makes the previous one
+newest-live; the next tick sees it differ from what is installed and puts it
+back, with nobody logging in. That is why the install passes an explicit
+`--version` with `--force` — `cargo install` refuses to go backwards otherwise.
+
+**The seating refuses a protocol mismatch rather than reporting success over
+it.** `is-active` says a process exists, not that it is a foot, and thrall
+writes no line when a channel opens — so the positive cannot be read from the
+journal. The one refusal that can be is a **wire protocol mismatch** (§3.6):
+every other failure there is transient by construction, and a mismatch is
+fail-closed by design and resolves only when one of the two components
+publishes. A box in that state has a seated timer and no foot, and the deploy
+says so. The units stay armed, because that is what makes it self-healing: the
+box adopts the fix by itself on the next tick after the release.
+
+**`make deploy-selftest` is the regression half and runs in `make lint`.** It
+drives the real reconciler under a fake `curl`, `cargo` and `systemctl` in a
+scratch `HOME`, both directions: half the cases assert an install or a restart
+happened *and with exactly which arguments*, and half assert `cargo` was never
+invoked or the unit was never touched. A reconciler that installs on every tick
+and one that has quietly stopped are both broken, and only one of them is loud.
+The decision itself is a pure function with its own table
+(`scripts/deploy/reconcile.sh --self-test`), because the restart arms need a live
+`/proc/<pid>/exe` that no fake world can offer.

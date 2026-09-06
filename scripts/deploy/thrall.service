@@ -1,0 +1,62 @@
+# The foot as a user service (README "Status"; yog `docs/REMOTE.md` §12) — the
+# unit `scripts/deploy/local.sh` seats.
+#
+# `thrall run` serves every channel this box is provisioned for and does not
+# return while a channel is up. A channel that drops is dialled again by the
+# process itself, with a backoff that starts at a second and stops at a minute,
+# so a laptop that sleeps or changes network does not need supervision for
+# that. What supervision IS for is the other exit: a foot that cannot be a foot
+# at all — a missing tool document, a certificate that is not foot-grade, an
+# engine serving another connection under this box's name — exits and says why.
+# README states that restarting then belongs to this machine's own supervision.
+# This file is that supervision.
+#
+# User-level and not system-level, because the data root is the operator's:
+# `$XDG_DATA_HOME/thrall`, holding the tool document and one directory per
+# channel, both put there by hand. `%h` keeps this file free of any account
+# name.
+#
+# **The binary is `%h/.local/bin/thrall`**, which is the Makefile's
+# `INSTALL_PREFIX` default and the path `reconcile.sh` installs to. One path, so
+# a box cannot end up with two feet and a coin toss about which one the unit
+# execs.
+#
+# Requires lingering (`loginctl enable-linger`) or the manager — and so the foot
+# — stops at logout. `scripts/deploy/local.sh` enables it.
+[Unit]
+Description=thrall foot
+Documentation=https://github.com/mudbungie/thrall
+# It dials an engine, so it needs the network. It must NOT order against a local
+# engine unit: the engine this box's foot serves is usually somewhere else, and
+# a foot that waited for a local one would not start on a box that has none.
+After=network-online.target
+Wants=network-online.target
+# `Restart=always` below must not hide a release that cannot be a foot. A foot
+# refusing on a missing tool document restarts every five seconds forever
+# otherwise, and presents as "running". Five failures in five minutes is a
+# broken box or a broken version, not a blip: enter `failed` and let it be seen
+# — and let the reconciler try the next version over it.
+StartLimitIntervalSec=5min
+StartLimitBurst=5
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/thrall run
+# A foot that exits has either lost every channel or refused one. Neither is a
+# state to sit in: come back and keep serving.
+Restart=always
+RestartSec=5s
+# A stop reaches the whole control group, which is what a deliberate stop should
+# do: an invocation running out of `src/spawn.rs` is a child here and dies with
+# it. The engine's own invocation timeout is what answers for the capture that
+# never comes back; thrall states no deadline of its own, so this is systemd's
+# default made explicit rather than a promise the foot makes.
+TimeoutStopSec=30s
+# The tools this box advertises are programs, and a systemd user unit does not
+# inherit a login shell's PATH. This is the PATH an invocation resolves against,
+# so it is part of what the box offers — a tool document naming a program not on
+# it is a tool that will fail at the moment it is called.
+Environment=PATH=%h/.local/bin:%h/.cargo/bin:/usr/local/bin:/usr/bin:/bin
+
+[Install]
+WantedBy=default.target

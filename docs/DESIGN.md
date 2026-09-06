@@ -674,6 +674,56 @@ channel ending.
 
 ---
 
+### 3.10 A foot is a deployment, not a process somebody started (bl-6c98)
+
+§3.8's redial is what keeps a channel alive across a sleep, a network change or
+a relay switch, and it is deliberately the *process's* own job: supervision
+restarts a process, and a dropped channel does not kill one. That covers the
+failure a running foot survives. It says nothing about the foot not running at
+all — and until bl-6c98 nothing in this repository did. `make install` put a
+binary on a box; what made it a foot was somebody typing `thrall run`. That foot
+ended at the next logout, never came back from the exits §3.9 reports, and never
+picked up a release.
+
+**The consequence is invisible from both ends, which is what makes it a design
+problem rather than an operational one.** §3.7 rules that a working foot is
+*absent* from the engine's view — the advertised set is stored per identity and
+a foot that is up is simply a set that is present. An engine whose foot is not
+running sees an identity that advertised once and has not since; it has no probe
+to send, because §3.1 forbids it speaking first. So the box holds a certificate,
+holds a tool document, holds a channel directory, and executes nothing, and
+neither end has a place to say so.
+
+`scripts/deploy/` is the answer, and it is the same shape yog's native engine and
+lernie's seat carry: a user unit with `Restart=always` and a StartLimit, plus an
+hourly reconciler that installs the newest live crates.io version and restarts
+the unit only when this box is not executing anything. README's "Deployment"
+states the mechanism. Three properties are architectural rather than
+operational:
+
+- **The busy read is the unit's own cgroup, and it needs nothing from the
+  wire.** thrall runs every tool as a child process (§4, `spawn`) and its own
+  concurrency inside one process is threads, so an idle foot is exactly one
+  process in its cgroup. §1's three acts stay three: adding a fourth so a
+  reconciler could ask "are you busy" would put a machine-facing question on a
+  wire whose whole point is that a foot asks nothing and answers only its own
+  mailbox. The fact is already there to read, on the box, by the box.
+- **A killed invocation does not settle, and the deferral is sized for that.**
+  The engine's equivalent restart costs the spend that bought a turn; the
+  conversation survives because litany settles the unanswered tool window. Here
+  the act was not a message. A command that ran half leaves its side effects on
+  this box, the capture never arrives, and §3.9's channel report has nothing to
+  say about it because the channel did not end. So an invocation in flight is
+  never interrupted for an upgrade, at any latency cost.
+- **Version skew is closed by the schedule, not by a shim.** §3.6 makes a
+  protocol mismatch a fail-closed refusal naming both versions, and §3.8 makes
+  that refusal end the channel. That is only tolerable because both ends reach
+  the newest release on their own: an engine box reconciles from its registry
+  and this box reconciles from the index, so a skew closes itself within the
+  hour with nobody logging in to either machine. Before bl-6c98 the foot half of
+  that sentence was not true, and §3.6's ruling rested on a schedule that did
+  not exist on this side.
+
 ## 4. Module map
 
 The map is the design-time split, kept ahead of the 300-line cap rather than at

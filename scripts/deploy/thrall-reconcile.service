@@ -1,0 +1,34 @@
+# The unattended reconcile pass (bl-6c98) — one run of
+# `scripts/deploy/reconcile.sh`, which `local.sh` installs at
+# `%h/.local/bin/thrall-reconcile`. The timer beside this file is the cadence;
+# this unit is one question asked once.
+#
+# **`Type=oneshot` and no `Restart=`.** A pass that fails has answered, and the
+# timer will ask again. The unit is left in `failed`, which is where an operator
+# sees it: `systemctl --user list-units --failed`.
+[Unit]
+Description=thrall foot reconcile (unattended CD)
+Documentation=https://github.com/mudbungie/thrall
+# It dials the registry, so it needs the network — and it must not race the foot
+# it is about to read a fact about.
+After=network-online.target thrall.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/thrall-reconcile
+# The build is the long pole and runs on this box's own cores. Long enough for a
+# cold first build, short enough that a wedged pass does not hold the box out
+# forever.
+TimeoutStartSec=30min
+# `cargo`, the `cc` a build shells to, the linker, `curl`, `systemctl`, and the
+# install root the reconciler writes and reads.
+Environment=PATH=%h/.local/bin:%h/.cargo/bin:/usr/local/bin:/usr/bin:/bin
+# **This box may be somebody's desktop and they may be using it**, and it is
+# certainly a box that is executing somebody's tools. A background build must
+# never outrank the invocations the foot exists to run, and one that makes the
+# machine unpleasant to type on gets the timer switched off — which is no CD at
+# all.
+Nice=19
+IOSchedulingClass=idle
+CPUSchedulingPolicy=idle

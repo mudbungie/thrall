@@ -55,6 +55,7 @@ coverage:
 # fail before the minute-scale tools start.
 lint:
 	$(MAKE) line-cap
+	$(MAKE) deploy-selftest
 	$(MAKE) leak-scan
 	cargo clippy --all-targets -- -D warnings
 	$(MAKE) rules-audit
@@ -221,6 +222,39 @@ install-hooks:
 # then `mv -f` it into place. A supervisor restarting mid-install then sees
 # whole-old or whole-new, never the ENOENT window install(1) opens between its
 # unlink and its write.
+# --- deployment (bl-6c98) ---------------------------------------------------
+# Seat THIS box on the foot unit and the crates.io reconciler: a `thrall.service`
+# systemd user unit, an hourly `thrall-reconcile.timer`, and lingering so both
+# outlive a logout. No ssh, no image, no parameter — every fact about the box is
+# the box's own, so pointing this at a second box is a different checkout rather
+# than an edit, and a box that should stop tracking releases is one
+# `systemctl --user disable` away with no file here to change.
+#
+# It refuses a box that is not provisioned. `tools.json` and at least one
+# channel under `wire/workspaces/` are operator-authored and thrall never writes
+# them; without them the unit would crash-loop into `failed` behind a seating
+# that reported success.
+#
+# `scripts/deploy/local.sh` and `scripts/deploy/reconcile.sh` carry the
+# reasoning, including why the idle read is the unit's own cgroup here and the
+# §8.5 boundary on yog's engine.
+deploy-local:
+	@scripts/deploy/local.sh
+
+# What this box is running right now, and whether it is still upgrading itself.
+deploy-status:
+	@systemctl --user --no-pager --lines=0 status thrall.service; \
+	 echo; "$(INSTALL_BIN)/thrall" --version 2>/dev/null; \
+	 echo; systemctl --user --no-pager list-timers thrall-reconcile.timer; \
+	 echo; journalctl --user -u thrall.service --no-pager -n 15
+
+# The reconciler's regression half, in the gate: it drives the real
+# `reconcile.sh` under a fake curl, cargo and systemctl, both directions, and
+# needs no network, no toolchain, no release and no box. Seconds, so it sits at
+# the head of `lint`.
+deploy-selftest:
+	@scripts/deploy/reconcile-selftest.sh
+
 install: release
 	@mkdir -p "$(INSTALL_BIN)"
 	@install -m 0755 $(CARGO_TARGET_DIR)/release/thrall "$(INSTALL_BIN)/.thrall.tmp" && \
