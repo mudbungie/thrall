@@ -1,7 +1,7 @@
 +++
-title = "the protocol pin is 8 while the engine speaks 13, so a foot built from main cannot dial an engine built from main — bl-e0f0 again, one bump later"
+title = "DUPLICATE of bl-f88f — the protocol pin is 8 while the engine speaks 13 (devadmin lane's independent sighting; close unworked)"
 created = 1788673497
-updated = 1788673497
+updated = 1788673504
 priority = 1
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
 tags = ["usability-r1"]
