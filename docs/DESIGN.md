@@ -179,6 +179,18 @@ reason: a reseed must not be a revocation.
 REMOTE §5.2's tool-host config is thrall's one operator-authored document. It
 is out of world, because it describes *this machine*.
 
+**A worked one ships** (`docs/tools.example.json`, bl-102b), rendered byte for
+byte in `README.md` and read by `config::read` in the suite, because until it
+did the file `thrall run` demands could not be written from the shipped
+documentation at all: its shape had to be assembled from this section's prose,
+from REMOTE §5.1 for the only place the three advertised keys are ever *named*,
+and from `src/exec.rs`'s module comment for the contract below — which no
+document stated. **The contract belongs in the README and not only in a source
+comment**: the invocation's `input` arrives on the command's **stdin**, its
+**stdout** is the capture and its **exit code** the verdict. A reader who does
+not open the Rust assumes argv interpolation, which the paragraph below
+forbids, and writes an entry that receives nothing and answers emptiness.
+
 The first three keys of each entry **are** the advertised element; `command`
 and the optional `cwd` are the local half. The advertisement is the projection
 that drops the local half — **one document, two readings** — so what a foot

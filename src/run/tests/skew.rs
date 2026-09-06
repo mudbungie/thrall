@@ -70,10 +70,18 @@ fn a_version_the_two_ends_do_not_share_is_over_and_not_the_wire() {
 /// filed beside this: the refusal ends in `.` and `waiting` appended a second
 /// one. Nothing is trimmed — the sentence simply stops going through the
 /// wording that assumed another dial was coming.
+///
+/// **The recorded waits are the proof that only one dial was made**, and not
+/// the engine's own record of what it heard. A refused foot drops the stream
+/// where it stands, so whether the far end finished reading the two frames it
+/// was sent is a race this end has already won and is nothing about the
+/// lifetime under test (it flaked exactly there, under tarpaulin). `redial`
+/// pauses before every dial after the first, so an empty series is a second
+/// dial that never happened.
 #[test]
 fn it_is_neither_waited_out_nor_dialled_again() {
     let scratch = Scratch::new();
-    let engine = ahead(scratch.path(), 2);
+    let _engine = ahead(scratch.path(), 2);
     let (waits, pause) = Waits::new();
     let (notices, sink) = Notices::new();
     let said = redial(&entry_at(scratch.path()), &set(), echo, &sink, &pause);
@@ -88,5 +96,4 @@ fn it_is_neither_waited_out_nor_dialled_again() {
         "the redial suffix used to append a second full stop: {said}"
     );
     assert!(notices.heard().is_empty(), "nothing said in flight");
-    assert_eq!(engine.heard().len(), 2, "one dial: a preface and a request");
 }

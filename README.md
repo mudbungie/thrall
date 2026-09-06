@@ -83,7 +83,7 @@ Two files, both put there by the operator's hand and neither ever written by
 thrall: `<data root>/tools.json` and one directory per channel under `<data
 root>/wire/workspaces/`, where the data root is `$XDG_DATA_HOME/thrall` or
 `$HOME/.local/share/thrall`. A box with neither is a foot that refuses and says
-which file is missing.
+which file is missing. *The tool document* below is a complete one.
 
 Certificates arrive out of channel, by the operator's hand, and thrall mints
 nothing — there is no bootstrap flow and there must never be one.
@@ -116,6 +116,85 @@ the tree packages whole: the agent guide, the design document, every rule and
 hook, and a corpus of deliberately fabricated secrets, shipped beside the
 binary. The guard judges file CLASSES and never content; auditing the list
 itself stays a human act.
+
+## The tool document
+
+`<data root>/tools.json` is what this box offers, and the only thing that says
+so. A tool absent from it is a tool this box does not have; the server's
+adjudication stacks on top of it and fails closed, but it stacks on *this*.
+
+**The contract is stdin, stdout, exit code**, and it is the thing to know before
+writing a single entry: the invocation's `input` JSON — the object the model
+produced, whole — arrives on the command's **standard input**; whatever the
+command writes to **standard output** is the capture the model reads; its
+**exit code** is the verdict, `0` for a tool that worked. Standard error is
+carried back beside stdout. Nothing is interpolated into the argv, so an entry
+that expects its input on the command line receives nothing at all and
+advertises a tool that silently returns emptiness.
+
+`command` is an **argv, spawned directly** — there is no shell. That is what
+keeps the declared `input_schema` binding rather than advisory: a shell line
+built from a model's output is a command-injection surface, and the schema
+would be a suggestion. A tool that wants a shell writes one in its own first
+line, on the box, where the operator can read it.
+
+Each entry is two halves in one object, and the split is the whole of the file's
+design: **the first three keys ARE what this box advertises**, verbatim
+(REMOTE §5.1), and `command`, `cwd` and everything else is local and crosses no
+wire. So what this box offers and what it can actually run cannot drift.
+
+| Key | Half | Meaning |
+|---|---|---|
+| `name` | advertised | the handle an invocation addresses, a **single path component** — no `/`, no `.`, no `..`, and unique in this file |
+| `description` | advertised | what it does, in this box's own words |
+| `input_schema` | advertised | the JSON Schema, verbatim — neither validated nor rewritten here, because it is this box's statement to a model |
+| `subject_cwd` | advertised | whether this box consents to running the tool at a directory the *invocation* names (absent reads `false`). Delete the key and the capability is gone |
+| `command` | local | the argv, spawned directly |
+| `cwd` | local | where to run it, **absolute** or the document is refused. A `subject_cwd` invocation that names a directory outranks it |
+
+`docs/tools.example.json` is a complete document — one plain entry and one
+carrying `subject_cwd` — and it is the one below, byte for byte: a test holds
+the two together, so the example that ships is an example the gate reads.
+
+```json
+[
+  {
+    "name": "Bash",
+    "description": "run a shell command on this box",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "command": { "type": "string", "minLength": 1 }
+      },
+      "required": ["command"]
+    },
+    "command": ["/usr/local/libexec/thrall-tools/bash-tool"]
+  },
+  {
+    "name": "Build",
+    "description": "build the project checked out on this box",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "target": { "type": "string" }
+      },
+      "required": ["target"]
+    },
+    "command": ["/usr/local/libexec/thrall-tools/build-tool"],
+    "cwd": "/srv/project",
+    "subject_cwd": true
+  }
+]
+```
+
+An **empty array is a legitimate document**: a foot that offers nothing, dials,
+presents the empty set and waits. An **absent file is not**, and thrall refuses
+naming it — starting a foot is a deliberate act and deserves a deliberate
+answer:
+
+```
+thrall: /state/thrall/tools.json: No such file or directory (os error 2) — this box has no tool config
+```
 
 ## Build
 

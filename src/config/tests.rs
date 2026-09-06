@@ -222,3 +222,6 @@ fn a_relative_working_directory_refuses_the_document_at_the_read() {
     assert!(said.contains("absolute"), "{said}");
     assert!(said.contains(TOOLS), "the file is named: {said}");
 }
+
+/// The shipped example, held to the reader and to the README that renders it.
+mod example;

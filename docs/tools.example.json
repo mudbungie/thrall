@@ -1,0 +1,28 @@
+[
+  {
+    "name": "Bash",
+    "description": "run a shell command on this box",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "command": { "type": "string", "minLength": 1 }
+      },
+      "required": ["command"]
+    },
+    "command": ["/usr/local/libexec/thrall-tools/bash-tool"]
+  },
+  {
+    "name": "Build",
+    "description": "build the project checked out on this box",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "target": { "type": "string" }
+      },
+      "required": ["target"]
+    },
+    "command": ["/usr/local/libexec/thrall-tools/build-tool"],
+    "cwd": "/srv/project",
+    "subject_cwd": true
+  }
+]
