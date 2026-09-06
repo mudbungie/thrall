@@ -1,6 +1,7 @@
 //! The preface: what this end states, and every way a peer can fail to agree.
 
 use super::{PROTOCOL, confirm, state};
+use crate::channel::Failure;
 use crate::channel::frame;
 use serde_json::{Value, json};
 
@@ -42,10 +43,17 @@ fn an_engine_of_this_version_is_confirmed() {
 /// A mismatch names BOTH versions and the remedy. That is the requirement, not
 /// a nicety: the sentence is the upgrade prompt, so a number an operator can
 /// act on has to be in it.
+///
+/// **And it is a [`Failure::Skew`]**, which is the half that decides a
+/// lifetime: a version the two ends do not share is a fact about the two
+/// binaries, so every later dial buys the same handshake and the same sentence
+/// (bl-5d62).
 #[test]
 fn a_mismatch_names_both_versions_and_the_remedy() {
     let wire = stated(&json!({ "protocol": 99 }));
-    let refusal = confirm(&mut wire.as_slice()).expect_err("refused");
+    let Failure::Skew(refusal) = confirm(&mut wire.as_slice()).expect_err("refused") else {
+        panic!("a stated version this end does not speak is not the wire");
+    };
     assert!(
         refusal.contains(&format!("version {PROTOCOL}")),
         "{refusal}"
@@ -58,22 +66,44 @@ fn a_mismatch_names_both_versions_and_the_remedy() {
     );
 }
 
-/// Four ways to state nothing, and they are one case: an unversioned build, a
-/// frame that is not an object, an object without the key, and a peer that hung
-/// up before it said anything.
+/// Three ways to state nothing in a frame that DID arrive — an unversioned
+/// build writing a gesture envelope where a preface belongs, a frame that is
+/// not an object, and the key carrying something that is not an integer. All
+/// three are one sentence, and all three are skew: the peer deliberately wrote
+/// what it wrote, and it will write it again next time.
 #[test]
-fn every_way_of_stating_nothing_is_the_one_sentence() {
-    let silences = [
+fn a_preface_that_arrived_and_states_nothing_is_skew() {
+    let arrived = [
         stated(&json!({"op": "advertise"})),
         stated(&json!(["not an object"])),
         stated(&json!({"protocol": "one"})),
-        Vec::new(),
     ];
-    for wire in silences {
-        let refusal = confirm(&mut wire.as_slice()).expect_err("refused");
+    for wire in arrived {
+        let Failure::Skew(refusal) = confirm(&mut wire.as_slice()).expect_err("refused") else {
+            panic!("a frame the peer wrote is not the wire");
+        };
         assert!(
             refusal.contains("the engine speaks no version"),
             "{refusal}"
         );
     }
+}
+
+/// **A preface that never arrived is the WIRE**, and that is the one place this
+/// end parts from REMOTE §3's own collapsing of the two cases (bl-5d62). The
+/// engine refuses a peer of the wrong version and a peer that hung up
+/// mid-preface with one sentence, because it can serve neither. A foot is
+/// asking a different question — whether dialling again could help — and there
+/// they part: an engine restarting under a foot's dial says nothing at all, and
+/// a foot that took that as final would exit on the blip that a redial exists
+/// for.
+#[test]
+fn a_preface_that_never_arrived_is_the_wire() {
+    let Failure::Wire(refusal) = confirm(&mut [].as_slice()).expect_err("refused") else {
+        panic!("a peer that hung up mid-preface is not a version this end cannot speak");
+    };
+    assert!(
+        refusal.contains("the engine speaks no version"),
+        "the sentence is the same sentence: {refusal}"
+    );
 }

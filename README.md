@@ -69,7 +69,13 @@ mode settles to a slow cadence rather than burning a core. Two refusals are
 told apart and never collapsed: the engine declining this box's *read* is its
 own predecessor's connection still dying, which frees within one hold's width
 and is waited past; the engine declining what this box *offers* is another
-connection serving under its name, and that ends the channel. **Restarting the
+connection serving under its name, and that ends the channel. **And a protocol
+version the two ends do not share is neither of those**: it is a fact about the
+two binaries rather than this engine's reading of this box, the wire admits no
+negotiation, and the refusal names the only remedy there is — upgrade the older
+component. So it ends the channel where it stands, with one sentence and no
+wait, instead of a line a minute into the operator's journal for the life of a
+process nothing was going to change. **Restarting the
 process is still this machine's own supervision** — a foot that cannot be a
 foot at all exits and says why.
 

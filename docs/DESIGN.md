@@ -529,6 +529,7 @@ prose would be a foot the far end could rewrite by rewording.
 | The engine refused | the `invocations` read | dial again, past one hold's width |
 | The engine refused | `advertise`, `complete` | over |
 | An answer no foot gesture can earn | any | over |
+| The two ends speak different versions | any | over |
 | This box's own material | before any dial | over |
 
 **The two refusals are two animals and must never be collapsed.** A refused
@@ -546,6 +547,32 @@ bl-2d78's answer: the engine declines a set that would replace a *serving*
 machine's own, so a refusal there is another connection holding this machine's
 read with a different set in force. Dialling again would hand it the box by
 pretending otherwise.
+
+**A version the two ends do not share is a fourth party, and it is over
+wherever it is met** (bl-5d62). The three rows above are the wire, which has no
+opinion of either binary, and two readings of what *this engine* thinks of *this
+box*. A protocol mismatch is neither: it is a fact about the two binaries, and
+REMOTE §3 states it as one — *"There is no negotiation ... an operator who
+installs both ends can upgrade the older one"* — so the sentence carries its own
+remedy and nothing but a new binary can perform it. Dialling again spends a
+handshake to be told the same thing, and under the backoff below it writes that
+sentence into an operator's journal a minute at a time for the life of the
+process. The README's own restraint applies exactly: *a foot that cannot be a
+foot at all exits and says why*. It is met at the first leg, because the preface
+is confirmed before a frame of any answer is decoded, but it is classified by
+the failure and not by the leg.
+
+**A preface that ARRIVED is told apart from one that never did, and that split
+is this end's alone.** REMOTE §3 collapses them — *"A peer that states no
+version is refused exactly as a peer of the wrong one"* — and is right to, on
+the *engine's* side: it cannot serve either, and three sentences for one outcome
+is three sentences. A foot is deciding a different question. A frame it read and
+could not agree with is the peer's deliberate act and will be the same act next
+time. A preface that never came is an engine restarting under this dial, a
+socket dying, a box waking up — the wire, and the wire is dialled again. The
+sentence stays one sentence either way; only what this foot does next differs,
+and collapsing them here would exit the process on the very blip the reversal
+above exists for.
 
 **The wait is three numbers** (`run::redial`), and each answers one way the
 loop could be wrong. It starts at **one second**, because the ordinary case is
@@ -753,7 +780,7 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/main.rs` | The process entry and nothing else: argv in, stream selected by the code, exit. The single `tarpaulin.toml` exclusion. |
 | `src/channel.rs` | **The channel** (bl-a4a5): one wire to one engine. Dial per ask, hold only while waiting, never reconnect. There is an `ask` and there is nothing else — the shape of the file is the dial-in invariant. |
 | `src/channel/frame.rs` | The framing: a big-endian `u32` length, then that many bytes of JSON; a zero-length frame terminates an answer (REMOTE §3). |
-| `src/channel/hello.rs` | The version preface, and this end's half of it — state, confirm, refuse fail-closed naming both versions. A foot never *admits*, because a foot is never dialled. |
+| `src/channel/hello.rs` | The version preface, and this end's half of it — state, confirm, refuse fail-closed naming both versions. A foot never *admits*, because a foot is never dialled. It also draws §3.8's one distinction REMOTE does not: a preface that arrived and states a version this end cannot speak is skew, one that never arrived is the wire. |
 | `src/channel/tls.rs` | The rustls client configuration: the operator CA as anchors, this box's leaf as its identity, `ring` named rather than defaulted. |
 | `src/channel/leaf.rs` | The foot grade, read off this box's own certificate — a DER walk, because thrall links no certificate library. |
 | `src/channel/material.rs` | What the operator carried here, and the three answers a directory can give: nothing, half, or a channel. |
@@ -764,7 +791,8 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/gestures.rs` | **The foot set** (bl-a2ea): `advertise`, `invocations`, `complete`, and the answers they can earn. The enumeration is the enforcement thrall can keep — there is no spelling here for a fourth verb. |
 | `src/invocation.rs` | What crosses the routing leg: the invocation a foot is handed and the capture it hands back, each in one strict spelling. |
 | `src/run.rs` | **The loop**, and the three seams that are parameters: what runs a command (`Handoff`), where a channel says something while it is still serving (`Notice`, §3.7) and where it waits between dials (`Pause`, §3.8). All three are effects no test can read back, so the one implementation of each is `src/main.rs`'s — which is what lets the whole conversation be tested against a real engine, a one-line executor and two recorders. This file itself is `fan`: every channel this box holds, one thread each — and `served`, which says a channel's terminal sentence in that channel's own thread rather than at the join (§3.9). |
-| `src/run/hold.rs` | **One channel's conversation** (split from `run.rs` by bl-916d): present, wait, hand off, answer, present again — and the `Ending` that stopped it, classified by who failed and at which leg (§3.8). |
+| `src/run/hold.rs` | **One channel's conversation** (split from `run.rs` by bl-916d): present, wait, hand off, answer, present again. |
+| `src/run/hold/ending.rs` | **How a channel ended, and who ended it** (split from `hold.rs` by bl-5d62): the `Ending`, the party that failed, and the leg it failed at — the classification of §3.8's table, kept apart from the conversation that produces it because they are two questions. |
 | `src/run/held.rs` | **The capture going back** (bl-f9d2): the ordinary post at the moment it is computed, and the one this process is still holding when that post fails on the wire — carried out with the ending and posted first on the next dial, ahead of the read that releases the engine's lease (§3.8, REMOTE §5.6 ruling 1). |
 | `src/run/redial.rs` | **One channel's lifetime** (bl-916d): the endings worth another dial, the backoff that settles, and the sentence said in the meantime. It is a separate file because it is a separate question — what happened, against what to do about it — and because its whole decision is three numbers and one line of arithmetic, testable as values. |
 | `src/exec.rs` | **The executor's dispatch** (bl-4cda): which entry an invocation names, whose working directory it may run in (§3.4's `subject_cwd`), and the three facts that come back. Every outcome is a capture — a tool that ran, one that overran, a name this box does not carry, a command that would not start. |

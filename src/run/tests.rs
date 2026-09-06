@@ -3,8 +3,9 @@
 //!
 //! Split on the seam the code is: [`channel`] is one conversation with one
 //! engine, [`ending`] is what that conversation's failure means for the
-//! channel's lifetime, [`redial`] is that lifetime, and [`fan`] is every
-//! channel a box holds, served at once. The fixtures they share live here.
+//! channel's lifetime, [`skew`] is the one ending that means it at every leg,
+//! [`redial`] is that lifetime, and [`fan`] is every channel a box holds,
+//! served at once. The fixtures they share live here.
 
 use crate::channel::Channel;
 use crate::channel::material::read_dir;
@@ -161,5 +162,7 @@ mod fan;
 mod redial;
 /// When a box says a channel has stopped.
 mod report;
+/// The version the two ends do not share: the ending no dial improves.
+mod skew;
 /// The capture the wire swallowed, and the dial that posts it.
 mod swallowed;

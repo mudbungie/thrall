@@ -60,6 +60,27 @@ use material::Material;
 /// answer into a dead channel.
 const READ_TIMEOUT: Duration = Duration::from_mins(2);
 
+/// **Why a channel could not carry a gesture** — in the two classes that
+/// differ in what to do next, and in nothing else.
+///
+/// The split is drawn from *what failed*, never from the sentence: a foot that
+/// decided its own lifetime by reading prose would be a foot the far end could
+/// rewrite by rewording.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Failure {
+    /// **The transport.** It carries no opinion of either binary — a socket
+    /// that would not open, an engine that went away, a peer that hung up
+    /// before it had said anything — so the same ask down a fresh connection
+    /// may well land.
+    Wire(String),
+    /// **The two ends do not speak one protocol version.** REMOTE §3 admits no
+    /// negotiation and names the remedy in the sentence itself — *"upgrade the
+    /// older component"* — so this is the one failure a further dial cannot
+    /// improve: only a new binary on one of the two boxes can, and until one
+    /// arrives every dial buys the same handshake and the same sentence.
+    Skew(String),
+}
+
 /// A foot's end of one wire.
 #[derive(Debug)]
 pub struct Channel {
@@ -102,14 +123,18 @@ impl Channel {
     /// several is a follow-class read — the same reader, which is REMOTE §3's
     /// *"the streaming form is not a second form"*.
     ///
-    /// One `Err` for a refusal, an unreadable answer and a socket that never
-    /// opened alike: all three are the same fact to the loop above — this
-    /// channel is gone, and here is the sentence.
-    pub fn ask(&self, request: &Value) -> Result<Vec<Value>, String> {
+    /// **The `Err` is [`Failure`]**, which is two classes and not a taxonomy: a
+    /// socket that never opened, an engine that went away and an unreadable
+    /// answer are one fact to the loop above — this channel is gone, and here
+    /// is the sentence — while a version the two ends do not share is the one
+    /// fact that is about the two *binaries* and survives every dial.
+    pub fn ask(&self, request: &Value) -> Result<Vec<Value>, Failure> {
         let mut tls = self.dial(request)?;
         let mut stream = Vec::new();
         loop {
-            match frame::read_value(&mut tls).map_err(|e| self.failed("receive", &e))? {
+            match frame::read_value(&mut tls)
+                .map_err(|e| Failure::Wire(self.failed("receive", &e)))?
+            {
                 Some(chunk) => stream.push(chunk),
                 None => return Ok(stream),
             }
@@ -154,15 +179,16 @@ impl Channel {
     /// request goes out in the same breath as this end's preface — so
     /// confirming the engine's costs no round trip, and a mismatch refuses
     /// before a frame of the answer is decoded.
-    fn dial(&self, request: &Value) -> Result<StreamOwned<ClientConnection, TcpStream>, String> {
+    fn dial(&self, request: &Value) -> Result<StreamOwned<ClientConnection, TcpStream>, Failure> {
         let tcp = TcpStream::connect(&self.address)
             .and_then(|tcp| tcp.set_read_timeout(Some(READ_TIMEOUT)).map(|()| tcp))
-            .map_err(|e| format!("connect {}: {e}", self.address))?;
+            .map_err(|e| Failure::Wire(format!("connect {}: {e}", self.address)))?;
         let conn = ClientConnection::new(Arc::clone(&self.config), self.name.clone())
-            .map_err(|e| format!("tls {}: {e}", self.address))?;
+            .map_err(|e| Failure::Wire(format!("tls {}: {e}", self.address)))?;
         let mut tls = StreamOwned::new(conn, tcp);
-        hello::state(&mut tls).map_err(|e| self.failed("send", &e))?;
-        frame::write_value(&mut tls, request).map_err(|e| self.failed("send", &e))?;
+        hello::state(&mut tls).map_err(|e| Failure::Wire(self.failed("send", &e)))?;
+        frame::write_value(&mut tls, request)
+            .map_err(|e| Failure::Wire(self.failed("send", &e)))?;
         hello::confirm(&mut tls)?;
         Ok(tls)
     }

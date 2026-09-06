@@ -5,7 +5,7 @@ use super::hello::PROTOCOL;
 // The version the FAR end states, got from the engine rather than from this
 // crate's own pin: two sources, as on the wire (`crate::corpus`).
 use super::material::{CHAIN, KEY, Material, read_dir};
-use super::{Channel, server_name};
+use super::{Channel, Failure, server_name};
 use crate::corpus::PROTOCOL as ENGINE;
 use crate::test_support::engine::Engine;
 use crate::test_support::{Scratch, mint};
@@ -21,6 +21,14 @@ fn wired(protocol: u32, script: Vec<Vec<Value>>) -> (Scratch, Engine, Material) 
         .expect("readable")
         .expect("provisioned");
     (scratch, engine, held)
+}
+
+/// The sentence a failure carries, whichever class it is — for the assertions
+/// that are about the words rather than about what the loop above does next.
+fn said(failure: Failure) -> String {
+    match failure {
+        Failure::Wire(said) | Failure::Skew(said) => said,
+    }
 }
 
 /// An answer of one frame: the ordinary shape.
@@ -111,9 +119,12 @@ fn an_engine_that_answers_nothing_ends_the_stream() {
 fn an_engine_of_another_protocol_refuses_and_names_both_versions() {
     let (_scratch, _engine, held) = wired(ENGINE + 1, vec![vec![advertised()]]);
     let channel = Channel::open(&held).expect("opened");
-    let refusal = channel
+    let Failure::Skew(refusal) = channel
         .ask(&json!({"op": "advertise"}))
-        .expect_err("refused");
+        .expect_err("refused")
+    else {
+        panic!("an engine of another version is not the wire");
+    };
     assert!(
         refusal.contains(&format!("foot speaks version {PROTOCOL}")),
         "{refusal}"
@@ -132,9 +143,11 @@ fn an_engine_that_is_not_there_names_the_address_it_dialled() {
     let scratch = Scratch::new();
     let held = mint::provisioned(scratch.path(), "127.0.0.1:1");
     let channel = Channel::open(&held).expect("opened");
-    let refusal = channel
-        .ask(&json!({"op": "advertise"}))
-        .expect_err("refused");
+    let refusal = said(
+        channel
+            .ask(&json!({"op": "advertise"}))
+            .expect_err("refused"),
+    );
     assert!(refusal.contains("connect 127.0.0.1:1"), "{refusal}");
 }
 
@@ -185,9 +198,11 @@ fn an_engine_that_vanishes_names_the_leg_and_the_address() {
         .expect("readable")
         .expect("provisioned");
     let channel = Channel::open(&held).expect("opened");
-    let said = channel
-        .ask(&json!({"op": "advertise", "tools": []}))
-        .expect_err("the engine went away");
+    let said = said(
+        channel
+            .ask(&json!({"op": "advertise", "tools": []}))
+            .expect_err("the engine went away"),
+    );
     assert!(said.starts_with("receive "), "the leg comes first: {said}");
     assert!(said.contains(&held.address), "no address: {said}");
     assert!(

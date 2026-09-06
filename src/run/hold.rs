@@ -57,7 +57,14 @@
 //! and the two are separate files because they are separate questions — what
 //! happened, and what to do about it.
 
+/// How a channel ended, and who ended it: the classification the loop below
+/// hands back, kept apart from the conversation that produces it.
+pub(crate) mod ending;
+
 use serde_json::Value;
+
+use ending::Leg;
+pub(crate) use ending::{Ending, Failed};
 
 use super::held::{self, Held};
 use super::{Handoff, Notice};
@@ -79,92 +86,6 @@ use crate::invocation::Invocation;
 const DISARMED: &str = "this box's advertised set was not the set in force and has just been \
     restored: it was replaced while a tool was running. Either another connection is bearing \
     this box's identity, or the engine lost the set it was holding.";
-
-/// **How a channel ended, and whether taking it up again could help.**
-///
-/// The distinction is drawn from **who failed and at which leg**, never from
-/// the engine's prose: a foot that decided its own lifetime by reading
-/// sentences would be a foot the far end could rewrite by rewording.
-#[derive(Debug, PartialEq, Eq)]
-pub(crate) enum Ending {
-    /// **Dial again** (REMOTE §5.3's reversal, bl-916d).
-    Again {
-        /// The sentence that ended it — said as it happens, because under a
-        /// redial it is no longer a sentence anything returns.
-        said: String,
-        /// Whether it was the one-reader refusal: the claim a vanished
-        /// predecessor of *this box* still holds. Its life is one hold's width
-        /// and not the connection's (REMOTE §5.1), so it is the one wait whose
-        /// length is known in advance.
-        predecessor: bool,
-        /// Whether the engine answered a read on this channel before it ended.
-        /// One answered read is the engine having parked this foot for its own
-        /// hold, which is the evidence that this channel was real — and a
-        /// hammering loop cannot manufacture it.
-        served: bool,
-        /// **The capture the wire swallowed on the way out**, when this ending
-        /// is carrying one: the next dial posts it first, ahead of the read
-        /// that releases the engine's lease (REMOTE §5.6 ruling 1, [`Held`]).
-        /// `None` is the ordinary ending, which has nothing in flight.
-        held: Option<Held>,
-    },
-    /// **This channel is over.** This box's own material, an engine refusing
-    /// what this box offers or what it captured, or an answer no foot gesture
-    /// can earn: dialling again would ask the same question and get the same
-    /// answer.
-    Over(String),
-}
-
-/// **A gesture that did not land, by who failed** — which is the whole of what
-/// the ending turns on, and the one thing the engine's own sentence cannot be
-/// asked for.
-pub(super) enum Failed {
-    /// **The wire.** It carries no opinion of this foot at all, so it is worth
-    /// dialling again whichever leg it struck.
-    Wire(String),
-    /// **The engine spoke, and what it said is no.** Whether that is worth
-    /// asking again is the LEG's answer and not this one's.
-    Refused(String),
-    /// **The engine answered something this foot cannot use.** Asking again
-    /// would ask the same question.
-    Unusable(String),
-}
-
-/// Which gesture was in flight, which is the whole of what decides a refusal.
-enum Leg {
-    Advertisement,
-    Read,
-    Completion,
-}
-
-impl Failed {
-    /// **The decision matrix, and it is three rows.** The wire is always worth
-    /// another dial. A refusal of this box's *read* is REMOTE §5.1's one-reader
-    /// guard, which after a blip names this very machine — a predecessor whose
-    /// claim is already expiring, so a foot that took it as final would make
-    /// the first blip permanent. Every other refusal, and every answer this
-    /// foot cannot read, ends the channel: an engine declining the set this box
-    /// offers is telling it another connection is serving under its name
-    /// (bl-2d78), and an engine declining a capture is telling it the two ends
-    /// disagree about what is in flight.
-    fn at(self, leg: Leg, served: bool) -> Ending {
-        match (self, leg) {
-            (Self::Wire(said), _) => Ending::Again {
-                said,
-                predecessor: false,
-                served,
-                held: None,
-            },
-            (Self::Refused(said), Leg::Read) => Ending::Again {
-                said,
-                predecessor: true,
-                served,
-                held: None,
-            },
-            (Self::Refused(said) | Self::Unusable(said), _) => Ending::Over(said),
-        }
-    }
-}
 
 /// **One channel, served** — until something ends it, and then what ended it.
 ///
@@ -260,14 +181,16 @@ fn waited(channel: &Channel) -> Result<Vec<Invocation>, Failed> {
 /// answered in one frame; when a read's answer is several, the newest is the
 /// one that stands (REMOTE §3: the streaming form is not a second form).
 ///
-/// **The three ways it can fail are three different parties**, and keeping them
-/// apart here is what lets [`Failed::at`] decide a lifetime without reading a
-/// sentence: the socket, the engine's refusal, and an answer no foot gesture
-/// can earn. A stream that terminated with no frame in it belongs to the last
-/// of those: the terminator is a zero-length frame the engine deliberately
-/// wrote, where a peer that went away is a read error instead.
+/// **The ways it can fail are different parties**, and keeping them apart here
+/// is what lets [`Failed::at`] decide a lifetime without reading a sentence:
+/// the socket, the engine's refusal, an answer no foot gesture can earn, and —
+/// arriving through the channel's own [`Failure`](crate::channel::Failure) —
+/// the two binaries disagreeing about the protocol. A stream that terminated
+/// with no frame in it belongs to the third: the terminator is a zero-length
+/// frame the engine deliberately wrote, where a peer that went away is a read
+/// error instead.
 pub(super) fn tell(channel: &Channel, request: &Value) -> Result<Reply, Failed> {
-    let stream = channel.ask(request).map_err(Failed::Wire)?;
+    let stream = channel.ask(request).map_err(Failed::from)?;
     let last = stream.last().ok_or_else(|| {
         Failed::Unusable("the engine ended the stream without answering".to_owned())
     })?;

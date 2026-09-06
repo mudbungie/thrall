@@ -22,12 +22,28 @@
 //! negotiation, no version list and no compat shim — negotiation is the
 //! mechanism that makes every later version carry every earlier one's shape
 //! forever, and the operator who installed both ends can upgrade the older one.
+//!
+//! **And a preface that ARRIVED is told apart from one that never did**
+//! (bl-5d62). REMOTE §3 collapses them on the *engine's* side, and rightly: a
+//! peer of the wrong version and a peer that hung up mid-preface are both peers
+//! it cannot serve, so one sentence answers both. A foot is deciding a
+//! different question — whether dialling again could help — and there the two
+//! part. A frame this end read and could not agree with is a fact about the two
+//! *binaries*: it will say the same thing on every dial until somebody installs
+//! a new one, so it is [`Failure::Skew`] and it ends the channel. A preface that
+//! never came is an engine restarting, a socket dying, a box waking up — the
+//! wire, [`Failure::Wire`], and dialled again. The SENTENCE stays one sentence
+//! either way; what differs is only what this foot does next.
+//!
+//! Under the old reading a foot that met a version bump wrote a line into its
+//! operator's journal every minute forever, and one that met a restarting
+//! engine was indistinguishable from it.
 
 use std::io::{self, Read, Write};
 
-use serde_json::json;
+use serde_json::{Value, json};
 
-use super::frame;
+use super::{Failure, frame};
 
 /// The protocol this build speaks.
 ///
@@ -76,17 +92,23 @@ pub fn state(w: &mut dyn Write) -> io::Result<()> {
 /// Read the engine's preface and refuse a mismatch — as the one `Err(String)`
 /// every other thing that can go wrong with this transport already arrives as,
 /// so nothing above here carries a case for it.
-pub fn confirm(r: &mut dyn Read) -> Result<(), String> {
-    let peer = stated(r);
+pub fn confirm(r: &mut dyn Read) -> Result<(), Failure> {
+    let Some(preface) = arrived(r) else {
+        return Err(Failure::Wire(mismatch(None)));
+    };
+    let peer = preface.get(KEY).and_then(Value::as_u64);
     if peer == Some(u64::from(PROTOCOL)) {
         return Ok(());
     }
-    Err(mismatch(peer))
+    Err(Failure::Skew(mismatch(peer)))
 }
 
-/// The version the peer stated, or `None` when it stated none.
-fn stated(r: &mut dyn Read) -> Option<u64> {
-    frame::read_value(r).ok().flatten()?.get(KEY)?.as_u64()
+/// **The peer's preface frame, if one came at all.** `None` is the wire: a read
+/// that failed, or a stream that ended where a frame belongs. Anything this
+/// end managed to read is a frame the peer deliberately wrote, whatever it
+/// says.
+fn arrived(r: &mut dyn Read) -> Option<Value> {
+    frame::read_value(r).ok().flatten()
 }
 
 /// The refusal: both versions, and what to do about it.
