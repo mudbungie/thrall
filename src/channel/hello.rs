@@ -46,13 +46,17 @@ use super::frame;
 /// ends of every test agreed by construction and the pin sat five versions
 /// behind a live engine with the suite green (bl-e0f0).
 ///
-/// **Most bumps between here and 2 were not a foot's business, and it could
-/// still not dial across any of them.** 3 through 7 moved seat-facing shapes
-/// this crate never decodes; 8 (yog bl-66d4) is the one that touched the foot's
-/// own surface, adding the required `wrote` to `reply/advertised`. The preface
-/// is one integer compared for equality, so the version states the engine's
-/// *build* and never which frames this end happens to read.
-pub const PROTOCOL: u32 = 8;
+/// **Most bumps are not a foot's business, and it can still not dial across a
+/// single one of them.** Of everything past 2, exactly one touched this crate's
+/// own surface — 8 (yog bl-66d4), the required `wrote` on `reply/advertised`.
+/// 3 through 7 and 9 through 13 moved seat-facing shapes this crate never
+/// decodes, and 10 moved no field at all (`attention` became follow-class). The
+/// preface is one integer compared for equality, so the version states the
+/// engine's *build* and never which frames this end happens to read — which is
+/// why this constant has now drifted twice (bl-e0f0, bl-f88f) with the suite
+/// green: nothing on this side of the socket can see the far end move, and a
+/// real dial is the only thing that meets the skew.
+pub const PROTOCOL: u32 = 13;
 
 /// The preface's one key, and the whole of its shape.
 const KEY: &str = "protocol";

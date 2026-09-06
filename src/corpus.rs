@@ -27,23 +27,36 @@
 //! decoders at the same strictness.
 //!
 //! **What a foot speaks is smaller than the protocol, so most bumps are not
-//! its business.** Between PROTOCOL 2 and 8 exactly one shape a foot decodes
-//! moved: `reply/advertised` gained `wrote` at 8. The five bumps between are
+//! its business.** Between PROTOCOL 2 and 13 exactly one shape a foot decodes
+//! moved: `reply/advertised` gained `wrote` at 8. Every other bump is
 //! seat-facing — a conversation row's `failure` (3), the queue row's `flag`
 //! (4), `reply/governing`'s lineage keys (5), `reply/providers`' `effort` and
-//! `priority` (6), `reply/help`'s `surface` (7) — and a foot decodes none of
-//! them. It still cannot dial across any of them, because the preface is one
-//! integer compared for equality: the version is the *engine's build*, not a
-//! statement about the frames this end happens to read.
+//! `priority` (6), `reply/help`'s `surface` (7), `reply/transcript`'s `wounded`
+//! entry beside `reply/steps` losing `auth_failed` (9), `attention` becoming
+//! follow-class with no field moving at all (10), `reply/ops`' failure readings
+//! (11), the queue row's `says` (12), `reply/config`'s `settings` (13) — and a
+//! foot decodes none of them. Every frame below is therefore byte for byte the
+//! text it was at 8; only the equality moved. It still cannot dial across any
+//! of them, because the preface is one integer compared for equality: the
+//! version is the *engine's build*, not a statement about the frames this end
+//! happens to read.
 
 /// **The protocol number, got from the engine.** yog's `src/wire/hello.rs`
-/// reads `pub const PROTOCOL: u32 = 8`, and this is that line copied.
+/// reads `pub const PROTOCOL: u32 = 13`, and this is that line copied.
 ///
 /// It is what the suite's stand-in engine states, so every channel test dials
 /// across the same equality a real one does — and
 /// [`channel::hello::PROTOCOL`](crate::channel::hello::PROTOCOL) agreeing with
 /// it is a test rather than a tautology.
-pub(crate) const PROTOCOL: u32 = 8;
+///
+/// **What it can and cannot catch.** Both constants live in this tree, so what
+/// the test defends is a re-vendor that moved the frames and forgot the pin. An
+/// engine that moved while this crate stood still is invisible to it — no
+/// fixture can see the far end — and the only thing that meets that skew is a
+/// real dial, which is why the sentence that dial earns has to read as an
+/// operator's upgrade prompt. This line is moved by hand, once per release
+/// train.
+pub(crate) const PROTOCOL: u32 = 13;
 
 /// `corpus/request/advertise.json`, stamped PROTOCOL 2 — the empty set, one
 /// ordinary element, and the element carrying §5.1's optional fourth fact.

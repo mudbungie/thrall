@@ -402,17 +402,34 @@ naming both versions**. A foot and an engine that disagree about the wire must
 not discover it one field at a time.
 
 The version moves in lockstep with the engine's, and the engine's corpus
-ledger is what forces a move. **The pin is 8** (bl-e0f0), and a foot's own
+ledger is what forces a move. **The pin is 13** (bl-f88f), and a foot's own
 surface moved exactly twice on the way there: PROTOCOL 2 (bl-36f7) is the
 worktree lane's bump — the advertised element gained `subject_cwd` and the
 invocation gained `cwd`, both optional, both a change to a shape already in
-use — and PROTOCOL 8 (yog bl-66d4) is the `wrote` receipt §3.7 consumes. The
-five bumps between are seat-facing shapes this crate never decodes: a
-conversation row's `failure` (3), the queue row's `flag` (4),
-`reply/governing`'s lineage keys (5), `reply/providers`' `effort` and
-`priority` (6), `reply/help`'s `surface` (7). **A foot could dial across none
+use — and PROTOCOL 8 (yog bl-66d4) is the `wrote` receipt §3.7 consumes. Every
+other bump is a seat-facing shape this crate never decodes: a conversation
+row's `failure` (3), the queue row's `flag` (4), `reply/governing`'s lineage
+keys (5), `reply/providers`' `effort` and `priority` (6), `reply/help`'s
+`surface` (7), `reply/transcript`'s `wounded` entry beside `reply/steps`
+losing `auth_failed` (9), `attention` becoming follow-class with **no field
+moving at all** (10), `reply/ops`' failure readings (11), the queue row's
+`says` (12), `reply/config`'s `settings` (13). **A foot could dial across none
 of them**, because the preface is one integer compared for equality — the
-version states the engine's *build*, never which frames this end reads.
+version states the engine's *build*, never which frames this end reads. So
+every vendored frame in §4's corpus is byte for byte the text it was at 8: the
+re-vendor for 13 moved the equality and nothing else.
+
+**And the pin drifting is the ordinary case, not an accident.** It has now
+gone stale twice with the suite green (bl-e0f0 at 2, bl-f88f at 8), because
+eleven of the thirteen bumps are invisible to this crate by construction — a
+foot's surface is small, so it is *usually* a version behind on shapes it does
+not read, and *always* unable to dial while it is. Nothing on this side of the
+socket can close that: a fixture cannot see the far end, so the corpus test
+defends a bad re-vendor and never a moved engine. Two things follow, and
+neither is a mechanism this repo can install. The pin moves on the release
+train, after yog and before a foot is shipped; and the skew, when an operator
+does meet it, must arrive as a sentence that ends the channel rather than a
+retry — a fact only a new binary can change is not something to wait on.
 
 **And the number is the engine's, so the suite states it as the engine's.**
 `src/corpus.rs` (§4) holds the protocol number and the frames of every shape a
