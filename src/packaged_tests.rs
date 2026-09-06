@@ -236,3 +236,28 @@ fn the_embed_sweep_sees_an_embed() {
     // A directory that is not there is an empty answer, not a panic.
     assert!(sources_that_embed(&scratch.path().join("absent")).is_empty());
 }
+
+/// **The crate's front page names the route onto a box** (bl-b250).
+///
+/// `README.md` is one of the two files ruled in above precisely because
+/// crates.io renders it: a stranger arriving at the registry entry for this
+/// crate reads exactly these bytes and nothing else. So the one thing they came
+/// for — how to get it — has to be in them, and for four months it was not:
+/// the file had a Build section addressed to a contributor and a complete image
+/// route, and the string `cargo install` appeared nowhere, on the crate whose
+/// own README says at length that it IS published.
+///
+/// It reads the shipped file rather than a copy, and the exact command rather
+/// than the words around it, because `--locked` is the half that makes the
+/// route reproducible: without it a stranger builds a dependency set no gate
+/// has ever run.
+#[test]
+fn the_readme_names_the_install_route_for_the_published_crate() {
+    let readme = std::fs::read_to_string(root().join("README.md")).expect("the README");
+    assert!(
+        readme.contains("cargo install thrall --locked"),
+        "the README no longer names the crate route. It is the file crates.io \
+         renders, so it is the one page a stranger who found this crate reads, \
+         and `cargo install` is what they came for"
+    );
+}

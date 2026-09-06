@@ -117,6 +117,32 @@ hook, and a corpus of deliberately fabricated secrets, shipped beside the
 binary. The guard judges file CLASSES and never content; auditing the list
 itself stays a human act.
 
+## Install
+
+```
+cargo install thrall --locked
+```
+
+thrall is published to crates.io, and that is the shortest way onto a box: one
+command, a Rust toolchain and a C linker, and about ten seconds on a registry
+some other crate has already warmed. `--locked` builds the dependency set the
+gate actually ran, rather than whatever a resolver picks today.
+
+**Nothing else is needed on the box at runtime** — no daemon, no service, no
+shared library, no state directory thrall creates for itself — beyond whatever
+the operator's own `tools.json` entries spawn. So the whole install is a binary
+plus the two files the operator writes by hand: *The tool document* below, and
+one channel directory under `<data root>/wire/workspaces/` holding the
+certificate an engine's operator issued.
+
+The other route is **the image** (below), for a box that takes images rather
+than toolchains. Either way, *Deployment* at the end of this file is how a foot
+becomes a long-running program that comes back from a crash and picks up its own
+releases — and it installs by exactly the command above, on the box, on a timer.
+
+`make install` is the contributor's route and not this one: it builds the
+working tree and puts that binary on this machine.
+
 ## The tool document
 
 `<data root>/tools.json` is what this box offers, and the only thing that says
