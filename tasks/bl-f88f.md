@@ -1,7 +1,8 @@
 +++
 title = "the protocol pin is 8 while the engine speaks 13, so no foot can dial a current engine — bl-e0f0 has recurred"
 created = 1788673284
-updated = 1788673505
+updated = 1788674073
+claimant = "Cantaloups-T1"
 priority = 1
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
 tags = ["usability-r1"]
