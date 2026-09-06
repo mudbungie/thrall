@@ -199,7 +199,7 @@ dependencies = [
 
 [[package]]
 name = "thrall"
-version = "0.0.14"
+version = "0.0.15"
 dependencies = [
  "rustls",
  "serde_json",
