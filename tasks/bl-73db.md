@@ -1,7 +1,7 @@
 +++
 title = "acceptance: mcp-server-fetch round-trips through a yog engine as a pinned tool — the bridge's first real server, and the web tool"
 created = 1788744507
-updated = 1788746118
+updated = 1788746501
 priority = 3
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
 tags = ["usability-r2"]
@@ -61,3 +61,7 @@ WHAT IS BLOCKED. Step 4 needs bl-b65d. The hold is real -- feeding the control a
 The model half was not driven: it ends at the same hold, and spending on a model to reach a known block buys nothing.
 
 Re-drive after bl-b65d: steps 1-3 and 5 reproduce from the drive log (kept beside its evidence outside the checkout, per yog QUALITY 3); what remains is the rules: row, the hold sentence naming it, the next call passing, and one real conversation over it.
+
+---
+
+Re-checked at the top of the T5 lane: yog bl-b65d is still NOT on yog main (git log origin/main | grep b65d is empty after a fetch; the ball itself reads status claimed, claimant Cantaloups-Y7). So step 4 is blocked exactly where T4 left it, and nothing in this repo moves it — the rules: row and the hold sentence that names it are both yog's half. Left ready and unclaimed. The re-drive is T4's log verbatim: steps 1-3 and 5 reproduce; what remains is the row, the hold naming it, the next call passing, and one conversation over the capture.
