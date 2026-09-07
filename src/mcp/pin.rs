@@ -51,7 +51,11 @@ pub fn entries(server: &[String], exe: &Path) -> Capture {
 
 /// The whole act, as a value or a sentence.
 fn pinned(server: &[String], exe: &Path) -> Result<Capture, String> {
-    let mut mcp = rpc::Server::start(server)?;
+    // No tool has been named yet — the operator typed the argv, so the
+    // program is the name they would recognise. An argv with nothing in it has
+    // no server to name and is refused by the start below.
+    let subject = server.first().map_or("", String::as_str);
+    let mut mcp = rpc::Server::start(subject, server)?;
     mcp.initialize()?;
     let catalog = mcp.list()?;
     let listed = catalog

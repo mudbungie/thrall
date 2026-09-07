@@ -49,6 +49,27 @@ fn a_server_that_ends_before_the_handshake_says_which_stage() {
     );
 }
 
+/// **The diagnosis names the tool the operator typed, not the argv's first
+/// word** (bl-3c8d). A bridged server is nearly always reached through a
+/// launcher — `uvx`, `npx`, `docker run` — so the head of the argv is the one
+/// process in the story that is not the server, and naming it sent an operator
+/// to read the launcher's documentation for a server's fault. Here the head is
+/// `/bin/sh`, which no sentence may claim was the MCP server.
+#[test]
+fn a_transport_failure_names_the_tool_and_not_the_launcher() {
+    let capture = bridge("fetch", &server("exit 0"), "{}");
+    assert!(
+        capture
+            .stderr
+            .contains(r#"the MCP server "fetch" ended before answering initialize"#),
+        "{capture:?}"
+    );
+    assert!(
+        !capture.stderr.contains("/bin/sh"),
+        "the sentence named the launcher rather than the tool: {capture:?}"
+    );
+}
+
 /// A JSON-RPC error answers in the server's own words.
 #[test]
 fn an_error_on_the_call_carries_the_servers_own_sentence() {

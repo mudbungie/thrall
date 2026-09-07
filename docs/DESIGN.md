@@ -1124,6 +1124,19 @@ known secret values from any sentence it emits and never quotes the server's
 argv or environment: a spawn failure loves to quote the command line, and
 that line is where the token is.
 
+**And what a transport sentence names INSTEAD is the tool** (bl-3c8d). The
+first version named the argv's first word, which is the one word this rule
+leaves available — and that word is nearly always a launcher (`uvx`, `npx`,
+`pipx run`, `docker run`), i.e. exactly the process that is not the server.
+*the MCP server "uvx" ended before answering initialize* sends an operator to
+read the launcher's documentation for a server's fault. The name the operator
+typed costs nothing, carries no argv, and is the same word the document, the
+roster and the engine's hold sentence (§6.6) already spell. The one sentence
+that still names the program is the spawn failure, where it is the right
+answer: nothing has become a server yet, and what would not start is the file
+this box tried to execute. `thrall mcp pin` names the program too, having been
+given no tool name to use.
+
 ### 6.8 Refusals
 
 - **No MCP in yog or litany** — §6.1. Not a verb, not a field, not a transport.

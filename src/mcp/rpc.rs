@@ -32,6 +32,15 @@
 //! What ends an invocation, then, is the far end going quiet or answering with
 //! an error.
 //!
+//! **And the sentence it ends with names the TOOL, not the argv's first word**
+//! (bl-3c8d). A bridged server is nearly always spawned through a launcher —
+//! `uvx`, `npx`, `pipx run`, `docker run` — so the head of the argv is the one
+//! process in the story that is *not* the server, and a diagnosis naming it
+//! sends the operator to read the launcher's documentation. DESIGN §6.7 rules
+//! out the other obvious repair, quoting the whole argv, because a credential
+//! lives in it; the name the operator typed costs nothing and is the same word
+//! the document, the roster and the engine's hold sentence spell.
+//!
 //! **The write's failure is not an outcome, and that is a simplification
 //! rather than an omission.** A server whose stdin will not take a byte is a
 //! server that has died, and a dead server's stdout is at end of file — so the
@@ -68,9 +77,14 @@ pub(super) struct Server {
     /// server is asked to leave.
     input: Option<ChildStdin>,
     output: BufReader<ChildStdout>,
-    /// The first word of the argv, and the only word of it any sentence here
-    /// may carry (DESIGN §6.7).
-    head: String,
+    /// **What a sentence here calls this server: the name the operator
+    /// reached it by.** For a bridged call that is the tool name — the word
+    /// the document, the roster and the engine's hold sentence all spell — and
+    /// never the argv's first word, which for the usual `uvx`/`npx`/`docker
+    /// run` pin is the launcher: exactly the process that is not the server
+    /// (bl-3c8d). `pin` has no tool name to give, so there it is the program,
+    /// which is what the operator typed.
+    subject: String,
     /// The last id spent. Ids are this client's own and monotonic, so a reply
     /// can be told from a log line by nothing but its id.
     spent: u64,
@@ -80,7 +94,12 @@ impl Server {
     /// Spawn it through the spawn boundary — its own process group, the git
     /// environment scrubbed — with stdin and stdout piped and stderr
     /// inherited.
-    pub(super) fn start(argv: &[String]) -> Result<Self, String> {
+    ///
+    /// **The one sentence that names the program rather than the `subject` is
+    /// this one**, and it is the one place naming it is right: nothing has
+    /// become a server yet, and the thing that would not start is the file
+    /// this box tried to execute.
+    pub(super) fn start(subject: &str, argv: &[String]) -> Result<Self, String> {
         let (head, rest) = argv.split_first().ok_or("the MCP server argv is empty")?;
         let mut cmd = crate::spawn::command(head);
         cmd.args(rest)
@@ -101,7 +120,7 @@ impl Server {
             child,
             input: Some(input),
             output: BufReader::new(output),
-            head: head.clone(),
+            subject: subject.to_owned(),
             spent: 0,
         })
     }
@@ -171,7 +190,7 @@ impl Server {
 
     /// A sentence about the server, naming the stage it was at.
     fn said(&self, stage: &str, what: &str) -> String {
-        format!("the MCP server {:?} {what} {stage}", self.head)
+        format!("the MCP server {:?} {what} {stage}", self.subject)
     }
 
     /// The server's own refusal, in the server's own words when it sent any.

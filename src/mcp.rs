@@ -77,7 +77,7 @@ fn called(tool: &str, server: &[String], input: &str) -> Result<Capture, String>
                 .to_owned(),
         );
     }
-    let mut server = rpc::Server::start(server)?;
+    let mut server = rpc::Server::start(tool, server)?;
     server.initialize()?;
     let result = server.call(tool, &arguments)?;
     render::capture(&result)
