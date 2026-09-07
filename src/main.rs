@@ -16,7 +16,9 @@
 //! real sleep between dials**, which is the same kind of thing one register
 //! down (`run::Pause`): a suite that slept a redial's backoff out would spend a
 //! minute proving arithmetic; and **this process's own stdin**, which the
-//! bridge's input arrives on (DESIGN §6.2). All five are effects, and the
+//! bridge's input arrives on (DESIGN §6.2) — with this process's own PATH
+//! beside it, which is the one fact a pinned entry's `command` must carry
+//! (§6.3). All five are effects, and the
 //! decision of WHICH of them one argv calls for is `cli::run`'s, where a test
 //! reads it back as a value.
 //!
@@ -42,6 +44,7 @@ fn main() -> ExitCode {
         Decided::Bridge { tool, server } => {
             captured(&thrall::mcp::bridge(&tool, &server, &input()))
         }
+        Decided::Pin { server } => captured(&thrall::mcp::pin::entries(&server, &exe())),
     }
 }
 
@@ -75,6 +78,14 @@ fn captured(capture: &Capture) -> ExitCode {
     print!("{}", capture.stdout);
     eprint!("{}", capture.stderr);
     ExitCode::from(u8::try_from(capture.exit_code).unwrap_or(1))
+}
+
+/// **This process's own path**, which is what a pinned entry's `command` must
+/// name so the document can spawn this very binary again. A box that cannot
+/// answer the question falls back to the bare name, which is the same thing a
+/// `PATH` lookup would find and is visible in the paste either way.
+fn exe() -> std::path::PathBuf {
+    std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("thrall"))
 }
 
 /// **This process's own stdin**, whole — the invocation's input JSON. Read

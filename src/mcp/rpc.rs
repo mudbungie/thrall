@@ -1,6 +1,5 @@
 //! **The stdio transport, and the three requests a bridge makes** (DESIGN
-//! §6.2): `initialize` and `tools/call` — `tools/list` joins them with the
-//! pin verb (bl-b6ab) — hand-read in the strict
+//! §6.2): `initialize`, `tools/call` and `tools/list`, hand-read in the strict
 //! style [`json`](crate::json) establishes.
 //!
 //! **Transport is stdio and only stdio.** One JSON-RPC message per line, down
@@ -11,11 +10,27 @@
 //! does it is still a server argv on this box: a local proxy the operator
 //! installs, which does not move this seam (DESIGN §6.2, §6.8).
 //!
-//! **A message that is not the answer to the request in flight is skipped.**
-//! A server may log, and may ask this client for something it declared no
-//! capability for; neither is an answer, and neither is an error worth ending
-//! an invocation over. What ends one is the far end going quiet, saying
-//! something that is not JSON at all, or answering with an error.
+//! **Anything that is not the answer to the request in flight is skipped**,
+//! and that includes a line that is not JSON at all (widened by bl-b6ab, on
+//! evidence). A server may log; it may ask this client for something it
+//! declared no capability for; and its own CHILD may write to the stdout it
+//! inherited, which is this transport. The last was measured rather than
+//! imagined: `mcp-server-fetch` bootstraps a node helper on a box's first
+//! fetch, and that helper's package-manager warnings arrive here as three
+//! lines of prose in the middle of the conversation — once per box, so a
+//! refusal there is a flake an operator meets exactly once and can do nothing
+//! about.
+//!
+//! Refusing them was a special case sitting inside the general rule rather
+//! than a second rule: *read until the answer arrives, and what is not it is
+//! not this end's to read*. Nothing is lost by widening it, because a program
+//! that speaks no MCP at all still ends without answering, and that sentence
+//! is the one an operator needs. The line itself is not carried anywhere — it
+//! was never a message, and a server's own words belong on the stderr it
+//! inherits, which reaches the capture already.
+//!
+//! What ends an invocation, then, is the far end going quiet or answering with
+//! an error.
 //!
 //! **The write's failure is not an outcome, and that is a simplification
 //! rather than an omission.** A server whose stdin will not take a byte is a
@@ -101,6 +116,13 @@ impl Server {
         Ok(())
     }
 
+    /// The catalog, as the server's own `tools` array — the pin's one request
+    /// (DESIGN §6.3), and the only one this file makes that no invocation
+    /// does.
+    pub(super) fn list(&mut self) -> Result<Value, String> {
+        self.request("tools/list", &json!({}))
+    }
+
     /// **The one call an invocation makes.** The arguments are the input off
     /// stdin, verbatim: this end narrows nothing, because the schema the model
     /// was shown is the server's own.
@@ -134,8 +156,9 @@ impl Server {
             if self.output.read_line(&mut line).unwrap_or(0) == 0 {
                 return Err(self.said(stage, "ended before answering"));
             }
-            let message: Value = serde_json::from_str(&line)
-                .map_err(|_| self.said(stage, "sent a line that is not JSON, answering"))?;
+            let Ok(message) = serde_json::from_str::<Value>(&line) else {
+                continue;
+            };
             if message.get("id").and_then(Value::as_u64) != Some(id) {
                 continue;
             }

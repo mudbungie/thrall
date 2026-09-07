@@ -15,6 +15,8 @@ use serde_json::{Value, json};
 
 /// The rendering rows of DESIGN §6.5, one test apiece.
 mod content;
+/// What `thrall mcp pin` prints, and what an operator pastes (DESIGN §6.3).
+mod pin;
 /// Every way this leg refuses, and the sentence each one earns.
 mod refusals;
 
@@ -105,6 +107,23 @@ fn a_notification_before_the_answer_is_not_the_answer() {
     .to_string();
     let (capture, _) = called(&[logged, text("after the log")], "{}");
     assert_eq!(capture.stdout, "after the log\n");
+    assert_eq!(capture.exit_code, 0);
+}
+
+/// **A line that is not a message is stepped over, wherever it came from.**
+/// A server's own child writes to the stdout it inherited, which is this
+/// transport: `mcp-server-fetch` bootstraps a node helper on a box's first
+/// fetch and its package-manager warnings land here mid-conversation. Refusing
+/// them was a flake an operator meets once per box and can do nothing about.
+#[test]
+fn prose_on_the_transport_is_not_an_answer_and_is_not_a_refusal() {
+    let scratch = Scratch::new();
+    let mut argv = conversing(&[text("the page")], &scratch.join("call.json"));
+    if let Some(script) = argv.last_mut() {
+        script.insert_str(0, "printf 'npm WARN EBADENGINE unsupported engine\n'; ");
+    }
+    let capture = bridge("fetch", &argv, "{}");
+    assert_eq!(capture.stdout, "the page\n");
     assert_eq!(capture.exit_code, 0);
 }
 

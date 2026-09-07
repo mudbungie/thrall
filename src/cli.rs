@@ -76,6 +76,14 @@ pub enum Decided {
     /// entry point performs it, because it is the only thing here that is not
     /// a value.
     Serve,
+    /// **Print the entries an MCP server's catalog would make** (DESIGN
+    /// §6.3), for the operator to paste into this box's document. It reads no
+    /// input and writes no file; the entry point performs it because the
+    /// absolute path it prints is this process's own.
+    Pin {
+        /// The server's argv, whole.
+        server: Vec<String>,
+    },
     /// **Bridge one call to an MCP server on this box** (DESIGN §6.2): run
     /// `tool` against the server this argv names. The input arrives on this
     /// process's stdin, which is why the entry point performs it — reading a
@@ -105,6 +113,7 @@ advertises what this box offers, waits for work, and posts the captures back.
 It never listens and it never speaks first.
 
 usage: thrall run
+       thrall mcp pin -- <server argv...>
        thrall mcp <tool> -- <server argv...>
        thrall [--version | --help]
 
@@ -115,6 +124,14 @@ usage: thrall run
                   a channel that cannot be served at all is an exit naming
                   it, and restarting the process belongs to this machine's
                   own supervision.
+  mcp pin         run an MCP server once, and print every tool of its catalog
+                  as a complete tools.json entry for you to paste. It writes
+                  nothing: the document is yours, and pasting the entries you
+                  vouch for is the allowlist. The server's own hints about each
+                  tool go to standard error, for the policy row on the engine
+                  side; they are never advertised. `pin` is therefore a tool
+                  name this verb cannot bridge — rename such a tool in the
+                  entry, which is an edit the paste already invites.
   mcp <tool>      call one tool on an MCP server this box can spawn, as an
                   ordinary tool command: the invocation's input JSON on stdin,
                   the tool's content on stdout, the exit code the verdict. The
@@ -136,19 +153,27 @@ for the protocol thrall implements against.",
     )
 }
 
+/// Words of a matched argv tail, owned.
+fn owned(words: &[&str]) -> Vec<String> {
+    words.iter().map(|word| (*word).to_owned()).collect()
+}
+
 /// Decide what one invocation does. `args` is argv **without** the program
 /// name.
 pub fn run(args: Vec<String>) -> Decided {
     let words: Vec<&str> = args.iter().map(String::as_str).collect();
     match words.as_slice() {
         ["run"] => Decided::Serve,
+        ["mcp", "pin", "--", server @ ..] if !server.is_empty() => Decided::Pin {
+            server: owned(server),
+        },
         ["mcp", tool, "--", server @ ..] if !server.is_empty() => Decided::Bridge {
             tool: (*tool).to_owned(),
-            server: server.iter().map(|w| (*w).to_owned()).collect(),
+            server: owned(server),
         },
         ["mcp", ..] => Decided::Say(Verdict::refused(
-            "mcp takes a tool name, then `--`, then the argv of a server this \
-             box can spawn: thrall mcp fetch -- uvx mcp-server-fetch"
+            "mcp takes a tool name — or `pin` — then `--`, then the argv of a \
+             server this box can spawn: thrall mcp fetch -- uvx mcp-server-fetch"
                 .to_string(),
         )),
         ["--version" | "-V"] => Decided::Say(Verdict::ok(version())),

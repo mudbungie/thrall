@@ -49,18 +49,6 @@ fn a_server_that_ends_before_the_handshake_says_which_stage() {
     );
 }
 
-/// stdout is the transport, so a line that is not JSON is not a diagnostic —
-/// it is a protocol violation, and it refuses naming the stage.
-#[test]
-fn a_line_that_is_not_json_refuses_at_the_stage_it_arrived() {
-    let capture = bridge("fetch", &server("printf 'starting up\\n'"), "{}");
-    assert_eq!(capture.exit_code, 1);
-    assert!(
-        capture.stderr.contains("not JSON, answering initialize"),
-        "{capture:?}"
-    );
-}
-
 /// A JSON-RPC error answers in the server's own words.
 #[test]
 fn an_error_on_the_call_carries_the_servers_own_sentence() {

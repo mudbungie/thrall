@@ -178,9 +178,10 @@ wire. So what this box offers and what it can actually run cannot drift.
 | `command` | local | the argv, spawned directly |
 | `cwd` | local | where to run it, **absolute** or the document is refused. A `subject_cwd` invocation that names a directory outranks it |
 
-`docs/tools.example.json` is a complete document — one plain entry and one
-carrying `subject_cwd` — and it is the one below, byte for byte: a test holds
-the two together, so the example that ships is an example the gate reads.
+`docs/tools.example.json` is a complete document — one plain entry, one
+carrying `subject_cwd`, and one bridged MCP server — and it is the one below,
+byte for byte: a test holds the two together, so the example that ships is an
+example the gate reads.
 
 ```json
 [
@@ -209,9 +210,59 @@ the two together, so the example that ships is an example the gate reads.
     "command": ["/usr/local/libexec/thrall-tools/build-tool"],
     "cwd": "/srv/project",
     "subject_cwd": true
+  },
+  {
+    "name": "fetch",
+    "description": "Fetches a URL from the internet and optionally extracts its contents as markdown.\n\nAlthough originally you did not have internet access, and were advised to refuse and tell the user this, this tool now grants you internet access. Now you can fetch the most up-to-date information and let the user know that.",
+    "input_schema": {
+      "description": "Parameters for fetching a URL.",
+      "type": "object",
+      "title": "Fetch",
+      "properties": {
+        "url": { "description": "URL to fetch", "format": "uri", "minLength": 1, "title": "Url", "type": "string" },
+        "max_length": { "default": 5000, "description": "Maximum number of characters to return.", "exclusiveMaximum": 1000000, "exclusiveMinimum": 0, "title": "Max Length", "type": "integer" },
+        "start_index": { "default": 0, "description": "On return output starting at this character index, useful if a previous fetch was truncated and more context is required.", "minimum": 0, "title": "Start Index", "type": "integer" },
+        "raw": { "default": false, "description": "Get the actual HTML content of the requested page, without simplification.", "title": "Raw", "type": "boolean" }
+      },
+      "required": ["url"]
+    },
+    "command": ["/usr/local/bin/thrall", "mcp", "fetch", "--", "uvx", "mcp-server-fetch"]
   }
 ]
 ```
+
+### The web tool is a pinned MCP server, not a thrall feature
+
+The third entry is not something this crate implements. thrall is the suite's
+**MCP client** (Model Context Protocol: a JSON-RPC protocol in which a server
+process publishes a catalog of tools and a client calls them), and
+`thrall mcp <tool> -- <server argv>` is an ordinary tool command whose program
+happens to be this binary: it spawns the server for the one call, performs the
+handshake, makes the call, renders the result to standard output and tears the
+server down. The document gains no key, the engine learns no verb, and
+deleting the entry deletes the capability like any other.
+
+Write those entries by running the server once, at your own hand:
+
+```
+thrall mcp pin -- uvx mcp-server-fetch
+```
+
+It prints one complete entry per tool in the catalog, on standard output, and
+**writes nothing** — you paste in the entries you vouch for and no others,
+which is the allowlist. What the server says about each tool's reach
+(`readOnlyHint`, `destructiveHint`, `openWorldHint`) goes to standard error
+instead: those are hints from a program you installed but did not write, so
+they inform the policy row on the engine side and are never advertised.
+
+Two things about the `fetch` entry above are worth reading rather than
+skimming. Its `description` and `input_schema` are the **server's own words**,
+carried into your document verbatim — that text is what a model is shown, so
+read it before you paste it. And `uvx` is yours to install: the shipped image
+carries an Alpine floor and what can run on it is still the operator's problem
+(see "The image"). A web *search* server needs a credentialed provider; that
+one is your own pin, and the credential lives in the server's argv or in a
+wrapper script on this box — never in this document, and never on the wire.
 
 An **empty array is a legitimate document**: a foot that offers nothing, dials,
 presents the empty set and waits. An **absent file is not**, and thrall refuses

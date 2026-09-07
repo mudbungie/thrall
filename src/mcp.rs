@@ -40,6 +40,8 @@ use serde_json::Value;
 
 use crate::invocation::Capture;
 
+/// **The operator verb** (DESIGN §6.3): discovery, once, printed to paste.
+pub mod pin;
 /// Content parts to capture bytes (DESIGN §6.5).
 mod render;
 /// The stdio transport and the requests a bridge makes.

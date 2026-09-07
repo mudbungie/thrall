@@ -127,6 +127,39 @@ fn the_bridge_takes_the_tool_before_the_dashes_and_the_server_after() {
     }
 }
 
+/// **`pin` is the operator's half of the same verb**, and it reads no input —
+/// which is why it is a decision of its own rather than a bridge with a
+/// reserved tool name: the entry point must know not to wait on a stdin that
+/// a human at a terminal is never going to write.
+#[test]
+fn pin_is_the_operator_verb_and_carries_only_the_server() {
+    match run(argv(&["mcp", "pin", "--", "uvx", "mcp-server-fetch"])) {
+        Decided::Pin { server } => {
+            assert_eq!(
+                server,
+                vec!["uvx".to_string(), "mcp-server-fetch".to_string()]
+            );
+        }
+        _ => panic!("mcp pin did not decide to pin"),
+    }
+}
+
+/// And so a server's tool actually CALLED `pin` cannot be bridged under that
+/// name — the usage says so, and renaming it is an edit the paste already
+/// invites (DESIGN §6.3: a prefix is the operator's edit).
+#[test]
+fn a_tool_named_pin_is_the_operator_verb_and_the_usage_says_so() {
+    assert!(matches!(
+        run(argv(&["mcp", "pin", "--", "a-server"])),
+        Decided::Pin { .. }
+    ));
+    assert!(
+        usage().contains("`pin` is therefore a tool"),
+        "the usage does not warn that the name is taken: {}",
+        usage()
+    );
+}
+
 /// **Every incomplete spelling of it refuses, and teaches the whole
 /// shape.** A bridge with no server to spawn is the one an operator writes
 /// into `tools.json` and never sees fail until a model calls it.

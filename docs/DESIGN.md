@@ -852,7 +852,7 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/mcp.rs` | **The bridge verb** (§6.2, bl-e104): `thrall mcp <tool> -- <server argv>`, an ordinary tool command whose program is this binary — input on stdin, the server spawned through the boundary, one `tools/call`, the capture on stdout, the server torn down. Its answer is an `invocation::Capture` and not a `cli::Verdict`, because it is being run AS a tool: the three facts are what the executor at the far end will post, and a failure still writes to stdout. |
 | `src/mcp/rpc.rs` | The stdio transport and the requests a bridge makes — `initialize`, `tools/call`, and `tools/list` for the pin — as strict hand-read frames in `json.rs`'s style. The teardown is a `Drop`, so no early return can skip it. |
 | `src/mcp/render.rs` | Content parts to capture bytes (§6.5): text in order, structured content as its JSON, a non-text part as one line naming what was dropped. |
-| `src/mcp/pin.rs` | **The operator verb** (§6.3, bl-b6ab): `thrall mcp pin -- <server argv>` — one `tools/list`, printed as complete document entries for the operator to paste, annotations on stderr, nothing written. Unbuilt. |
+| `src/mcp/pin.rs` | **The operator verb** (§6.3, bl-b6ab): `thrall mcp pin -- <server argv>` — one `tools/list`, printed as complete document entries for the operator to paste, annotations on stderr, nothing written. It refuses no name: a name that is not a single path component, or one that collides, is refused at `config::read` like every other, so the operator meets one answer to that question rather than two that could disagree. |
 
 **There is no flat material root, and its absence is a simplification rather
 than an omission** (bl-a4a5). Upstream a client box also holds material
@@ -1148,7 +1148,21 @@ nobody supplied a workspace token, and a fetch needs none.
 So `docs/tools.example.json` gains a `fetch` entry (bl-b6ab), the README says
 it is a pinned server and that its runtime is the operator's to install, and
 a web *search* — which needs a credentialed provider — is the operator's own
-pin, exercising §6.7. `bash` reaching the web is already visible to the
+pin, exercising §6.7.
+
+**It was pinned and called for real** (bl-b6ab): `mcp-server-fetch` under
+`uv tool install`, pinned by this verb, pasted, and one page fetched through
+`thrall mcp fetch`. Two facts came back that no fixture would have produced.
+The description a server states is **prose aimed at a model** — the reference
+fetch server's tells the reader it now has internet access and to say so —
+which is why it is carried verbatim into the operator's document where they
+read it before pasting, and why the README says as much beside the entry. And
+a server's own CHILD writes to the stdout it inherited, which is the bridge's
+transport: this one bootstraps a node helper on a box's first fetch, and its
+package-manager warnings arrived mid-conversation as prose. §6.2's transport
+therefore skips anything that is not the answer in flight, a line that is not
+JSON included — the general rule it already had, with the special case that
+sat inside it removed. `bash` reaching the web is already visible to the
 engine's control (`curl` and `wget` classify open-world in the shipped
 ruleset); what the pinned tool adds is a name in the roster and a row in the
 policy, which is what bl-4409 meant by *visible*.

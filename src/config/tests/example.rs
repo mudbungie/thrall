@@ -50,7 +50,11 @@ fn readme() -> String {
 fn the_shipped_example_is_a_document_this_foot_reads() {
     let set: Vec<Local> = read(Path::new(&root().join("docs").join("tools.example.json")))
         .expect("the example is a document thrall reads");
-    assert_eq!(set.len(), 2, "the ball asked for two entries");
+    assert_eq!(
+        set.len(),
+        3,
+        "a plain entry, a consenting one, and a bridged one"
+    );
     assert!(!set[0].tool.subject_cwd, "the first entry is the plain one");
     assert!(
         set[1].tool.subject_cwd,
@@ -60,6 +64,55 @@ fn the_shipped_example_is_a_document_this_foot_reads() {
         set[1].cwd.is_some(),
         "and the local half beside it, so the two halves are both shown"
     );
+    assert_eq!(
+        set[2].tool.name, "fetch",
+        "the third entry is the pinned server"
+    );
+}
+
+/// **The pinned entry is the bridge's own shape** (bl-b6ab, DESIGN §6.9): a
+/// tool document entry like any other, whose `command` runs this binary's
+/// `mcp` verb against a server argv. The document gains no key for it, which
+/// is the whole ruling — so what holds it here is the ordinary reader.
+#[test]
+fn the_web_tool_is_an_ordinary_entry_whose_command_is_the_bridge() {
+    let set: Vec<Local> = read(Path::new(&root().join("docs").join("tools.example.json")))
+        .expect("the example is a document thrall reads");
+    let fetch = &set[2];
+    assert_eq!(fetch.command[1], "mcp", "{:?}", fetch.command);
+    assert_eq!(fetch.command[2], "fetch", "{:?}", fetch.command);
+    assert_eq!(fetch.command[3], "--", "{:?}", fetch.command);
+    assert!(
+        fetch.command[0].ends_with("thrall"),
+        "the bridge's command must name this binary: {:?}",
+        fetch.command
+    );
+    assert!(
+        fetch.tool.description.starts_with("Fetches a URL"),
+        "the description is the server's own words, carried verbatim"
+    );
+}
+
+/// **And the README says it is a pinned server rather than a feature**, with
+/// the two things an operator has to know before pasting one: the runtime is
+/// theirs to install, and the description they are pasting was written by the
+/// server.
+#[test]
+fn the_readme_says_the_web_tool_is_a_pinned_server() {
+    let readme = readme();
+    for said in [
+        "thrall mcp pin -- uvx mcp-server-fetch",
+        "writes nothing",
+        "never advertised",
+        "server's own words",
+        "own pin",
+    ] {
+        assert!(
+            readme.contains(said),
+            "the pinned-server paragraph no longer says {said:?} — an operator \
+             who pastes an entry without it is trusting text nobody read"
+        );
+    }
 }
 
 /// **The README carries it byte for byte.** Two copies of one document drift
