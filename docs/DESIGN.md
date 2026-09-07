@@ -819,6 +819,11 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/test_support.rs` | `cfg(test)` only. The scratch directory, the fork lock, the stand-in engine, the recording notice sink (§3.7 — a serving foot writes to stderr, and a test cannot read that back), and the certificate mint the suite performs on the operator's behalf. |
 | `src/packaged_tests.rs` | `cfg(test)` only. **The publication guard** (bl-d25a): what `cargo publish` would upload, read off the real `cargo package --list` and judged against the classes `Cargo.toml`'s `include` allowlist rules in — both directions, since a shape guard dies by matching nothing. It is in `src` rather than a `tests/` crate because it forks a child and the spawn boundary is `pub(crate)`; an integration crate could only reach a bare `Command::new`, which the confinement rules refuse. |
 
+| `src/mcp.rs` | **The bridge verb** (§6.2, bl-e104): `thrall mcp <tool> -- <server argv>`, an ordinary tool command whose program is this binary — input on stdin, the server spawned through the boundary, one `tools/call`, the capture on stdout, the server torn down. Unbuilt. |
+| `src/mcp/rpc.rs` | The stdio transport and the three requests a bridge makes — `initialize`, `tools/list`, `tools/call` — as strict hand-read frames in `json.rs`'s style. Unbuilt (bl-e104). |
+| `src/mcp/render.rs` | Content parts to capture bytes (§6.5): text in order, structured content as its JSON, a non-text part as one line naming what was dropped. Unbuilt (bl-e104). |
+| `src/mcp/pin.rs` | **The operator verb** (§6.3, bl-b6ab): `thrall mcp pin -- <server argv>` — one `tools/list`, printed as complete document entries for the operator to paste, annotations on stderr, nothing written. Unbuilt. |
+
 **There is no flat material root, and its absence is a simplification rather
 than an omission** (bl-a4a5). Upstream a client box also holds material
 directly under `wire/`, because that same directory is where a *server* keeps
@@ -853,22 +858,10 @@ them from scratch.
 
 ### 5.1 The MCP bridge (bl-d5d6)
 
-**Deferred, not v1.** thrall runs as an MCP client against MCP servers on its
-own box and **re-advertises their tools up the wire** as ordinary entries in
-its own advertisement — an MCP tool becomes a `{name, description,
-input_schema}` triple like every other, and an invocation routed to it is
-dispatched over MCP instead of to an argv.
-
-Two properties are the whole point:
-
-- **The engine never learns MCP.** MCP terminates at the foot. Upstream sees
-  one vocabulary and gains no protocol, no verb, and no transport.
-- **The local config stays the gate.** An MCP server is enabled the way a
-  command is: by appearing in the operator's document. Nothing is discovered
-  and auto-advertised.
-
-Open questions are in the ball, not here; the ball is the living document for
-work that has not started.
+**No longer deferred — ruled in §6** (bl-3b03). The two properties this stub
+named — the engine never learns MCP, the local config stays the gate — are
+§6.1 and §6.3, and the four questions bl-d5d6 left open are answered at
+§6.3 (names), §6.4 (lifetime), §6.5 (content) and §6.8 (no passthrough).
 
 ### 5.2 What is deliberately absent from the gate
 
@@ -898,3 +891,241 @@ The founding's objection was real and is answered rather than waived: a rule
 with nothing to measure passes as green forever, so `rules-audit` stopped
 measuring rules by scanning `src` and now measures every one of them,
 individually, against its own deliberate violation.
+
+---
+
+## 6. The MCP bridge (bl-3b03)
+
+**Ruling: the bridge is the foot's.** thrall is the Model Context Protocol
+(MCP) *client* in the suite: it speaks MCP to servers on its own box and
+advertises their tools up the wire as ordinary entries of its tool document.
+yog learns no verb, no field and no transport; litany learns nothing at all.
+The web tool is the first server pinned this way. What follows is the
+reasoning, the mechanism, and the contracts the four children implement.
+
+MCP, for this document: a JSON-RPC protocol in which a **server** (a process
+that fronts some resource — a database, a SaaS API, the web) publishes a
+catalog of **tools** — each a name, a description and a JSON Schema for its
+input — and a **client** calls them. The catalog is exactly the shape of a
+REMOTE §5.1 advertisement, which is the whole reason the bridge is cheap.
+
+### 6.1 Placement, and why there is one answer and not two
+
+Three homes were weighed (usability round 1, TRIAGE ruling 8: *MCP before
+web; the bridge is the general path*):
+
+- **Engine-side** — a `litany-tool-mcp` binary yog ships beside its embedded
+  litany, the framing of litany's `docs/DESIGN_MCP_BRIDGE.md`. **Dead on
+  arrival in this suite**, and not on taste: yog's router is total and its
+  driver keeps no local executor (REMOTE §5, *the engine's driver keeps no
+  local executor*), so nothing beneath yog ever resolves a `litany-tool-<name>`
+  binary — every tool call is adjudicated, queued to a foot's mailbox and
+  executed on that foot's box, and a granted name no foot advertises and the
+  engine does not implement is refused in band (REMOTE §5.4's ladder, rung 4).
+  A bridge in that slot would be a binary nothing forks.
+- **Foot-side** — this section. It is also what REMOTE §5.4's own closing
+  paragraph named, deferred, and what bl-d5d6 filed.
+- **Both, with a ruled default** — refused. Two homes for one capability is
+  two adjudication stories, two credential stories and two places for a
+  server's quirks to be handled differently; REMOTE §5's *one pipeline, and
+  there is no second one* is the same refusal one layer up.
+
+Four facts pick the foot, and each is a law this suite already has:
+
+1. **The layer law** (yog VISION §2): mechanism sinks, policy rises. Speaking
+   a wire protocol to a process is mechanism, and the component already on
+   the box, already spawning operator-named argv, already owning *what this
+   box will run* is the foot. What rises is exactly the policy — which
+   servers, which of their tools, what each reaches — and each of those has
+   a home above: the tool document (this box's operator), the workspace
+   policy (the engine's operator, §6.6).
+2. **Blast radius** (yog DESIGN §3.1; §16.2's *nothing ambient*): an MCP
+   server's credential is a fact about a box, not about the world. The foot's
+   document is out of world by construction (§3.4: *it describes this
+   machine*), its local half never crosses the wire (REMOTE §5.2), and a
+   credential that sat beside the engine would be one every workspace on the
+   server could spend.
+3. **Fleet reach**: the servers are where the resources are. A database
+   server on box 2 runs on box 2; the foot on box 2 is the process that can
+   spawn it, and REMOTE §5's subject-locality invariant — *a tool executes
+   where its subject lives* — says that is the only honest executor.
+4. **Adjudication is already total over routed names** (yog bl-72bd): a foot's
+   tool reaches `yog tool-control` like every other, and the control's answer
+   for a tool it cannot read is a hold. A bridged tool needs no MCP case there
+   — it is a routed name, which is the case the control already has (§6.6).
+
+### 6.2 The mechanism: the bridge is a tool command, and the command is thrall
+
+`thrall mcp <tool> -- <server argv...>` is a subcommand that behaves as an
+ordinary tool command under the document's stdin/stdout/exit-code contract
+(§3.4, README *The tool document*). A pinned MCP tool is therefore a plain
+entry:
+
+```json
+{
+  "name": "fetch",
+  "description": "Fetches a URL from the internet and extracts its contents as markdown.",
+  "input_schema": { "type": "object", "properties": { "url": { "type": "string" } }, "required": ["url"] },
+  "command": ["/usr/local/bin/thrall", "mcp", "fetch", "--", "uvx", "mcp-server-fetch"]
+}
+```
+
+**The document gains no key.** `config::read`, the advertisement projection,
+`exec` and its deadline are untouched; the server is the tool's child and so
+inside the process group the cascade already signals (§3.5), and deleting the
+entry deletes the capability (§3.4). One invocation: read the input from
+stdin, spawn the server through the spawn boundary, `initialize`, one
+`tools/call {name, arguments: input}`, render, exit, tear down. Contract and
+tests are bl-e104's body.
+
+**Transport is stdio and only stdio.** A remote or HTTP server, and any OAuth
+flow, is refused until a named deployment needs a specific one — and when it
+does, it is still a server argv on this box (a local stdio proxy the operator
+installs), so the seam does not move. litany's §4 ruling, carried over.
+
+### 6.3 Pin: discovery is an operator act, once
+
+`thrall mcp pin -- <server argv...>` runs the server once, requests its
+catalog (`tools/list`) and prints every tool as a complete entry in the shape
+above, with `command` naming this binary's absolute path. **It writes
+nothing**: the document is operator-authored (§3.4), and the allowlist is the
+paste — the operator copies in the entries they vouch for and no others.
+Never a server's whole catalog: an unpinned tool costs nothing and a pinned
+one costs its schema in every prompt of every role that loads it.
+
+- **Names**: the MCP name verbatim; a prefix is the operator's edit. A name
+  that is not a single path component, or that collides with an entry already
+  in the document, is refused where every such name is refused today —
+  `config::read`, at the next `thrall run` (bl-d5d6's first question).
+- **Annotations are commentary, never advertised.** Servers hint at a tool's
+  reach (`readOnlyHint`, `destructiveHint`, `openWorldHint`). Pin prints them
+  on stderr for the operator writing the engine-side policy row (§6.6) and
+  puts none of them in the entry: REMOTE §5.1 admits nothing yog stores and
+  cannot check, and a hint from an untrusted server is exactly that.
+- **Drift**: a server whose schema moved surfaces as its own in-band error on
+  the next call (non-zero exit, the server's sentence). The remedy is a
+  re-pin. There is no live catalog, no `list_changed` receiver and no
+  auto-advertise — the advertisement changes when the operator reconfigures
+  the box, which is REMOTE §5's rate-of-change ruling.
+
+Contract and tests are bl-b6ab's body.
+
+### 6.4 Lifetime: the server's is contained in the invocation's
+
+Per invocation: spawn, handshake, one call, tear down (bl-d5d6's second
+question). The serial-per-channel rule (§2) is untouched because nothing
+outlives the call; §2's *it holds no world* stays true because there is no
+resident connection to be state; and every failure — would not start, no
+handshake, died mid-call — is one observable, a non-zero exit with a sentence.
+The cost is a server start per call, which for an `npx`/`uvx`-hosted server
+is seconds. **A warm server is deferred until a deployment measures that
+cost** (the acceptance child records the number); if it is ever paid for it
+lives behind the same argv, invisible at the document and at the wire.
+
+### 6.5 Content: a capture is text
+
+Text parts, in order, each on its own line; `structuredContent` as its JSON
+when no text part is present; a non-text part (image, audio, resource blob)
+replaced by one line naming its type, mime type and byte length, dropped and
+said so (bl-d5d6's third question). `isError: true` writes the content and
+exits 1. A capture is text because a tool result is a model's message (REMOTE
+§5.3); an image a vision model could read is a later ask with its own ball.
+
+### 6.6 Adjudication: opaque, held, then a row the operator writes
+
+A pinned tool reaches the engine's control as `<client>_<tool>` with an input
+shaped by the server's schema — no `command` field — so yog's routed lane
+classifies it **opaque** and the shipped table **holds** it (yog bl-72bd): the
+first call parks for the operator with the tool and its input in front of
+them. Fail-closed by default, which is the right default for a tool whose
+reach the adjudicator cannot read (§3.5's honesty clause, from the far side).
+
+The standing answer is one line in the workspace's `capability.yaml`:
+
+```yaml
+rules:
+  box2_fetch: open-world
+```
+
+— the operator's own statement of what that tool on that box reaches, keyed
+on the **host-qualified** name because the same server on two boxes is two
+trust decisions (REMOTE §5, *locality rides in the name*). The hold sentence
+names that row as the way out. That is yog bl-b65d; the effect vocabulary
+gains no class and the file gains no key. A shell-shaped MCP tool — one whose
+input carries `command` — is classified by its line like every other shell,
+and a row does not outrank the line.
+
+Two things are refused so that this stays exact. The foot never advertises a
+class (§6.3). And there is no generic `mcp_call {server, tool, arguments}`
+passthrough (bl-d5d6's fourth question): one entry per tool, so the load act
+on the far end names one, the policy row names one and the hold shows one —
+the same reason the far end has one `clients` tool with named ops and not a
+`call`.
+
+### 6.7 Credentials: the server's, on the box
+
+A server's token lives in the server's own argv — or in the wrapper script the
+operator writes on this box, which is the document's existing answer to *a
+tool that wants a shell* (§3.4). Nothing credential-shaped enters the
+document (the leak gate refuses it), nothing is placed in thrall's environment
+by thrall, and nothing crosses the wire, because the local half never does.
+
+**Reach**: a foot is per box and per enrolment, so a credential's reach is
+the foot's. A workspace that must not share one is served by its own foot —
+its own leaf, its own data root, its own document — which is the blast-radius
+ruling applied at the layer that owns the credential. The bridge scrubs its
+known secret values from any sentence it emits and never quotes the server's
+argv or environment: a spawn failure loves to quote the command line, and
+that line is where the token is.
+
+### 6.8 Refusals
+
+- **No MCP in yog or litany** — §6.1. Not a verb, not a field, not a transport.
+- **No new key in the tool document** — §6.2. The bridge is a `command`.
+- **No live discovery, no auto-advertise, no catalog surface** — §6.3.
+- **No resident server** — §6.4, until a measured cost says otherwise.
+- **No HTTP/SSE transport** — §6.2, until a named deployment.
+- **No class on the wire** — §6.3, §6.6.
+- **No generic passthrough** — §6.6.
+- **No native fetch in thrall or in the engine** — §6.9.
+
+### 6.9 The web tool is the first pinned server
+
+litany bl-4409 asked whether the suite's missing fetch is a native tool or the
+bridge's first server, and asked for the general path to be decided first so
+the specific one is not a second home. It is the first server. A fetch is a
+machine's act and the engine executes none (REMOTE §5.4: *nothing new goes
+into the engine that a thrall could advertise*); a fetch native to thrall
+would be this crate carrying HTTP, HTML-to-markdown and pagination — code
+whose whole subject is the web's quirks, the trusted-computing-base argument
+litany made against an in-process bridge, applied here. The reference
+`mcp-server-fetch` already does all three and needs no credential, which is
+why it is also the acceptance story: litany's §7 Slack swap never ran because
+nobody supplied a workspace token, and a fetch needs none.
+
+So `docs/tools.example.json` gains a `fetch` entry (bl-b6ab), the README says
+it is a pinned server and that its runtime is the operator's to install, and
+a web *search* — which needs a credentialed provider — is the operator's own
+pin, exercising §6.7. `bash` reaching the web is already visible to the
+engine's control (`curl` and `wget` classify open-world in the shipped
+ruleset); what the pinned tool adds is a name in the roster and a row in the
+policy, which is what bl-4409 meant by *visible*.
+
+### 6.10 Children
+
+Four, each one lane-day, tagged `usability-r2`:
+
+1. **thrall bl-e104** — `thrall mcp <tool> -- <server argv>`, the bridge verb
+   (§6.2, §6.4, §6.5).
+2. **thrall bl-b6ab** — `thrall mcp pin`, and the `fetch` example entry (§6.3,
+   §6.9).
+3. **yog bl-b65d** — the `rules:` row keyed on a routed tool's host-qualified
+   name, and the hold sentence that names it (§6.6).
+4. **thrall bl-73db** — the round trip: `mcp-server-fetch` through a yog
+   engine, first call held, row written, page read; the wall time of one
+   fetch recorded against §6.4.
+
+The sibling amendments land beside this section: yog REMOTE §5.4's closing
+paragraph (yog bl-df52) and litany `docs/DESIGN_MCP_BRIDGE.md` §10 (litany
+bl-795c). litany bl-0f26 and bl-4409 and this repo's bl-d5d6 close superseded
+by the four above.
