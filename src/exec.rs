@@ -208,7 +208,13 @@ fn captured(out: &[u8], err: &[u8], exit_code: i32) -> Capture {
 
 /// A refusal this box makes about itself, in the same three facts — so the far
 /// end reads it exactly as it reads a tool that failed, which is what it is.
-fn refused(exit_code: i32, reason: &str) -> Capture {
+///
+/// `pub(crate)` because the bridge ([`mcp`](crate::mcp)) makes the same kind of
+/// refusal about the same kind of event, one register down: it runs AS a tool
+/// and its failures are the tool's. Two spellings of "this box says no, in the
+/// three facts" would drift, and the sentence's `thrall:` prefix is the thing
+/// that must not.
+pub(crate) fn refused(exit_code: i32, reason: &str) -> Capture {
     Capture {
         stdout: String::new(),
         stderr: format!("thrall: {reason}\n"),

@@ -20,6 +20,11 @@
 //! and the [`exec`]utor behind the loop's hand-off, with the [`serve`] read
 //! that starts the whole thing from a data root [`paths`] names (bl-4cda).
 //!
+//! **And the bridge** (DESIGN §6, bl-e104): [`mcp`] is the Model Context
+//! Protocol client — `thrall mcp <tool> -- <server argv>` speaks MCP to a
+//! server on this box and answers as an ordinary tool command, so a bridged
+//! tool is a plain entry of the document above and the engine learns nothing.
+//!
 //! **thrall is complete as a foot at that point** — advertise, wait, execute,
 //! answer — and what remains is what it deliberately is not: it holds no world,
 //! it never listens, it never asks and it never acts.
@@ -31,6 +36,7 @@ pub mod exec;
 pub mod gestures;
 pub mod invocation;
 pub mod json;
+pub mod mcp;
 pub mod paths;
 pub mod run;
 pub mod serve;

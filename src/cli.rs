@@ -76,6 +76,16 @@ pub enum Decided {
     /// entry point performs it, because it is the only thing here that is not
     /// a value.
     Serve,
+    /// **Bridge one call to an MCP server on this box** (DESIGN §6.2): run
+    /// `tool` against the server this argv names. The input arrives on this
+    /// process's stdin, which is why the entry point performs it — reading a
+    /// stream is not a value this file can hand back.
+    Bridge {
+        /// The tool to call, as the server names it.
+        tool: String,
+        /// The server's argv, whole.
+        server: Vec<String>,
+    },
 }
 
 /// The crate's name and version, as the `--version` line.
@@ -95,6 +105,7 @@ advertises what this box offers, waits for work, and posts the captures back.
 It never listens and it never speaks first.
 
 usage: thrall run
+       thrall mcp <tool> -- <server argv...>
        thrall [--version | --help]
 
   run             serve every channel this box is provisioned for: present
@@ -104,6 +115,13 @@ usage: thrall run
                   a channel that cannot be served at all is an exit naming
                   it, and restarting the process belongs to this machine's
                   own supervision.
+  mcp <tool>      call one tool on an MCP server this box can spawn, as an
+                  ordinary tool command: the invocation's input JSON on stdin,
+                  the tool's content on stdout, the exit code the verdict. The
+                  server runs for this one call and is torn down after it. It
+                  is not a verb to type by hand — it is what a `command` in
+                  tools.json names, so a bridged tool is a plain entry and this
+                  box's document gains no key.
   -V, --version   print the name and version
   -h, --help      print this
 
@@ -124,6 +142,15 @@ pub fn run(args: Vec<String>) -> Decided {
     let words: Vec<&str> = args.iter().map(String::as_str).collect();
     match words.as_slice() {
         ["run"] => Decided::Serve,
+        ["mcp", tool, "--", server @ ..] if !server.is_empty() => Decided::Bridge {
+            tool: (*tool).to_owned(),
+            server: server.iter().map(|w| (*w).to_owned()).collect(),
+        },
+        ["mcp", ..] => Decided::Say(Verdict::refused(
+            "mcp takes a tool name, then `--`, then the argv of a server this \
+             box can spawn: thrall mcp fetch -- uvx mcp-server-fetch"
+                .to_string(),
+        )),
         ["--version" | "-V"] => Decided::Say(Verdict::ok(version())),
         ["--help" | "-h"] => Decided::Say(Verdict::ok(usage())),
         [] => Decided::Say(Verdict::refused(
@@ -137,147 +164,4 @@ pub fn run(args: Vec<String>) -> Decided {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{Decided, FAILED, REFUSED, Verdict, run, usage, version};
-
-    /// Build the argument vector the way `main` does, from string literals.
-    fn argv(words: &[&str]) -> Vec<String> {
-        words.iter().map(|w| (*w).to_string()).collect()
-    }
-
-    /// What a run said, for the arguments that decide to say something.
-    fn said(words: &[&str]) -> Verdict {
-        match run(argv(words)) {
-            Decided::Say(verdict) => verdict,
-            Decided::Serve => panic!("{words:?} decided to serve"),
-        }
-    }
-
-    #[test]
-    fn version_names_the_crate_and_its_version() {
-        assert_eq!(version(), format!("thrall {}", env!("CARGO_PKG_VERSION")));
-    }
-
-    #[test]
-    fn usage_leads_with_the_version_line_then_says_what_thrall_is() {
-        let text = usage();
-        assert!(
-            text.starts_with(&version()),
-            "usage did not lead with the version: {text}"
-        );
-        assert!(
-            text.contains("thrall is the foot"),
-            "usage did not say what thrall is"
-        );
-        assert!(
-            text.contains("never speaks first"),
-            "usage dropped the dial-in invariant"
-        );
-    }
-
-    /// The usage names the verb, and names the two files an operator has to
-    /// put on the box by hand — because a foot arrives on a machine whose
-    /// operator did not necessarily choose to install it.
-    #[test]
-    fn usage_names_the_verb_and_what_it_reads() {
-        let text = usage();
-        assert!(text.contains("thrall run"), "{text}");
-        assert!(text.contains("tools.json"), "{text}");
-        assert!(text.contains("wire/workspaces/"), "{text}");
-        assert!(text.contains("dialled again"), "{text}");
-    }
-
-    #[test]
-    fn ok_carries_the_success_code() {
-        let v = Verdict::ok("said".to_string());
-        assert_eq!(v.code, 0);
-        assert_eq!(v.text, "said");
-    }
-
-    #[test]
-    fn every_refusal_names_what_it_refused_and_still_teaches() {
-        // The prefix and the usage are the constructor's, not the call
-        // site's — so this holds for a refusal nobody has written yet.
-        let v = Verdict::refused("that is not a verb".to_string());
-        assert_eq!(v.code, REFUSED);
-        assert_eq!(v.text, format!("thrall: that is not a verb\n\n{}", usage()));
-    }
-
-    /// **A failure carries no usage**, and that is the difference: a refusal is
-    /// about what the caller typed, a failure is about this box or the far end,
-    /// where a usage line is noise in front of the sentence that matters.
-    #[test]
-    fn a_failure_says_only_what_happened() {
-        let v = Verdict::failed("this box holds no channel".to_string());
-        assert_eq!(v.code, FAILED);
-        assert_eq!(v.text, "thrall: this box holds no channel");
-        assert!(!v.text.contains("usage:"), "{}", v.text);
-    }
-
-    #[test]
-    fn both_version_spellings_print_the_version_and_succeed() {
-        for spelling in ["--version", "-V"] {
-            let v = said(&[spelling]);
-            assert_eq!(v.code, 0, "{spelling} did not succeed");
-            assert_eq!(v.text, version(), "{spelling} printed something else");
-        }
-    }
-
-    #[test]
-    fn both_help_spellings_print_the_usage_and_succeed() {
-        for spelling in ["--help", "-h"] {
-            let v = said(&[spelling]);
-            assert_eq!(v.code, 0, "{spelling} did not succeed");
-            assert_eq!(v.text, usage(), "{spelling} printed something else");
-        }
-    }
-
-    /// **The one verb decides to serve, and says nothing.** Serving is not a
-    /// sentence, so it is not a verdict — which is what keeps this file a pure
-    /// function and the entry point a performer.
-    #[test]
-    fn the_verb_decides_to_serve() {
-        assert!(matches!(run(argv(&["run"])), Decided::Serve));
-    }
-
-    #[test]
-    fn a_bare_invocation_refuses_and_names_the_verb() {
-        let v = said(&[]);
-        assert_eq!(v.code, REFUSED);
-        assert!(v.text.contains("`thrall run` is the verb"), "{}", v.text);
-        assert!(
-            v.text.contains("usage: thrall"),
-            "a refusal must still teach: {}",
-            v.text
-        );
-    }
-
-    #[test]
-    fn an_unrecognised_argument_refuses_and_quotes_every_word_of_it() {
-        let v = said(&["seat", "--ws", "Example"]);
-        assert_eq!(v.code, REFUSED);
-        assert!(
-            v.text.contains("unrecognised argument: seat --ws Example"),
-            "the refusal did not name what it refused: {}",
-            v.text
-        );
-        assert!(v.text.contains("usage: thrall"), "{}", v.text);
-    }
-
-    #[test]
-    fn a_recognised_word_with_extra_words_is_not_recognised() {
-        // The match is on the WHOLE argument list, not on a first word, so a
-        // word that would succeed alone refuses when something rides behind
-        // it — rather than silently ignoring the rest.
-        for extra in [["--version", "--now"], ["run", "--now"]] {
-            let v = said(&extra);
-            assert_eq!(v.code, REFUSED);
-            assert!(
-                v.text
-                    .contains(&format!("unrecognised argument: {}", extra.join(" "))),
-                "{}",
-                v.text
-            );
-        }
-    }
-}
+mod tests;

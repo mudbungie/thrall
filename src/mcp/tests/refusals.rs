@@ -1,0 +1,105 @@
+//! **Every way the bridge refuses**, and the sentence each one earns
+//! (split from `tests.rs` at the pre-split band). A refusal is a capture like
+//! any other — three facts and a `thrall:` sentence — because the model at the
+//! far end reads one as it reads a tool that failed, which is what it is.
+
+use super::{answered, bridge, server};
+use serde_json::json;
+
+/// **A server that would not start is a capture**, and the sentence names the
+/// program and nothing else of the argv: a credential lives in that argv, and
+/// a spawn failure loves to quote the command line (DESIGN §6.7).
+#[test]
+fn a_server_that_would_not_start_names_the_program_and_no_more_of_the_argv() {
+    let argv = vec![
+        "/nonexistent/mcp-server".to_owned(),
+        "--the-argv-tail".to_owned(),
+    ];
+    let capture = bridge("fetch", &argv, "{}");
+    assert_eq!(capture.exit_code, 1);
+    assert_eq!(capture.stdout, "");
+    assert!(
+        capture.stderr.contains("/nonexistent/mcp-server"),
+        "{capture:?}"
+    );
+    assert!(capture.stderr.contains("would not start"), "{capture:?}");
+    assert!(
+        !capture.stderr.contains("the-argv-tail"),
+        "the sentence quoted the argv past its first word: {capture:?}"
+    );
+}
+
+/// An argv with no program in it is refused before anything is spawned.
+#[test]
+fn an_empty_server_argv_is_refused() {
+    let capture = bridge("fetch", &[], "{}");
+    assert_eq!(capture.exit_code, 1);
+    assert!(capture.stderr.contains("argv is empty"), "{capture:?}");
+}
+
+/// A server that leaves without answering is the wire's own silence, named at
+/// the stage it fell over.
+#[test]
+fn a_server_that_ends_before_the_handshake_says_which_stage() {
+    let capture = bridge("fetch", &server("exit 0"), "{}");
+    assert_eq!(capture.exit_code, 1);
+    assert!(
+        capture.stderr.contains("ended before answering initialize"),
+        "{capture:?}"
+    );
+}
+
+/// stdout is the transport, so a line that is not JSON is not a diagnostic —
+/// it is a protocol violation, and it refuses naming the stage.
+#[test]
+fn a_line_that_is_not_json_refuses_at_the_stage_it_arrived() {
+    let capture = bridge("fetch", &server("printf 'starting up\\n'"), "{}");
+    assert_eq!(capture.exit_code, 1);
+    assert!(
+        capture.stderr.contains("not JSON, answering initialize"),
+        "{capture:?}"
+    );
+}
+
+/// A JSON-RPC error answers in the server's own words.
+#[test]
+fn an_error_on_the_call_carries_the_servers_own_sentence() {
+    let capture = answered(
+        &json!({"jsonrpc": "2.0", "id": 2,
+                "error": {"code": -32602, "message": "unknown tool: fetch"}})
+        .to_string(),
+    );
+    assert_eq!(capture.exit_code, 1);
+    assert!(
+        capture
+            .stderr
+            .contains("refused tools/call: unknown tool: fetch"),
+        "{capture:?}"
+    );
+}
+
+/// A response that is neither a result nor an error is refused in this box's
+/// words, because the server offered none.
+#[test]
+fn a_response_carrying_neither_result_nor_error_is_refused() {
+    let capture = answered(&json!({"jsonrpc": "2.0", "id": 2}).to_string());
+    assert_eq!(capture.exit_code, 1);
+    assert!(
+        capture
+            .stderr
+            .contains("it sent neither a result nor an error"),
+        "{capture:?}"
+    );
+}
+
+/// The input is the object the model produced, whole — so anything that is not
+/// an object, and anything that is not JSON at all, is refused before a server
+/// is spawned.
+#[test]
+fn input_that_is_not_a_json_object_is_refused_before_anything_is_spawned() {
+    for (input, said) in [("", "not JSON"), ("[1, 2]", "not a JSON object")] {
+        let capture = bridge("fetch", &server("exit 0"), input);
+        assert_eq!(capture.exit_code, 1, "{input:?}");
+        assert!(capture.stderr.contains(said), "{input:?}: {capture:?}");
+    }
+}

@@ -833,9 +833,9 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/test_support.rs` | `cfg(test)` only. The scratch directory, the fork lock, the stand-in engine, the recording notice sink (§3.7 — a serving foot writes to stderr, and a test cannot read that back), and the certificate mint the suite performs on the operator's behalf. |
 | `src/packaged_tests.rs` | `cfg(test)` only. **The publication guard** (bl-d25a): what `cargo publish` would upload, read off the real `cargo package --list` and judged against the classes `Cargo.toml`'s `include` allowlist rules in — both directions, since a shape guard dies by matching nothing. It is in `src` rather than a `tests/` crate because it forks a child and the spawn boundary is `pub(crate)`; an integration crate could only reach a bare `Command::new`, which the confinement rules refuse. |
 
-| `src/mcp.rs` | **The bridge verb** (§6.2, bl-e104): `thrall mcp <tool> -- <server argv>`, an ordinary tool command whose program is this binary — input on stdin, the server spawned through the boundary, one `tools/call`, the capture on stdout, the server torn down. Unbuilt. |
-| `src/mcp/rpc.rs` | The stdio transport and the three requests a bridge makes — `initialize`, `tools/list`, `tools/call` — as strict hand-read frames in `json.rs`'s style. Unbuilt (bl-e104). |
-| `src/mcp/render.rs` | Content parts to capture bytes (§6.5): text in order, structured content as its JSON, a non-text part as one line naming what was dropped. Unbuilt (bl-e104). |
+| `src/mcp.rs` | **The bridge verb** (§6.2, bl-e104): `thrall mcp <tool> -- <server argv>`, an ordinary tool command whose program is this binary — input on stdin, the server spawned through the boundary, one `tools/call`, the capture on stdout, the server torn down. Its answer is an `invocation::Capture` and not a `cli::Verdict`, because it is being run AS a tool: the three facts are what the executor at the far end will post, and a failure still writes to stdout. |
+| `src/mcp/rpc.rs` | The stdio transport and the requests a bridge makes — `initialize`, `tools/call`, and `tools/list` for the pin — as strict hand-read frames in `json.rs`'s style. The teardown is a `Drop`, so no early return can skip it. |
+| `src/mcp/render.rs` | Content parts to capture bytes (§6.5): text in order, structured content as its JSON, a non-text part as one line naming what was dropped. |
 | `src/mcp/pin.rs` | **The operator verb** (§6.3, bl-b6ab): `thrall mcp pin -- <server argv>` — one `tools/list`, printed as complete document entries for the operator to paste, annotations on stderr, nothing written. Unbuilt. |
 
 **There is no flat material root, and its absence is a simplification rather
@@ -985,12 +985,24 @@ entry:
 ```
 
 **The document gains no key.** `config::read`, the advertisement projection,
-`exec` and its deadline are untouched; the server is the tool's child and so
-inside the process group the cascade already signals (§3.5), and deleting the
-entry deletes the capability (§3.4). One invocation: read the input from
-stdin, spawn the server through the spawn boundary, `initialize`, one
-`tools/call {name, arguments: input}`, render, exit, tear down. Contract and
-tests are bl-e104's body.
+`exec` and its deadline are untouched, and deleting the entry deletes the
+capability (§3.4). One invocation: read the input from stdin, spawn the server
+through the spawn boundary, `initialize`, one `tools/call {name, arguments:
+input}`, render, exit, tear down. Contract and tests are bl-e104's body.
+
+**The teardown is the bridge's own act and not the executor's** (amended by
+bl-e104; the section as ruled said the server sat inside the process group the
+§3.5 cascade already signals, and that is not what the boundary does). Every
+child built at `spawn::command` is born LEADING a group of its own — the
+server included — so a cascade aimed at the bridge's group does not reach the
+server's. The bridge therefore performs §3.5's cascade itself, one register
+down and on its own subject: close the server's stdin, which is the stdio
+transport's own shutdown and what a well-behaved server leaves on; wait a
+grace; then signal the server's group unconditionally, so a helper the server
+started cannot outlive the invocation either. The one case that reaches past
+it is the bridge being killed outright rather than asked, where no teardown of
+any kind runs — and there the closed stdin is what the server sees, which is
+the same end of file it was going to be asked with.
 
 **Transport is stdio and only stdio.** A remote or HTTP server, and any OAuth
 flow, is refused until a named deployment needs a specific one — and when it
