@@ -65,15 +65,15 @@ use super::{Failure, frame};
 /// **Most bumps are not a foot's business, and it can still not dial across a
 /// single one of them.** Of everything past 2, exactly one touched this crate's
 /// own surface — 8 (yog bl-66d4), the required `wrote` on `reply/advertised`.
-/// 3 through 7 and 9 through 15 moved seat-facing shapes this crate never
+/// 3 through 7 and 9 through 16 moved seat-facing shapes this crate never
 /// decodes, and 10 moved no field at all (`attention` became follow-class). The
 /// preface is one integer compared for equality, so the version states the
 /// engine's *build* and never which frames this end happens to read — which is
-/// why this constant has now drifted four times (bl-e0f0, bl-f88f, bl-dc5f,
-/// bl-605f) with the suite
+/// why this constant has now drifted five times (bl-e0f0, bl-f88f, bl-dc5f,
+/// bl-605f, bl-44b4) with the suite
 /// green: nothing on this side of the socket can see the far end move, and a
 /// real dial is the only thing that meets the skew.
-pub const PROTOCOL: u32 = 15;
+pub const PROTOCOL: u32 = 16;
 
 /// The preface's one key, and the whole of its shape.
 const KEY: &str = "protocol";

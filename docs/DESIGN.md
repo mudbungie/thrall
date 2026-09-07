@@ -414,7 +414,7 @@ naming both versions**. A foot and an engine that disagree about the wire must
 not discover it one field at a time.
 
 The version moves in lockstep with the engine's, and the engine's corpus
-ledger is what forces a move. **The pin is 15** (bl-605f), and a foot's own
+ledger is what forces a move. **The pin is 16** (bl-44b4), and a foot's own
 surface moved exactly twice on the way there: PROTOCOL 2 (bl-36f7) is the
 worktree lane's bump — the advertised element gained `subject_cwd` and the
 invocation gained `cwd`, both optional, both a change to a shape already in
@@ -427,18 +427,22 @@ losing `auth_failed` (9), `attention` becoming follow-class with **no field
 moving at all** (10), `reply/ops`' failure readings (11), the queue row's
 `says` (12), `reply/config`'s `settings` (13), `request/enroll`'s optional
 `address` beside `reply/clients`' optional `last_seen` (14),
-`reply/follow`'s tool window (15). **A foot could dial across none
+`reply/follow`'s tool window (15), `reply/ops`' rows gaining `client` (16).
+**A foot could dial across none
 of them**, because the preface is one integer compared for equality — the
 version states the engine's *build*, never which frames this end reads. So
 every vendored frame in §4's corpus is byte for byte the text it was at 8: the
-re-vendors for 13, 14 and 15 moved the equality and nothing else.
+re-vendors for 13, 14, 15 and 16 moved the equality and nothing else.
 
 **And the pin drifting is the ordinary case, not an accident.** It has now
-gone stale FOUR times with the suite green (bl-e0f0 at 2, bl-f88f at 8,
-bl-dc5f at 13, bl-605f at 14), and the interval is collapsing rather than
-lengthening: the last two are ONE SESSION apart — bl-dc5f's pin was stale
-before its own release finished publishing, because the engine published in the
-window bl-dc5f was waiting in. Thirteen of the fifteen bumps are invisible to
+gone stale FIVE times with the suite green (bl-e0f0 at 2, bl-f88f at 8,
+bl-dc5f at 13, bl-605f at 14, bl-44b4 at 15), and the interval is collapsing
+rather than
+lengthening: three of the five fall inside two sessions — bl-dc5f's pin was
+stale before its own release finished publishing, because the engine published
+in the window bl-dc5f was waiting in, and bl-44b4 was filed off a clean-room
+install of the published foot meeting a published engine one further version
+on. Fourteen of the sixteen bumps are invisible to
 this crate by construction — a
 foot's surface is small, so it is *usually* a version behind on shapes it does
 not read, and *always* unable to dial while it is. Nothing on this side of the
