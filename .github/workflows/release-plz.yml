@@ -135,11 +135,20 @@ name: Release-plz
 # That is the exact job `release-plz-release` gates on, so the merge gate and
 # the publish gate cannot disagree, and it is deliberately NOT the release
 # PR's own checks: THOSE NEVER RUN IN THIS REPOSITORY. Every `pull_request` CI
-# run on a `release-plz-*` head here has been created in `action_required` and
-# has never started a single job — three of them across the two release PRs
-# this repository has had, the last created a full day before its PR was merged
-# by hand and still unrun at that moment. A merge gated on the PR's own checks,
-# or on its check rollup, would therefore merge nothing, forever.
+# run on a `release-plz-*` head here is created in `action_required` and never
+# starts a single job — the PR is opened by `GITHUB_TOKEN`, and GitHub does not
+# run workflows for events that token triggers. A merge gated on the PR's own
+# checks, or on its check rollup, would therefore merge nothing, forever.
+#
+# **And such a run does not stay quiet: it ends RED** (bl-f3f2). Deleting the
+# head ref takes away the tree the run would have had to check out, so the run
+# flips from waiting to `failure` with zero jobs about a second later — measured
+# on every release this repository has cut, including one that sat waiting for a
+# full day and reddened the second its PR was merged by hand. That is a
+# permanent red per release standing beside the real ones, so the merge step
+# collects those runs on its way past. Its guard is zero jobs, which makes it
+# self-retiring: set `RELEASE_PLZ_TOKEN` and the runs start executing for real,
+# and the step stops matching anything.
 #
 # `ci` judges THIS run's commit, and the release PR is a bump on top of exactly
 # that commit: release-plz rebases the release branch onto `main` on every push
@@ -391,6 +400,34 @@ jobs:
             fi
             printf 'PR %s  merging: version bump on the gated %s  [merge state %s]\n' \
               "$number" "${GATED_SHA:0:8}" "$state"
+            # The pull request's OWN CI run, collected before the merge takes
+            # away the ref it would have needed (bl-f3f2). It was created when
+            # the PR opened, it has never been approved to start a single job —
+            # the PR is the Actions bot's, and GitHub creates such runs in
+            # `action_required` — and the `--delete-branch` below removes the
+            # head, at which point it concludes FAILURE with zero jobs about a
+            # second later. Every release this repository has cut left one
+            # standing red (PRs #4-#8 are five in a row), and a permanent red
+            # per release is exactly how a real one goes unnoticed.
+            #
+            # The tree those runs would have judged is judged by `ci` in THIS
+            # run, which is the gate this job already hangs on, so nothing is
+            # lost by collecting them. **The guard is ZERO JOBS and nothing
+            # else**: a run that started a job holds a verdict worth keeping, so
+            # if `RELEASE_PLZ_TOKEN` is ever set and these runs begin to execute
+            # for real, this step finds nothing and deletes nothing. It retires
+            # itself rather than having to be retired.
+            for run in $(gh api "repos/$GH_REPO/actions/runs?head_sha=$sha&event=pull_request" \
+                            -q '.workflow_runs[].id'); do
+              ran="$(gh api "repos/$GH_REPO/actions/runs/$run/jobs" -q '.total_count')"
+              if [ "${ran:-1}" -eq 0 ]; then
+                printf 'PR %s  deleting run %s: zero jobs, and its head ref is about to go\n' \
+                  "$number" "$run"
+                gh api -X DELETE "repos/$GH_REPO/actions/runs/$run"
+              else
+                printf 'PR %s  keeping run %s: it ran %s job(s)\n' "$number" "$run" "$ran"
+              fi
+            done
             gh pr merge "$number" --merge --delete-branch
             printf 'PR %s  merged\n' "$number"
             merged=$((merged + 1))
