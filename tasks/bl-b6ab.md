@@ -1,7 +1,8 @@
 +++
 title = "thrall mcp pin -- <server argv>: discover once, at operator time, and print the entries the operator vouches for; the fetch server is the shipped example"
 created = 1788744423
-updated = 1788744423
+updated = 1788745649
+claimant = "Cantaloups-T3"
 priority = 2
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
 tags = ["usability-r2"]
