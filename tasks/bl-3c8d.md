@@ -1,7 +1,7 @@
 +++
 title = "the MCP bridge fails its own first call on every box: a launcher's cold-cache chatter is read as the server's framing, the diagnosis names the launcher, and the failure exits 0"
 created = 1788745783
-updated = 1788745787
+updated = 1788745812
 priority = 3
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
 tags = ["usability-r2"]
@@ -49,3 +49,11 @@ p2 for the exit code (a failure reported as a success is the one class the route
 ## What this lane also confirmed
 
 The bridge answers the two gaps round 1 ranked G1 and G2 — "there is no web" and "no MCP, and the door is nailed shut" — and it answers them at the foot, exactly as DESIGN §6 rules. Recorded in the round-2 comparator report as the largest single delta in the matrix.
+
+---
+
+Point 1 has landed, in bl-b6ab (ed079a9), and the fix is WIDER than the remedy this ball proposes — on evidence this lane hit independently while pinning the same server. The transport now skips anything that is not the answer to the request in flight, a line that is not JSON included, at every stage rather than only before the first frame. 'Leading lines only' would not have covered the sighting here: the node helper mcp-server-fetch bootstraps on a box's first fetch writes its package-manager warnings to the stdout it inherited DURING tools/call, i.e. after a valid frame had already arrived. So the rule is the general one the reply loop already had — read until the answer arrives; what is not it is not this end's to read — with the special case that sat inside it removed. Nothing is lost: a program that speaks no MCP at all still ends without answering, which is the sentence that helps. Nothing is said on stderr about a skipped line either: it was never a message, and a server's own words belong on the stderr it inherits, which reaches the capture already. DESIGN 6.2 and 6.9 carry the reasoning.
+
+Point 2 STANDS and is now the whole ball: the sentences that remain ('ended before answering <stage>', 'refused <stage>: <the server's words>') still name the argv head, which is the launcher and not the server. Note the constraint whoever fixes it works under — DESIGN 6.7 forbids quoting the argv past its first word, because a credential lives in that argv, so 'name the whole argv' is not available. The tool name the operator typed is, and src/mcp/rpc.rs already holds it at the call site.
+
+Point 3 was withdrawn by the filer and this lane confirms the withdrawal: the capture the bridge answers with is written stdout-to-stdout, stderr-to-stderr, exit code as-is (src/main.rs), and every failure in this leg is exit 1.
