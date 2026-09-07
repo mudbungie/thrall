@@ -1,6 +1,7 @@
 .PHONY: all build release test coverage lint fmt fmt-check check ci \
         line-cap leak-scan rules-audit deny install-hooks install uninstall \
-        image image-scan mac-artifact clean
+        image image-scan mac-artifact clean \
+        deploy deploy-local deploy-status deploy-selftest
 
 # The build authority. Every gate step has ONE home here, and every caller
 # calls the same targets — the pre-commit hook, a hand-run `make check`, and
@@ -222,31 +223,53 @@ install-hooks:
 # then `mv -f` it into place. A supervisor restarting mid-install then sees
 # whole-old or whole-new, never the ENOENT window install(1) opens between its
 # unlink and its write.
-# --- deployment (bl-6c98) ---------------------------------------------------
-# Seat THIS box on the foot unit and the crates.io reconciler: a `thrall.service`
+# --- deployment (bl-6c98; the remote carrier is bl-605f) ---------------------
+# Seat a box on the foot unit and the crates.io reconciler: a `thrall.service`
 # systemd user unit, an hourly `thrall-reconcile.timer`, and lingering so both
-# outlive a logout. No ssh, no image, no parameter — every fact about the box is
-# the box's own, so pointing this at a second box is a different checkout rather
-# than an edit, and a box that should stop tracking releases is one
+# outlive a logout.
+#
+#   make deploy-local            # seat THIS box
+#   make deploy HOST=<ssh-host>  # seat that one
+#
+# ONE payload, two carriers, and both targets run the same script — the local
+# form is not a second recipe, because two statements of one seating drift and
+# the copy that drifts is the one nobody re-reads. HOST is an ssh destination
+# and the only parameter: no address, account or machine name is committed
+# anywhere in this tree, and a box that should stop tracking releases is one
 # `systemctl --user disable` away with no file here to change.
 #
-# It refuses a box that is not provisioned. `tools.json` and at least one
-# channel under `wire/workspaces/` are operator-authored and thrall never writes
-# them; without them the unit would crash-loop into `failed` behind a seating
-# that reported success.
+# The remote form is the door for the box class that most needs a foot — the
+# always-on server, awake when the laptop is not and the only box that can act
+# on itself — which could not be seated at all until bl-605f. The local form is
+# the door for the box that is running no sshd and cannot ssh to itself.
 #
-# `scripts/deploy/local.sh` and `scripts/deploy/reconcile.sh` carry the
-# reasoning, including why the idle read is the unit's own cgroup here and the
-# §8.5 boundary on yog's engine.
+# Nothing is compiled here and no build is carried: a foot's unit of install is a
+# published version and the box installs it from crates.io on its own schedule.
+# It refuses a box that is not provisioned — `tools.json` and at least one
+# channel under `wire/workspaces/` are operator-authored and thrall never writes
+# them — and a target with no cargo, which could hold a binary but never pick up
+# a release.
+#
+# `scripts/deploy/seat.sh` and `scripts/deploy/reconcile.sh` carry the reasoning,
+# including why the idle read is the unit's own cgroup here and the §8.5 boundary
+# on yog's engine.
 deploy-local:
-	@scripts/deploy/local.sh
+	@scripts/deploy/seat.sh
 
-# What this box is running right now, and whether it is still upgrading itself.
+deploy:
+	@[ -n "$(HOST)" ] || { echo "usage: make deploy HOST=<ssh-host>" >&2; exit 2; }
+	@scripts/deploy/seat.sh "$(HOST)"
+
+# What a box is running right now, and whether it is still upgrading itself.
+# With no HOST it answers for THIS box. One recipe, the same two carriers as the
+# seating, and it reads the path the UNIT execs rather than an INSTALL_PREFIX
+# override — what is installed for a contributor is not what the foot is running.
 deploy-status:
-	@systemctl --user --no-pager --lines=0 status thrall.service; \
-	 echo; "$(INSTALL_BIN)/thrall" --version 2>/dev/null; \
-	 echo; systemctl --user --no-pager list-timers thrall-reconcile.timer; \
-	 echo; journalctl --user -u thrall.service --no-pager -n 15
+	@cmd='systemctl --user --no-pager --lines=0 status thrall.service; \
+	  echo; "$$HOME/.local/bin/thrall" --version 2>/dev/null; \
+	  echo; systemctl --user --no-pager list-timers thrall-reconcile.timer; \
+	  echo; journalctl --user -u thrall.service --no-pager -n 15'; \
+	if [ -n "$(HOST)" ]; then ssh -n "$(HOST)" "$$cmd"; else sh -c "$$cmd"; fi
 
 # The reconciler's regression half, in the gate: it drives the real
 # `reconcile.sh` under a fake curl, cargo and systemctl, both directions, and

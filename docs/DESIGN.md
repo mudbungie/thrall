@@ -414,7 +414,7 @@ naming both versions**. A foot and an engine that disagree about the wire must
 not discover it one field at a time.
 
 The version moves in lockstep with the engine's, and the engine's corpus
-ledger is what forces a move. **The pin is 14** (bl-dc5f), and a foot's own
+ledger is what forces a move. **The pin is 15** (bl-605f), and a foot's own
 surface moved exactly twice on the way there: PROTOCOL 2 (bl-36f7) is the
 worktree lane's bump — the advertised element gained `subject_cwd` and the
 invocation gained `cwd`, both optional, both a change to a shape already in
@@ -426,18 +426,20 @@ keys (5), `reply/providers`' `effort` and `priority` (6), `reply/help`'s
 losing `auth_failed` (9), `attention` becoming follow-class with **no field
 moving at all** (10), `reply/ops`' failure readings (11), the queue row's
 `says` (12), `reply/config`'s `settings` (13), `request/enroll`'s optional
-`address` beside `reply/clients`' optional `last_seen` (14). **A foot could
-dial across none
+`address` beside `reply/clients`' optional `last_seen` (14),
+`reply/follow`'s tool window (15). **A foot could dial across none
 of them**, because the preface is one integer compared for equality — the
 version states the engine's *build*, never which frames this end reads. So
 every vendored frame in §4's corpus is byte for byte the text it was at 8: the
-re-vendors for 13 and 14 moved the equality and nothing else.
+re-vendors for 13, 14 and 15 moved the equality and nothing else.
 
 **And the pin drifting is the ordinary case, not an accident.** It has now
-gone stale three times with the suite green (bl-e0f0 at 2, bl-f88f at 8,
-bl-dc5f at 13), and the interval is shrinking rather than lengthening — the
-last two are hours apart, on one day's release train. Twelve of the fourteen
-bumps are invisible to this crate by construction — a
+gone stale FOUR times with the suite green (bl-e0f0 at 2, bl-f88f at 8,
+bl-dc5f at 13, bl-605f at 14), and the interval is collapsing rather than
+lengthening: the last two are ONE SESSION apart — bl-dc5f's pin was stale
+before its own release finished publishing, because the engine published in the
+window bl-dc5f was waiting in. Thirteen of the fifteen bumps are invisible to
+this crate by construction — a
 foot's surface is small, so it is *usually* a version behind on shapes it does
 not read, and *always* unable to dial while it is. Nothing on this side of the
 socket can close that: a fixture cannot see the far end, so the corpus test
@@ -793,6 +795,20 @@ operational:
   hour with nobody logging in to either machine. Before bl-6c98 the foot half of
   that sentence was not true, and §3.6's ruling rested on a schedule that did
   not exist on this side.
+- **The seating must reach a box nobody is logged in to** (bl-605f). bl-6c98's
+  recipe seated the box it was run on and had no other form, so a foot could be
+  deployed only by a human at that machine's own keyboard — which is backwards
+  for the box class the paragraphs above are about. The always-on server is
+  awake when a laptop is not, and it is the only box that can execute anything
+  ON ITSELF; a deployment whose engine ran there while the only foot certificate
+  it held was issued for a laptop could act on nothing most of the time and on
+  its own machine never, with neither end able to say so. So `seat.sh` carries
+  ONE payload over two carriers — `put` and `run` are the whole of what a HOST
+  changes — and the local form stays for the box running no sshd, which cannot
+  ssh to itself. The preflight moves with the payload: every refusal above is
+  asked of the TARGET, and a target with no toolchain is refused too, because
+  the unit of install is a published version and a box that cannot install one
+  can hold a foot but never a deployment.
 
 ## 4. Module map
 

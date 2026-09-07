@@ -564,20 +564,36 @@ the far end of one of its channels holding a foot certificate issued for it, and
 no thrall process running at all — an engine with no live foot, with nothing
 anywhere saying so.
 
-    make deploy-local        # seat THIS box: unit, reconciler, timer, first pass
-    make deploy-status       # what this box runs and when it next looks
+    make deploy-local             # seat THIS box: unit, reconciler, timer, first pass
+    make deploy HOST=<ssh-host>   # seat that one
+    make deploy-status [HOST=…]   # what a box runs and when it next looks
 
-**No parameter and no ssh.** Every fact about the box is the box's own — the
-tool document and the channel directories are already there, put by the
-operator's hand and never by thrall — so pointing this at a second box is a
-different checkout, not an edit, and a box that should stop tracking releases is
-one `systemctl --user disable` away with no file in this tree to change. No
-address, account or machine name is committed anywhere here.
+**One payload, two carriers** (bl-605f). The files and the arming commands are
+spelled once in `scripts/deploy/seat.sh` and do not know which way they arrived;
+only `put` and `run` differ. HOST is an ssh destination and the only parameter,
+so pointing this at a second box is a different argument rather than an edit, and
+no address, account or machine name is committed anywhere here. A box that should
+stop tracking releases is one `systemctl --user disable` away, with no file in
+this tree to change.
 
-It **refuses a box that is not provisioned**. `tools.json` and at least one
-channel are the two things thrall reads, and a foot without them refuses at
-every start; seating over that would be a unit crash-looping into `failed`
-behind a report of success.
+**The remote form is the door for the box class that most needs a foot.** Until
+bl-605f a foot could be deployed only by a human logged in to the machine that
+would run it, which is exactly backwards: the always-on server is awake when a
+laptop is not, and it is the only box that can act on ITSELF. A deployment whose
+engine ran there while its only foot certificate was issued for somebody's
+laptop could execute nothing most of the time and could never look at its own
+box — and **neither end could say so**, because a foot that is not running is
+indistinguishable from a foot that has not spoken lately (§3.7) and the engine
+may not probe (§3.1). The local form stays the door for the box running no sshd,
+which cannot ssh to itself.
+
+It **refuses a box that is not provisioned**, and every check runs on the TARGET.
+`tools.json` and at least one channel are the two things thrall reads, and a foot
+without them refuses at every start; seating over that would be a unit
+crash-looping into `failed` behind a report of success. It also refuses a target
+with no `cargo`: the box installs its own releases from crates.io, so a box with
+no toolchain can hold a foot binary but can never pick up the next version, and
+arming a timer that could never install anything would report CD it cannot do.
 
 | what | where it lands |
 |---|---|
@@ -586,8 +602,8 @@ behind a report of success.
 | `scripts/deploy/thrall-reconcile.service` | `~/.config/systemd/user/` — oneshot, `Nice=19`, idle IO and CPU |
 | `scripts/deploy/thrall-reconcile.timer` | `~/.config/systemd/user/` — hourly, `Persistent=true` |
 
-Nothing is compiled by the seating and nothing is carried onto the box: it
-installs from crates.io on its own schedule from then on. A foot's unit of
+Nothing is compiled by the seating and nothing is carried onto the box but those
+four text files: it installs from crates.io on its own schedule from then on. A foot's unit of
 install is a **published version**, and the registry already serves it.
 
 **What supervision is and is not for.** A channel that drops is dialled again by
@@ -636,7 +652,7 @@ back, with nobody logging in. That is why the install passes an explicit
 `--version` with `--force` — `cargo install` refuses to go backwards otherwise.
 
 **The seating refuses a protocol mismatch rather than reporting success over
-it.** `is-active` says a process exists, not that it is a foot, and thrall
+it, and never claims service it cannot establish.** `is-active` says a process exists, not that it is a foot, and thrall
 writes no line when a channel opens — so the positive cannot be read from the
 journal. The one refusal that can be is a **wire protocol mismatch** (§3.6):
 every other failure there is transient by construction, and a mismatch is
@@ -644,6 +660,16 @@ fail-closed by design and resolves only when one of the two components
 publishes. A box in that state has a seated timer and no foot, and the deploy
 says so. The units stay armed, because that is what makes it self-healing: the
 box adopts the fix by itself on the next tick after the release.
+
+A dial that has simply not landed yet — an engine that is down, a listener not
+yet up, a name that has not resolved — is the opposite case and is reported as a
+**notice**: it is transient by construction, §3.8's backoff is what it is for,
+and the units are right where they should be. It earned its own arm the first
+time this script was run against a real server (bl-605f), where the foot was
+redialling a refused port and the last line said "serving" — the exact blindness
+the paragraph above exists to refuse, arriving through the one arm that had no
+case. The last line now says what can be established (which version is running,
+and that the box tracks releases) and not what cannot.
 
 **`make deploy-selftest` is the regression half and runs in `make lint`.** It
 drives the real reconciler under a fake `curl`, `cargo` and `systemctl` in a

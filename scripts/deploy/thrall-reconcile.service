@@ -1,5 +1,5 @@
 # The unattended reconcile pass (bl-6c98) — one run of
-# `scripts/deploy/reconcile.sh`, which `local.sh` installs at
+# `scripts/deploy/reconcile.sh`, which `seat.sh` installs at
 # `%h/.local/bin/thrall-reconcile`. The timer beside this file is the cadence;
 # this unit is one question asked once.
 #

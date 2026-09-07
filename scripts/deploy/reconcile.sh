@@ -1,6 +1,6 @@
 #!/bin/sh
-# **Unattended foot CD** (bl-6c98) — the timer-driven half of `local.sh`'s
-# deployment. `local.sh` is a human at a keyboard; this runs on the box with
+# **Unattended foot CD** (bl-6c98) — the timer-driven half of `seat.sh`'s
+# deployment. `seat.sh` is a human at a keyboard; this runs on the box with
 # nobody there.
 #
 #   reconcile.sh                # from thrall-reconcile.service, hourly

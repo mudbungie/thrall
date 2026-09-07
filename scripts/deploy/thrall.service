@@ -1,5 +1,5 @@
 # The foot as a user service (README "Status"; yog `docs/REMOTE.md` §12) — the
-# unit `scripts/deploy/local.sh` seats.
+# unit `scripts/deploy/seat.sh` seats.
 #
 # `thrall run` serves every channel this box is provisioned for and does not
 # return while a channel is up. A channel that drops is dialled again by the
@@ -22,7 +22,7 @@
 # execs.
 #
 # Requires lingering (`loginctl enable-linger`) or the manager — and so the foot
-# — stops at logout. `scripts/deploy/local.sh` enables it.
+# — stops at logout. `scripts/deploy/seat.sh` enables it.
 [Unit]
 Description=thrall foot
 Documentation=https://github.com/mudbungie/thrall
