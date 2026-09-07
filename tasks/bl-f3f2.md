@@ -1,7 +1,8 @@
 +++
 title = "every release PR leaves a permanently red CI / pull_request run: auto-merge deletes the head branch seconds after the PR opens, and release-plz.yml's header still says those runs never started a job"
 created = 1788674753
-updated = 1788674753
+updated = 1788745681
+claimant = "Cantaloups-T2"
 priority = 3
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
 tags = ["usability-r2"]
