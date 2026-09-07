@@ -430,7 +430,7 @@ naming both versions**. A foot and an engine that disagree about the wire must
 not discover it one field at a time.
 
 The version moves in lockstep with the engine's, and the engine's corpus
-ledger is what forces a move. **The pin is 17** (bl-272d), and a foot's own
+ledger is what forces a move. **The pin is 18** (bl-dc8a), and a foot's own
 surface moved exactly twice on the way there: PROTOCOL 2 (bl-36f7) is the
 worktree lane's bump — the advertised element gained `subject_cwd` and the
 invocation gained `cwd`, both optional, both a change to a shape already in
@@ -444,20 +444,29 @@ moving at all** (10), `reply/ops`' failure readings (11), the queue row's
 `says` (12), `reply/config`'s `settings` (13), `request/enroll`'s optional
 `address` beside `reply/clients`' optional `last_seen` (14),
 `reply/follow`'s tool window (15), `reply/ops`' rows gaining `client` (16),
-and the §6 signal vocabulary gaining the word `truncated` beside a delivered
-row's optional `sender_name` / `from_name` (17) — the first of which moves no
-field at all, being a new VALUE a strict decoder built against 16 refuses by
-name, so the shape ledger cannot see it and the NUMBER is the authority.
+the §6 signal vocabulary gaining the word `truncated` beside a delivered
+row's optional `sender_name` / `from_name` (17), and **three shapes on one
+number** at 18 — `reply/follow`'s tool-window entry gaining `held` (yog
+bl-58bb), `reply/steps`' `framing` gaining a fourth word `in_flight` (yog
+bl-ab53), and `request/answer` with `reply/answered` gaining `scope` (yog
+bl-94a5), batched deliberately because under the release hold each extra
+number is another window in which no published suite composes. Two of those
+move no field at all, being new VALUES a strict decoder built against the
+previous number refuses by name, so the shape ledger cannot see them and the
+NUMBER is the authority.
 **A foot could dial across none
 of them**, because the preface is one integer compared for equality — the
 version states the engine's *build*, never which frames this end reads. So
 every vendored frame in §4's corpus is byte for byte the text it was at 8: the
-re-vendors for 13, 14, 15, 16 and 17 moved the equality and nothing else.
+re-vendors for 13, 14, 15, 16, 17 and 18 moved the equality and nothing else —
+at 18 that was re-established by comparing all seven foot-decoded shapes
+against the engine's `corpus/` frame by frame, which found thirteen frames
+identical and every stamp unmoved (2/1/1/8/2/1/1).
 
 **And the pin drifting is the ordinary case, not an accident.** It has now
-gone stale SIX times with the suite green (bl-e0f0 at 2, bl-f88f at 8,
-bl-dc5f at 13, bl-605f at 14, bl-44b4 at 15, bl-272d at 16), and the interval
-is collapsing
+gone stale SEVEN times with the suite green (bl-e0f0 at 2, bl-f88f at 8,
+bl-dc5f at 13, bl-605f at 14, bl-44b4 at 15, bl-272d at 16, bl-dc8a at 17), and
+the interval is collapsing
 rather than
 lengthening: four of the six fall inside three sessions — bl-dc5f's pin was
 stale before its own release finished publishing, because the engine published
@@ -468,7 +477,7 @@ dial**: a mismatch now exits instead of retrying (yog bl-5d62), so the foot
 walked its restart limit and `thrall.service` sat `failed` on both live boxes
 until the pin moved. And 16 was never an engine anyone could have met — yog
 published 15, then 17, so this crate's previous pin named a build that exists
-only on yog's `main`. Fifteen of the seventeen bumps are invisible to
+only on yog's `main`. Sixteen of the eighteen bumps are invisible to
 this crate by construction — a
 foot's surface is small, so it is *usually* a version behind on shapes it does
 not read, and *always* unable to dial while it is. Nothing on this side of the
@@ -478,6 +487,19 @@ neither is a mechanism this repo can install. The pin moves on the release
 train, after yog and before a foot is shipped; and the skew, when an operator
 does meet it, must arrive as a sentence that ends the channel rather than a
 retry — a fact only a new binary can change is not something to wait on.
+
+**bl-dc8a is the first of the seven that no operator paid for**, and the only
+thing that made it so was doing it in the order yog `docs/REMOTE.md` §3 already
+writes down: *the consumers' mains carry the number first, then yog publishes,
+then the consumers publish.* Landing the constant on `main` is held by neither
+gate — it is what yog's release hold (yog bl-bca2) waits for — so the move can
+always be made against yog's `main` rather than against a published engine, and
+the six before it were made against a published engine only because nothing
+prompted them until a unit failed. Nothing here can OBSERVE the engine moving;
+what it can do is stop treating a dead unit as the notification. The reading to
+take from the six is not that the pin will keep going stale but that the prompt
+was in the wrong place, and the standing residual is that this repository has
+no signal for a raise on yog's `main` — only a person who looks.
 
 **And pinning FORWARD is not the way out** (bl-dc5f). The obvious repair for a
 pin that keeps falling behind is to pin at yog's `main` rather than at yog's

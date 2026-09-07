@@ -54,7 +54,7 @@ use super::{Failure, frame};
 /// envelope, or what a spelling already in use is taken to say.
 ///
 /// **The number is the engine's and there is nothing here to version.** It must
-/// read whatever yog's own `src/wire/hello.rs` reads, so it is stated a second
+/// read whatever yog's own `src/wire/hello/version.rs` reads, so it is stated a second
 /// time — as a literal copied from that file — in `crate::corpus`, which is
 /// what the suite's stand-in engine dials at. The two agreeing is a test
 /// (`corpus::tests`) rather than a tautology, and that is the whole of the
@@ -65,17 +65,20 @@ use super::{Failure, frame};
 /// **Most bumps are not a foot's business, and it can still not dial across a
 /// single one of them.** Of everything past 2, exactly one touched this crate's
 /// own surface — 8 (yog bl-66d4), the required `wrote` on `reply/advertised`.
-/// 3 through 7 and 9 through 17 moved seat-facing shapes this crate never
+/// 3 through 7 and 9 through 18 moved seat-facing shapes this crate never
 /// decodes, 10 moved no field at all (`attention` became follow-class), and 17
-/// moved a VALUE rather than a field — a new `signals` word the shape ledger
-/// cannot see. The
+/// and 18 each moved a VALUE rather than a field — a new `signals` word, then a
+/// fourth `framing` word — that the shape ledger cannot see. The
 /// preface is one integer compared for equality, so the version states the
 /// engine's *build* and never which frames this end happens to read — which is
-/// why this constant has now drifted six times (bl-e0f0, bl-f88f, bl-dc5f,
-/// bl-605f, bl-44b4, bl-272d) with the suite
+/// why this constant has now drifted seven times (bl-e0f0, bl-f88f, bl-dc5f,
+/// bl-605f, bl-44b4, bl-272d, bl-dc8a) with the suite
 /// green: nothing on this side of the socket can see the far end move, and a
-/// real dial is the only thing that meets the skew.
-pub const PROTOCOL: u32 = 17;
+/// real dial is the only thing that meets the skew. bl-dc8a is the first moved
+/// while the engine's number was still UNPUBLISHED, which is the order yog
+/// `docs/REMOTE.md` §3 asks for: a consumer's `main` carries the number, then
+/// the engine publishes, then the consumer does.
+pub const PROTOCOL: u32 = 18;
 
 /// The preface's one key, and the whole of its shape.
 const KEY: &str = "protocol";

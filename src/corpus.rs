@@ -27,7 +27,7 @@
 //! decoders at the same strictness.
 //!
 //! **What a foot speaks is smaller than the protocol, so most bumps are not
-//! its business.** Between PROTOCOL 2 and 17 exactly one shape a foot decodes
+//! its business.** Between PROTOCOL 2 and 18 exactly one shape a foot decodes
 //! moved: `reply/advertised` gained `wrote` at 8. Every other bump is
 //! seat-facing — a conversation row's `failure` (3), the queue row's `flag`
 //! (4), `reply/governing`'s lineage keys (5), `reply/providers`' `effort` and
@@ -37,16 +37,20 @@
 //! (11), the queue row's `says` (12), `reply/config`'s `settings` (13),
 //! `request/enroll`'s optional `address` beside `reply/clients`' optional
 //! `last_seen` (14), `reply/follow`'s tool window (15), `reply/ops`' rows
-//! gaining `client` (16), and the `signals` vocabulary gaining `truncated`
-//! beside a delivered row's optional `sender_name` / `from_name` (17) — and a
+//! gaining `client` (16), the `signals` vocabulary gaining `truncated` beside a
+//! delivered row's optional `sender_name` / `from_name` (17), and three shapes
+//! on one number at 18 — `reply/follow`'s tool-window entry gaining `held`,
+//! `reply/steps`' `framing` gaining a fourth word `in_flight`, and
+//! `request/answer` with `reply/answered` gaining `scope` — and a
 //! foot decodes none of them. Every frame below is therefore byte for byte the
 //! text it was at 8; only the equality moved. It still cannot dial across any
 //! of them, because the preface is one integer compared for equality: the
 //! version is the *engine's build*, not a statement about the frames this end
 //! happens to read.
 
-/// **The protocol number, got from the engine.** yog's `src/wire/hello.rs`
-/// reads `pub const PROTOCOL: u32 = 17`, and this is that line copied.
+/// **The protocol number, got from the engine.** yog's
+/// `src/wire/hello/version.rs` reads `pub const PROTOCOL: u32 = 18`, and this
+/// is that line copied.
 ///
 /// It is what the suite's stand-in engine states, so every channel test dials
 /// across the same equality a real one does — and
@@ -59,10 +63,12 @@
 /// fixture can see the far end — and the only thing that meets that skew is a
 /// real dial, which is why the sentence that dial earns has to read as an
 /// operator's upgrade prompt. This line is moved by hand, once per release
-/// train — and it has been moved six times now (bl-e0f0, bl-f88f, bl-dc5f,
-/// bl-605f, bl-44b4, bl-272d), the last four inside three sessions, on three
-/// days' release trains.
-pub(crate) const PROTOCOL: u32 = 17;
+/// train — and it has been moved seven times now (bl-e0f0, bl-f88f, bl-dc5f,
+/// bl-605f, bl-44b4, bl-272d, bl-dc8a), the last five inside three sessions, on
+/// three days' release trains. bl-dc8a is the first of the seven taken while
+/// the engine's number was unpublished, so it is the one that did not begin
+/// with a foot that could not dial.
+pub(crate) const PROTOCOL: u32 = 18;
 
 /// `corpus/request/advertise.json`, stamped PROTOCOL 2 — the empty set, one
 /// ordinary element, and the element carrying §5.1's optional fourth fact.
