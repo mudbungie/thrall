@@ -1,7 +1,8 @@
 +++
 title = "the protocol pin is 17 while yog's main carries 18: vendor the number before the engine publishes it, not after a dead unit"
 created = 1788754660
-updated = 1788754660
+updated = 1788754661
+claimant = "Cantaloups-T7"
 priority = 1
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
 tags = ["usability-r3"]
