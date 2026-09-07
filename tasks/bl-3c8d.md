@@ -1,7 +1,8 @@
 +++
 title = "the MCP bridge fails its own first call on every box: a launcher's cold-cache chatter is read as the server's framing, the diagnosis names the launcher, and the failure exits 0"
 created = 1788745783
-updated = 1788745812
+updated = 1788745910
+claimant = "Cantaloups-T4"
 priority = 3
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
 tags = ["usability-r2"]
