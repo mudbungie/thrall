@@ -1,7 +1,8 @@
 +++
 title = "deferred: the MCP bridge, thrall as a local MCP client"
 created = 1787977363
-updated = 1787977363
+updated = 1788744581
+claimant = "Cantaloups-M1"
 priority = 0
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
 
