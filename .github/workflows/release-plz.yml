@@ -181,7 +181,7 @@ name: Release-plz
 #
 # THE GUARDS. yog rejects an author guard because its PAT makes release PRs
 # indistinguishable from a human's; here the fallback token opens them, so the
-# author IS a usable signal and is used. Five stand, and none is the check
+# author IS a usable signal and is used. Six stand, and none is the check
 # rollup:
 #
 #   1. The head branch is release-plz's own timestamped shape, anchored end to
@@ -198,6 +198,41 @@ name: Release-plz
 #   4. Not a draft, and GitHub says `MERGEABLE`.
 #   5. The head commit's first parent is this run's commit — the tree `ci`
 #      passed, as above.
+#   6. This release does not speak a wire PROTOCOL that no PUBLISHED engine
+#      speaks — see THE PROTOCOL GATE below. The only guard whose answer can
+#      change with nothing in this repository changing, and therefore the only
+#      one a re-run of this workflow can clear.
+#
+# ---------------------------------------------------------------------------
+# THE PROTOCOL GATE — A FOOT DOES NOT PUBLISH AHEAD OF THE ENGINE (bl-635b)
+#
+# yog mints the wire protocol version; this crate, the seat (`lernie`) and the
+# phone (`yog-android`) each VENDOR a copy of the constant, and the wire is
+# fail-closed on a mismatch with no negotiation (yog `docs/REMOTE.md` §3). The
+# skew that opens is two-directional and each direction is gated where it can
+# be decided:
+#
+#   1. yog publishing a bump ahead of its consumers — held at yog's own release
+#      pull request until this repository's `main`, lernie's and
+#      yog-android's carry the number. That is yog bl-bca2.
+#   2. THIS repository publishing a bump ahead of the engine — held here.
+#      thrall 0.0.15 published PROTOCOL 16 while the newest published yog,
+#      0.0.49, spoke 15: a foot ahead of every engine a user can install,
+#      composing with nothing, by exactly the road the other direction took.
+#
+# **The ordering the two gates produce**: the consumers' mains carry the number
+# first, then yog publishes, then the consumers publish. Landing the constant
+# on `main` is held by neither — it is what gate 1 waits for.
+#
+# **Strictly greater, not different.** A thrall BEHIND the published engine is
+# direction 1's defect and its release is the fix; holding that would hold the
+# remedy shut.
+#
+# The published engine is yog's newest `v<x.y.z>` tag, because yog's release
+# job cuts the tag in the same act as the crates.io upload. The decision itself
+# is `scripts/protocol-gate.sh` — pure logic, no network — because this
+# workflow cannot run locally; `make protocol-gate` proves it both ways in the
+# local gate.
 #
 # A verdict line is printed for EVERY open pull request on EVERY run, passing
 # or not: a mechanism that merges silently is one nobody can audit, and the run
@@ -335,11 +370,22 @@ jobs:
       group: merge-release-pr
       cancel-in-progress: false
     steps:
+      # `scripts/protocol-gate.sh`, and nothing else. From THIS repository's
+      # default branch, never from the pull request, whose diff is a version
+      # bump and has no business supplying the check that judges it.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
       - name: Judge every open pull request, and merge a green release PR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           OWNER: ${{ github.repository_owner }}
+          # The engine whose published PROTOCOL this release may not exceed
+          # (guard 6). Named here rather than in the script because it is the
+          # one fact about GitHub in the whole check.
+          ENGINE_REPO: mudbungie/yog
           # The commit `ci` passed in this run. Guard 5 tests the candidate
           # against it.
           GATED_SHA: ${{ github.sha }}
@@ -396,6 +442,30 @@ jobs:
             if [ "$parent" != "$GATED_SHA" ]; then
               printf 'PR %s  hold: head sits on %s, not the gated %s  [merge state %s]\n' \
                 "$number" "${parent:0:8}" "${GATED_SHA:0:8}" "$state"
+              continue
+            fi
+            # Guard 6: this release may not speak a PROTOCOL no PUBLISHED
+            # engine speaks (bl-635b). yog's release job cuts the `v<x.y.z>`
+            # tag in the same act as the crates.io upload, so that tag IS the
+            # published engine. Both fetches truncate first and are `|| true`:
+            # a missing tag, a moved constant or a network fault reads as
+            # unreadable and holds rather than merging.
+            gate="$(mktemp -d)"
+            hello="$(scripts/protocol-gate.sh hello)"
+            raw() {
+              gh api "repos/$1/contents/$3?ref=$2" \
+                -H "Accept: application/vnd.github.raw" >"$4" || true
+            }
+            engine_tag="$(gh api "repos/$ENGINE_REPO/releases/latest" -q .tag_name || true)"
+            [ -z "$engine_tag" ] || \
+              raw "$ENGINE_REPO" "$engine_tag" src/wire/hello.rs "$gate/published"
+            raw "$GH_REPO" "$sha" "$hello" "$gate/candidate"
+            gate_rc=0
+            gate_says="$(scripts/protocol-gate.sh judge \
+              "$gate/published" "$gate/candidate")" || gate_rc=$?
+            printf 'PR %s  protocol gate: %s\n' "$number" "$gate_says"
+            if [ "$gate_rc" != 0 ]; then
+              printf 'PR %s  held: land the number in yog and let it publish first\n' "$number"
               continue
             fi
             printf 'PR %s  merging: version bump on the gated %s  [merge state %s]\n' \

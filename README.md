@@ -106,6 +106,19 @@ same gated workflow. Publication authenticates to the registry by a trusted
 publisher — a short-lived token minted per run for one workflow file in one
 repository — so this repository stores no registry credential at all.
 
+**A protocol bump waits for the engine** (bl-635b). yog mints the wire protocol
+version and this crate *vendors* a copy of the constant; the wire is
+fail-closed on a mismatch and does not negotiate (yog `docs/REMOTE.md` §3). So
+`merge-release-pr` also **holds a release whose `PROTOCOL` exceeds the newest
+published yog's** — thrall 0.0.15 shipped 16 while the newest published engine
+spoke 15, which composes with nothing exactly as the mirror-image defect did.
+Strictly greater, not different: a thrall *behind* the engine is that mirror
+image, and its release is the fix. Between the two gates — yog holds a bump
+until the consumers' mains carry it, each consumer holds a release until yog
+has published it — the ordering a bump requires is: **the consumers' mains
+first, then yog publishes, then the consumers publish.** The decision is
+`scripts/protocol-gate.sh`, proved both ways by `make protocol-gate`.
+
 What guards a version's CONTENT was built before the first flip and stands
 unchanged. `Cargo.toml` declares an anchored `include` **allowlist** — never an
 `exclude`, because a missing `include` entry costs a build, which is loud and

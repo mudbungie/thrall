@@ -1,5 +1,5 @@
 .PHONY: all build release test coverage lint fmt fmt-check check ci \
-        line-cap leak-scan rules-audit deny install-hooks install uninstall \
+        line-cap leak-scan protocol-gate rules-audit deny install-hooks install uninstall \
         image image-scan mac-artifact clean \
         deploy deploy-local deploy-status deploy-selftest
 
@@ -57,6 +57,7 @@ coverage:
 lint:
 	$(MAKE) line-cap
 	$(MAKE) deploy-selftest
+	$(MAKE) protocol-gate
 	$(MAKE) leak-scan
 	cargo clippy --all-targets -- -D warnings
 	$(MAKE) rules-audit
@@ -136,6 +137,20 @@ line-cap:
 leak-scan:
 	@scripts/leak-scan.sh --self-test
 	@scripts/leak-scan.sh
+
+# The release-ordering gate's logic, proved both ways (bl-635b; yog bl-bca2 is
+# the other direction). yog mints the wire protocol version and this crate
+# VENDORS a copy of the constant, so the skew is two-directional: yog must not
+# publish a bump ahead of its consumers, and this repository must not publish
+# one ahead of the engine. thrall 0.0.15 shipped PROTOCOL 16 while the newest
+# published yog spoke 15 — a foot ahead of every installable engine.
+#
+# `.github/workflows/release-plz.yml`'s `merge-release-pr` job spends the
+# decision and CANNOT run locally, so the decision does not live there:
+# `scripts/protocol-gate.sh` holds it, reads no network, and this target runs
+# its self-test. Milliseconds, so it sits at the head of `lint`.
+protocol-gate:
+	@scripts/protocol-gate.sh --self-test
 
 # Static audit of every ast-grep rule (rules/, pinned ast-grep 0.44.1 — see
 # sgconfig.yml). BOTH DIRECTIONS: `src` must be clean, AND every rule must
