@@ -1,7 +1,8 @@
 +++
 title = "docs/tools.example.json is outside the crate include allowlist, so bl-102b's example does not reach anyone who installs from crates.io"
 created = 1788746115
-updated = 1788746115
+updated = 1788746289
+claimant = "Cantaloups-T5"
 priority = 3
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
 tags = ["usability-r2"]
