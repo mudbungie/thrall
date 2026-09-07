@@ -1,8 +1,7 @@
 +++
 title = "acceptance: mcp-server-fetch round-trips through a yog engine as a pinned tool — the bridge's first real server, and the web tool"
 created = 1788744507
-updated = 1788746117
-claimant = "Cantaloups-T4"
+updated = 1788746118
 priority = 3
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
 tags = ["usability-r2"]
