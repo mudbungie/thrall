@@ -448,18 +448,24 @@ jobs:
             # engine speaks (bl-635b). yog's release job cuts the `v<x.y.z>`
             # tag in the same act as the crates.io upload, so that tag IS the
             # published engine. Both fetches truncate first and are `|| true`:
-            # a missing tag, a moved constant or a network fault reads as
-            # unreadable and holds rather than merging.
+            # a missing tag, a tree that states no number or a network fault
+            # reads as unreadable and holds rather than merging.
+            #
+            # ONE path, at the root of both repositories, and the script is its
+            # one home (bl-c618): this used to name yog's Rust path here, and
+            # yog moved it in a module split — so the fetch went on succeeding
+            # while the read found nothing, and the hold would have become
+            # permanent at the next engine publish.
             gate="$(mktemp -d)"
-            hello="$(scripts/protocol-gate.sh hello)"
+            file="$(scripts/protocol-gate.sh file)"
             raw() {
               gh api "repos/$1/contents/$3?ref=$2" \
                 -H "Accept: application/vnd.github.raw" >"$4" || true
             }
             engine_tag="$(gh api "repos/$ENGINE_REPO/releases/latest" -q .tag_name || true)"
             [ -z "$engine_tag" ] || \
-              raw "$ENGINE_REPO" "$engine_tag" src/wire/hello.rs "$gate/published"
-            raw "$GH_REPO" "$sha" "$hello" "$gate/candidate"
+              raw "$ENGINE_REPO" "$engine_tag" "$file" "$gate/published"
+            raw "$GH_REPO" "$sha" "$file" "$gate/candidate"
             gate_rc=0
             gate_says="$(scripts/protocol-gate.sh judge \
               "$gate/published" "$gate/candidate")" || gate_rc=$?

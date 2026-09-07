@@ -57,6 +57,11 @@ publish = true
 # `Cargo.toml` and `Cargo.lock` are added by cargo itself and need no entry.
 include = [
     "/src/**/*.rs",
+    # The wire version's one file-shaped home and the script that compiles it
+    # into the constant (bl-c618). Both are build inputs: without them the
+    # published crate does not compile.
+    "/PROTOCOL",
+    "/build.rs",
     "/README.md",
     "/LICENSE",
     # The example tool document (bl-bb7d). It is here because the crate READS it

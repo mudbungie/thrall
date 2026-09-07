@@ -23,7 +23,7 @@
 //!
 //! **It states the engine's protocol number, not this crate's** (bl-e0f0).
 //! Every fixture here dials at [`crate::corpus::PROTOCOL`], a literal copied
-//! from yog's `src/wire/hello.rs`. While it wrote its preface from
+//! from yog's repo-root `PROTOCOL` file. While it wrote its preface from
 //! `channel::hello::PROTOCOL` the two ends of every test were one constant
 //! wearing two names, so they agreed at any value — and the pin sat five
 //! versions behind a live engine, unable to open a single real channel, with

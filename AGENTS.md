@@ -40,8 +40,10 @@ does not matter who broke the test.
 ### A PROTOCOL bump is a four-repository act (bl-635b; yog bl-bca2)
 
 yog mints the wire protocol version. This crate, the seat (`lernie`) and the
-phone (`yog-android`) each **vendor** a copy of the constant
-(`src/channel/hello.rs`, mirrored in `src/corpus.rs`), and the wire is
+phone (`yog-android`) each **vendor** a copy of the number in a **repo-root
+`PROTOCOL` file** — one line, the integer, compiled into
+`src/channel/hello.rs`'s constant by `build.rs` and mirrored by hand in
+`src/corpus.rs` (bl-c618) — and the wire is
 fail-closed on a mismatch with no negotiation (yog `docs/REMOTE.md` §3 — the
 authority, and the one place the two-direction rule is written out). So the
 skew is two-directional and each direction is gated where it can be decided:
@@ -62,6 +64,15 @@ publish.** Landing the constant on `main` is held by neither gate — it is what
 gate 1 waits for. `scripts/protocol-gate.sh` is the decision (pure logic, no
 network, because the workflow that spends it cannot run locally) and
 `make protocol-gate` proves it both ways in `lint`.
+
+**Bump it by editing `PROTOCOL`, and nothing else.** Both gates read that path
+at the root of whatever tree, tag or main they judge, and **no gate, workflow
+or roster in any of the four repositories names a Rust path for the number**
+(bl-c618). It used to: this repository fetched the engine's constant from
+`src/wire/hello.rs`, yog split that file, and the fetch went on succeeding
+while the read found nothing — so this gate held on an input it could not
+read, and the engine's next publish would have made that hold permanent
+instead of clearing it.
 
 ### The disclosure gate
 

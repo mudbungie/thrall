@@ -2,7 +2,7 @@
 # protocol-gate.sh — this foot does not publish a wire protocol version that no
 # published engine speaks (bl-635b; yog bl-bca2 is the other direction).
 #
-#   scripts/protocol-gate.sh hello        this repo's hello file, one path
+#   scripts/protocol-gate.sh file         the path every repo states it at
 #   scripts/protocol-gate.sh read FILE    the PROTOCOL integer that file states
 #   scripts/protocol-gate.sh judge PUBLISHED CANDIDATE
 #   scripts/protocol-gate.sh --self-test  both directions, no network
@@ -33,32 +33,42 @@
 #
 # THIS FILE IS PURE LOGIC AND READS NO NETWORK, which is what makes the rule
 # testable: `.github/workflows/release-plz.yml`'s `merge-release-pr` job
-# fetches the two `hello.rs` files — yog's at its newest `v<x.y.z>` tag, and
+# fetches the two `PROTOCOL` files — yog's at its newest `v<x.y.z>` tag, and
 # this repository's at the release pull request's head — and hands this script
 # the paths.
+#
+# THE NUMBER IS A FILE, NOT A DECLARATION (bl-c618, yog bl-3e57). Both reads
+# here are a fetch of one path out of a tree this gate does not build, and a
+# Rust path is not a stable address for that: yog split `src/wire/hello.rs`
+# into `src/wire/hello/version.rs` and left the old path re-exporting, which a
+# build cannot notice and a regex reads as no declaration. This gate went on
+# fetching the old path, read the engine's number as ABSENT, and held — the
+# fail-closed answer, and the wrong one, because the input was readable at
+# another address. The next engine publish would have made that hold permanent
+# rather than clearing it. So the number now has one file-shaped home per
+# repository: a top-level `PROTOCOL` file, one line, the integer, compiled into
+# the constant by `build.rs`. There is NO Rust path in this file.
 
 set -euo pipefail
 
-# The wire constant's one home here. `src/corpus.rs` keeps a second copy that
-# this crate's own tests hold equal to it; the one that decides a handshake is
-# the one read.
-HELLO='src/channel/hello.rs'
+# The path, at the root of this repository and of the engine's alike. One
+# constant for both reads, because one address is the whole point: a
+# per-repository path is a per-repository way to rot.
+FILE='PROTOCOL'
 
-# The declaration, anchored at the start of a line so a doc comment quoting it
-# — `src/corpus.rs` quotes the line verbatim — is not mistaken for it. `pub`,
-# `pub(crate)` and a bare `const` all read, because the four repositories that
-# vendor this constant do not spell its visibility the same way.
-DECL='^[[:space:]]*(pub[[:space:]]*(\([^)]*\))?[[:space:]]+)?const[[:space:]]+PROTOCOL[[:space:]]*:[[:space:]]*u32[[:space:]]*=[[:space:]]*([0-9]+)[[:space:]]*;.*$'
-
-# The integer FILE states, or nothing and a non-zero status. No pipe: `sed |
-# head` would kill the writer with SIGPIPE and `pipefail` would then report the
-# read as failed exactly when it succeeded.
+# The integer FILE states, or nothing and a non-zero status. The whole file is
+# the number: any second line, any word, any punctuation is not a PROTOCOL file
+# and reads as unstated rather than as a number found inside something else.
+# Command substitution strips the trailing newline, and a newline is not a
+# digit, so the one `case` rejects an empty file and a multi-line one alike.
 protocol_of() {
-  local file=$1 hits
+  local file=$1 stated
   [ -r "$file" ] || return 1
-  hits=$(sed -nE "s/$DECL/\\3/p" "$file")
-  [ -n "$hits" ] || return 1
-  printf '%s\n' "${hits%%$'\n'*}"
+  stated=$(<"$file")
+  case $stated in
+  '' | *[!0-9]*) return 1 ;;
+  esac
+  printf '%s\n' "$stated"
 }
 
 # The verdict, as one line on stdout. Exit 0 merges, 3 holds. Every unreadable
@@ -67,11 +77,15 @@ protocol_of() {
 judge() {
   local published=$1 candidate=$2 pub cand
   if ! cand=$(protocol_of "$candidate"); then
-    echo "hold: no PROTOCOL declaration in this release's $candidate"
+    echo "hold: this release's $candidate states no PROTOCOL integer"
     return 3
   fi
   if ! pub=$(protocol_of "$published"); then
-    echo "hold: the published engine's PROTOCOL could not be read"
+    # This repository's expectation, named as this repository's — the engine's
+    # file is not the thing that failed. A yog release predating its own
+    # PROTOCOL file states nothing at this path, and so does a fetch that never
+    # answered.
+    echo "hold: the published engine states no PROTOCOL integer at its repo root, which is where this gate reads it"
     return 3
   fi
   if [ "$cand" -gt "$pub" ]; then
@@ -84,8 +98,10 @@ judge() {
 # --- the self-test ----------------------------------------------------------
 # Both directions, because the workflow that spends this cannot run locally and
 # a check that has stopped matching passes everything forever.
+# A tree's `PROTOCOL` file, written byte for byte — `%b` so a case can state
+# its own line endings, which is half of what these fixtures are for.
 fixture() {
-  printf '//! /// pub const PROTOCOL: u32 = 999;\n%s\n' "$2" >"$1"
+  printf '%b' "$2" >"$1"
 }
 
 expect() {
@@ -106,46 +122,55 @@ self_test() {
   # shellcheck disable=SC2064
   trap "rm -rf '$d'" EXIT
 
-  fixture "$d/p15" 'pub const PROTOCOL: u32 = 15;'
-  fixture "$d/p16" '    pub(crate) const PROTOCOL: u32 = 16;'
-  fixture "$d/bare15" 'const PROTOCOL: u32 = 15;'
-  fixture "$d/quoted" '/// reads `pub const PROTOCOL: u32 = 15`, copied below.'
+  fixture "$d/n15" '15\n'
+  fixture "$d/n16" '16\n'
+  # A file is the number and nothing else, but the number may be spelled with
+  # the whitespace an editor leaves.
+  fixture "$d/tight16" '16'
+  fixture "$d/loose15" '15\n\n'
+  # What the number's home used to be. A Rust declaration is now exactly as
+  # unreadable as prose, which is the point: this file names no Rust path, so a
+  # tree that still keeps its number in a module states nothing.
+  fixture "$d/decl" 'pub const PROTOCOL: u32 = 15;\n'
 
   # The 2026-09-06 tree: this repo at 16, the published engine at 15.
   expect 3 'hold: this release speaks PROTOCOL 16 and the published engine speaks 15' \
-    "$d/p15" "$d/p16"
+    "$d/n15" "$d/n16"
   # The same release once yog has published 16.
   expect 0 'merge: PROTOCOL 16, and the published engine speaks 16' \
-    "$d/p16" "$d/p16"
-  # Level, however each end spells the constant.
+    "$d/n16" "$d/n16"
+  # Level, however each end terminates its file.
   expect 0 'merge: PROTOCOL 15, and the published engine speaks 15' \
-    "$d/bare15" "$d/p15"
+    "$d/loose15" "$d/n15"
   # BEHIND the engine is direction 1's defect and this release is its fix:
   # strictly greater, so it publishes.
   expect 0 'merge: PROTOCOL 15, and the published engine speaks 16' \
-    "$d/p16" "$d/p15"
-  # Fail closed on each unreadable input, and never merge on one. The quoted
-  # fixture also proves the anchor: a doc comment is not a declaration.
-  expect 3 "hold: no PROTOCOL declaration in this release's $d/quoted" \
-    "$d/p15" "$d/quoted"
-  expect 3 'hold: the published engine'"'"'s PROTOCOL could not be read' \
-    "$d/quoted" "$d/p16"
-  expect 3 'hold: the published engine'"'"'s PROTOCOL could not be read' \
-    "$d/absent" "$d/p16"
+    "$d/tight16" "$d/n15"
+  # Fail closed on each unreadable input, and never merge on one. The `decl`
+  # fixture is the defect this shape ended: the number in a Rust file is read
+  # by nothing here.
+  expect 3 "hold: this release's $d/decl states no PROTOCOL integer" \
+    "$d/n15" "$d/decl"
+  expect 3 'hold: the published engine states no PROTOCOL integer at its repo root, which is where this gate reads it' \
+    "$d/decl" "$d/n16"
+  expect 3 'hold: the published engine states no PROTOCOL integer at its repo root, which is where this gate reads it' \
+    "$d/absent" "$d/n16"
 
-  if [ ! -r "$HELLO" ] || ! protocol_of "$HELLO" >/dev/null; then
-    echo "protocol-gate self-test: $HELLO states no PROTOCOL — the path has moved" >&2
+  # This repository's own file, read as the workflow will read it: the gate is
+  # worthless if the tree it ships in does not state the number where it looks.
+  if [ ! -r "$FILE" ] || ! protocol_of "$FILE" >/dev/null; then
+    echo "protocol-gate self-test: $FILE does not state one integer — the number's home has moved" >&2
     exit 1
   fi
-  echo "protocol-gate: self-test OK — 7 verdicts both ways, and $HELLO still states one" >&2
+  echo "protocol-gate: self-test OK — 7 verdicts both ways, and $FILE states one" >&2
 }
 
 case ${1:-} in
 --self-test) self_test ;;
-hello) printf '%s\n' "$HELLO" ;;
+file) printf '%s\n' "$FILE" ;;
 read) [ "$#" = 2 ] || { echo "usage: protocol-gate.sh read FILE" >&2; exit 2; }
-      protocol_of "$2" || { echo "protocol-gate: no PROTOCOL declaration in $2" >&2; exit 1; } ;;
+      protocol_of "$2" || { echo "protocol-gate: $2 states no PROTOCOL integer" >&2; exit 1; } ;;
 judge) [ "$#" = 3 ] || { echo "usage: protocol-gate.sh judge PUBLISHED CANDIDATE" >&2; exit 2; }
        judge "$2" "$3" ;;
-*) echo "usage: protocol-gate.sh {hello|read FILE|judge PUBLISHED CANDIDATE|--self-test}" >&2; exit 2 ;;
+*) echo "usage: protocol-gate.sh {file|read FILE|judge PUBLISHED CANDIDATE|--self-test}" >&2; exit 2 ;;
 esac

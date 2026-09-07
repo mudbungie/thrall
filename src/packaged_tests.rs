@@ -87,6 +87,8 @@ fn is_ruled_in(path: &str) -> bool {
             | "Cargo.lock"
             | "Cargo.toml.orig"
             | ".cargo_vcs_info.json"
+            | "PROTOCOL"
+            | "build.rs"
             | "README.md"
             | "LICENSE"
             | "docs/tools.example.json"
@@ -120,6 +122,10 @@ fn the_files_a_registry_needs_ship() {
     for needed in [
         "Cargo.toml",
         "Cargo.lock",
+        // The wire version and the script that compiles it in: without either,
+        // the published crate does not build at all (bl-c618).
+        "PROTOCOL",
+        "build.rs",
         "README.md",
         "LICENSE",
         "src/lib.rs",

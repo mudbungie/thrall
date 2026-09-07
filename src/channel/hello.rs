@@ -54,9 +54,9 @@ use super::{Failure, frame};
 /// envelope, or what a spelling already in use is taken to say.
 ///
 /// **The number is the engine's and there is nothing here to version.** It must
-/// read whatever yog's own `src/wire/hello/version.rs` reads, so it is stated a second
-/// time — as a literal copied from that file — in `crate::corpus`, which is
-/// what the suite's stand-in engine dials at. The two agreeing is a test
+/// read whatever yog's own repo-root `PROTOCOL` file reads, so it is stated a
+/// second time — as a literal copied from that file — in `crate::corpus`, which
+/// is what the suite's stand-in engine dials at. The two agreeing is a test
 /// (`corpus::tests`) rather than a tautology, and that is the whole of the
 /// defence: while the stand-in wrote its preface from *this* constant, both
 /// ends of every test agreed by construction and the pin sat five versions
@@ -78,7 +78,23 @@ use super::{Failure, frame};
 /// while the engine's number was still UNPUBLISHED, which is the order yog
 /// `docs/REMOTE.md` §3 asks for: a consumer's `main` carries the number, then
 /// the engine publishes, then the consumer does.
-pub const PROTOCOL: u32 = 18;
+///
+/// **It is not declared here.** The repo-root `PROTOCOL` file states it, one
+/// line, and `build.rs` compiles that into the constant re-exported below
+/// (bl-c618) — the same shape yog and every other consumer now carry. Bump it
+/// by editing that line; nothing under `src` says the number. It is a file
+/// because the release gates that read it are other repositories FETCHING one
+/// path out of a tree they do not build, and a Rust path is not a stable
+/// address for that: yog's own split of `src/wire/hello.rs` left the old path
+/// re-exporting, which a build cannot notice and a regex reads as no
+/// declaration, and it broke every gate in the suite at once.
+pub use protocol::PROTOCOL;
+
+/// The generated constant, and nothing else: `build.rs` writes it from the
+/// repo-root `PROTOCOL` file on every build the file has moved.
+mod protocol {
+    include!(concat!(env!("OUT_DIR"), "/protocol.rs"));
+}
 
 /// The preface's one key, and the whole of its shape.
 const KEY: &str = "protocol";

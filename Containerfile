@@ -52,7 +52,10 @@ RUN set -eu; \
 # `--locked` for the same reason the gate uses it: the committed Cargo.lock is
 # the dependency answer, and a build that is allowed to solve for a different
 # one is not the build the gate judged.
-COPY Cargo.toml Cargo.lock ./
+# `PROTOCOL` and `build.rs` are build inputs, not documents: the wire version's
+# one file-shaped home and the script that compiles it into the constant
+# (bl-c618). Without them this stage does not compile.
+COPY Cargo.toml Cargo.lock PROTOCOL build.rs ./
 COPY src ./src
 RUN cargo build --release --locked
 

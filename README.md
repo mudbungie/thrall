@@ -107,8 +107,11 @@ publisher — a short-lived token minted per run for one workflow file in one
 repository — so this repository stores no registry credential at all.
 
 **A protocol bump waits for the engine** (bl-635b). yog mints the wire protocol
-version and this crate *vendors* a copy of the constant; the wire is
-fail-closed on a mismatch and does not negotiate (yog `docs/REMOTE.md` §3). So
+version and this crate *vendors* a copy of the number in a repo-root
+`PROTOCOL` file — one line, compiled into the constant by `build.rs` (bl-c618),
+at the one address a module split cannot move, which is what both gates read;
+the wire is fail-closed on a mismatch and does not negotiate (yog
+`docs/REMOTE.md` §3). So
 `merge-release-pr` also **holds a release whose `PROTOCOL` exceeds the newest
 published yog's** — thrall 0.0.15 shipped 16 while the newest published engine
 spoke 15, which composes with nothing exactly as the mirror-image defect did.

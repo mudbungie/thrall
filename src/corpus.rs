@@ -48,9 +48,8 @@
 //! version is the *engine's build*, not a statement about the frames this end
 //! happens to read.
 
-/// **The protocol number, got from the engine.** yog's
-/// `src/wire/hello/version.rs` reads `pub const PROTOCOL: u32 = 18`, and this
-/// is that line copied.
+/// **The protocol number, got from the engine.** yog's repo-root `PROTOCOL`
+/// file reads `18`, and this is that number copied.
 ///
 /// It is what the suite's stand-in engine states, so every channel test dials
 /// across the same equality a real one does — and

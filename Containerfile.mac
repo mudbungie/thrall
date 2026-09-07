@@ -116,7 +116,10 @@ RUN cargo install cargo-zigbuild --version "${ZIGBUILD_VERSION}" --locked
 RUN rustup target add aarch64-apple-darwin
 
 WORKDIR /src
-COPY Cargo.toml Cargo.lock ./
+# `PROTOCOL` and `build.rs` are build inputs, not documents: the wire version's
+# one file-shaped home and the script that compiles it into the constant
+# (bl-c618). Without them this stage does not compile.
+COPY Cargo.toml Cargo.lock PROTOCOL build.rs ./
 COPY src ./src
 
 # THE MACOS FLOOR IS NOT ASKED FOR, IT IS READ BACK. rustc passes
