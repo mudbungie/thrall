@@ -65,6 +65,15 @@ gate 1 waits for. `scripts/protocol-gate.sh` is the decision (pure logic, no
 network, because the workflow that spends it cannot run locally) and
 `make protocol-gate` proves it both ways in `lint`.
 
+**A held release is re-judged by a `workflow_dispatch` of Release-plz**
+(bl-f3a5). Gate 2 is the one gate whose answer changes with nothing in this
+repository changing — it clears when the ENGINE publishes, an event this
+repository never sees — so without a hand-wakeable door a held release waits
+for an unrelated landing on `main`. `merge-release-pr` therefore runs on a
+dispatch as well as on a push, re-judging the open release pull request against
+the newest published yog tag. The gate itself does not move: `ci` and
+`release-plz-release` must have succeeded in that run either way.
+
 **Bump it by editing `PROTOCOL`, and nothing else.** Both gates read that path
 at the root of whatever tree, tag or main they judge, and **no gate, workflow
 or roster in any of the four repositories names a Rust path for the number**

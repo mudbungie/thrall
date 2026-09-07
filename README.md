@@ -120,7 +120,11 @@ image, and its release is the fix. Between the two gates — yog holds a bump
 until the consumers' mains carry it, each consumer holds a release until yog
 has published it — the ordering a bump requires is: **the consumers' mains
 first, then yog publishes, then the consumers publish.** The decision is
-`scripts/protocol-gate.sh`, proved both ways by `make protocol-gate`.
+`scripts/protocol-gate.sh`, proved both ways by `make protocol-gate`. A hold
+clears when the engine publishes, which is an event this repository never sees,
+so `merge-release-pr` runs on a `workflow_dispatch` of Release-plz as well as
+on a push (bl-f3a5): that dispatch is the door for re-judging a held release,
+and without it the release waited for an unrelated landing on `main`.
 
 What guards a version's CONTENT was built before the first flip and stands
 unchanged. `Cargo.toml` declares an anchored `include` **allowlist** — never an

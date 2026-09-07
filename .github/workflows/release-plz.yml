@@ -169,9 +169,39 @@ name: Release-plz
 # job's `needs: ci` does not vary by trigger, and the dispatched run therefore
 # re-runs the whole gate on the merged tree before publishing anything.
 #
-# The dispatched run cannot re-enter this job: `release-plz-pr` is push-only,
-# so on a dispatch it is SKIPPED and every `needs:` of it skips with it. There
-# is no loop to bound because there is no second merge to make.
+# The dispatched run DOES re-enter this job, and finds nothing to do. It used
+# to be unreachable — `release-plz-pr` is push-only, so a bare `needs` on it
+# skipped this job on every dispatch — and that unreachability was the
+# recursion stop AND the defect (bl-f3a5): see A DISPATCH IS THE RE-JUDGE DOOR
+# below. The loop is bounded by the work instead of by the wiring: a dispatched
+# run refreshes no pull request and opens no second one, and the merge step
+# dispatches only when it actually merged something. One dispatch, one pass,
+# and no second merge to make.
+#
+# ---------------------------------------------------------------------------
+# A DISPATCH IS THE RE-JUDGE DOOR (bl-f3a5)
+#
+# Guard 6 below is the only guard whose answer can change with nothing in this
+# repository changing: a held release clears when the ENGINE publishes, which
+# is an event this repository never sees. So a hand needs a way to ask again,
+# and `workflow_dispatch` is it — the same door yog's `release-automerge.yml`
+# names in the comment it leaves on a held pull request.
+#
+# It was nailed shut. Measured 2026-09-06: yog published v0.0.53 at PROTOCOL
+# 18, this repository's release pull request for 0.0.18 stood open and clean,
+# and a dispatch of this workflow skipped the merge job outright — so the
+# release waited on an unrelated landing on `main` rather than on the condition
+# it was actually held by.
+#
+# The job therefore names its dependencies' RESULTS instead of inheriting an
+# implicit `success()` from `needs`. The gate does not move: `ci` and
+# `release-plz-release` must have SUCCEEDED on either trigger. Only
+# `release-plz-pr` may be `skipped`, which is exactly what a dispatch does to
+# it and nothing else does — a FAILED PR job still skips this one.
+#
+# Guard 5 holds on a dispatch exactly as it does on a push: release-plz rebases
+# the release branch onto `main` on every push here, so the head's first parent
+# is `main`'s tip, and `github.sha` for a dispatch on `main` is that same tip.
 #
 # The dependency on `release-plz-release` is not ordering decoration either.
 # That job checks out the `main` BRANCH rather than this run's sha, so a merge
@@ -346,15 +376,29 @@ jobs:
   merge-release-pr:
     name: merge the release PR
     runs-on: ubuntu-latest
-    # The gate, and the ordering, and the recursion stop, all in one list. The
-    # bare `needs` carries an implicit success(), so a red `ci`, a failed PR
-    # job or a failed release all skip this job; and `release-plz-pr` is
-    # push-only, so the run this job dispatches skips it and skips this with
-    # it. `ci` is named although `release-plz-release` already needs it —
-    # the gate should be readable here, not inferred through another job.
+    # `needs` states the ORDERING and the `if` states the GATE, because the two
+    # cannot be one list here: a bare `needs` carries an implicit success(),
+    # which skips this job whenever any dependency is SKIPPED — and
+    # `release-plz-pr` is push-only, so on a `workflow_dispatch` it always is.
+    # That skip closed the one door a held release has (see A DISPATCH IS THE
+    # RE-JUDGE DOOR above), so the results are named outright.
+    #
+    # A red `ci` and a failed or skipped release still skip this job, and so
+    # does a FAILED `release-plz-pr`; only its `skipped` — the dispatch case —
+    # is admitted. `ci` is named although `release-plz-release` already needs
+    # it: the gate should be readable here, not inferred through another job.
+    # `!cancelled()` is what drops the implicit success(); an `if` with no
+    # status function keeps it, which is the trap this comment holds shut.
     needs: [ci, release-plz-pr, release-plz-release]
-    # Owner guard: never runs in a fork, like every other job here.
-    if: github.repository_owner == 'mudbungie'
+    # ...and the owner guard, which the implicit success() used to carry in
+    # through `release-plz-pr`. Never runs in a fork, like every other job here.
+    if: >-
+      ${{ !cancelled()
+      && github.repository_owner == 'mudbungie'
+      && needs.ci.result == 'success'
+      && needs.release-plz-release.result == 'success'
+      && (needs.release-plz-pr.result == 'success'
+      || needs.release-plz-pr.result == 'skipped') }}
     timeout-minutes: 10
     permissions:
       # To merge, and to delete the merged head branch.
