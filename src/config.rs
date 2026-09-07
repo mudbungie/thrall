@@ -47,6 +47,28 @@ use crate::tools::{self, Tool};
 /// The document's leaf under the data root.
 pub const TOOLS: &str = "tools.json";
 
+/// **The example document, embedded** (bl-bb7d) — the bytes of
+/// `docs/tools.example.json`, compiled in.
+///
+/// The example is the one artifact of bl-102b's fix that its own audience
+/// could not reach: `cargo install thrall` is the route the README teaches, and
+/// it puts a binary on a box and leaves every file of this repository in the
+/// repository. A registry install therefore had the README's prose and nothing
+/// it could copy into place.
+///
+/// It is an embed rather than a shipped path because a file inside a downloaded
+/// crate is not a file an operator can find: the route to it runs through the
+/// registry cache, a version directory and a checksum, none of which the person
+/// writing `tools.json` knows. A binary that prints its own example needs none
+/// of them — `thrall --example-tools > <data root>/tools.json` is the whole
+/// gesture, and it works identically on a box that has this repository and on
+/// one that has only the binary.
+///
+/// **It is the file and never a copy of it.** The same bytes are parsed by
+/// [`read`] in `config/tests/example.rs`, carried by the README byte for byte,
+/// and printed by the flag; one document, three readers, no drift.
+pub const EXAMPLE: &str = include_str!("../docs/tools.example.json");
+
 /// One tool this box offers: the advertised half, and the local half that is
 /// never presented to anyone.
 #[derive(Debug, Clone, PartialEq, Eq)]

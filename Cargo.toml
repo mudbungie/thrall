@@ -59,6 +59,14 @@ include = [
     "/src/**/*.rs",
     "/README.md",
     "/LICENSE",
+    # The example tool document (bl-bb7d). It is here because the crate READS it
+    # at compile time — `config::EXAMPLE` embeds it, and `thrall
+    # --example-tools` prints it — so leaving it out is not a missing document
+    # but a crate that cannot build for anyone who downloads it. That is the
+    # allowlist's one cost, and `src/packaged_tests/embeds.rs` is where it is
+    # paid: every compile-time embed in `src` is resolved and must be ruled in
+    # both here and in `is_ruled_in`.
+    "/docs/tools.example.json",
 ]
 
 # A dependency lands here with the ball that first LINKS it, never before: a

@@ -180,9 +180,10 @@ REMOTE §5.2's tool-host config is thrall's one operator-authored document. It
 is out of world, because it describes *this machine*.
 
 **A worked one ships** (`docs/tools.example.json`, bl-102b), rendered byte for
-byte in `README.md` and read by `config::read` in the suite, because until it
-did the file `thrall run` demands could not be written from the shipped
-documentation at all: its shape had to be assembled from this section's prose,
+byte in `README.md`, read by `config::read` in the suite, and **printed by the
+binary itself** — `thrall --example-tools` (bl-bb7d) — because until it did the
+file `thrall run` demands could not be written from the shipped documentation at
+all: its shape had to be assembled from this section's prose,
 from REMOTE §5.1 for the only place the three advertised keys are ever *named*,
 and from `src/exec.rs`'s module comment for the contract below — which no
 document stated. **The contract belongs in the README and not only in a source
@@ -196,6 +197,21 @@ and the optional `cwd` are the local half. The advertisement is the projection
 that drops the local half — **one document, two readings** — so what a foot
 offers and what it can actually run cannot drift. That is the entire reason the
 config is not a second list beside the advertisement.
+
+**The example reaches the install route the README teaches** (bl-bb7d). `cargo
+install thrall` puts a binary on a box and leaves this repository in the
+repository, so for as long as the example was only a tracked file it was the one
+artifact of bl-102b's fix that bl-102b's own audience could not reach. It is
+therefore compiled in (`config::EXAMPLE`) and printed by a flag, rather than
+merely added to the `include` allowlist: a file inside a downloaded crate is not
+a file an operator can find — the route to it runs through a registry cache, a
+version directory and a checksum, none of which the person writing `tools.json`
+knows — while `thrall --example-tools > <data root>/tools.json` is one gesture
+that reads the same on a box holding this repository and on a box holding only
+the binary. The embed is what puts the file in `include`, and
+`src/packaged_tests/embeds.rs` is what holds those two facts together: a
+compile-time input the allowlist does not name builds here and fails to build
+for everyone who downloaded the crate.
 
 A tool absent from that document is a tool this box does not have. Server-side
 adjudication is unchanged, stacks on top, and fails closed.
@@ -831,7 +847,7 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/channel/leaf.rs` | The foot grade, read off this box's own certificate — a DER walk, because thrall links no certificate library. |
 | `src/channel/material.rs` | What the operator carried here, and the three answers a directory can give: nothing, half, or a channel. |
 | `src/channel/entries.rs` | The entries this box holds, one per channel. A refusal is one entry's, never the set's. |
-| `src/config.rs` | **The operator's document** (bl-05fe): what this box offers, and the projection that drops the local half. The gate on what is enabled. |
+| `src/config.rs` | **The operator's document** (bl-05fe): what this box offers, and the projection that drops the local half. The gate on what is enabled. It also holds `EXAMPLE`, the worked document compiled in from `docs/tools.example.json` so `thrall --example-tools` can print it on a box that has only the binary (bl-bb7d). |
 | `src/tools.rs` | The advertised element — the three facts REMOTE §5.1 fixes, in one spelling spent by the wire and by the document alike, and the check that a set is addressable. |
 | `src/json.rs` | The strict field reads every decoder here shares: a missing field, a mistyped one and a wrong-shaped one each refuse with the key an operator typed. |
 | `src/gestures.rs` | **The foot set** (bl-a2ea): `advertise`, `invocations`, `complete`, and the answers they can earn. The enumeration is the enforcement thrall can keep — there is no spelling here for a fourth verb. |
@@ -851,6 +867,7 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/state.rs` | **The lock chokepoint.** Every `Mutex`/`RwLock` in the crate. Unbuilt, and it stayed that way: the only cross-thread hand-offs thrall has are a `JoinHandle`'s own answer (the pipes a child writes, the sentence a channel ends with), which need no lock. The suite's fork lock is **not** a tenant — a test's serialization lock is scaffolding, and the rule's own text sends it to `src/test_support.rs`. |
 | `src/corpus.rs` | `cfg(test)` only. **The engine's conformance corpus, vendored as literal text** (REMOTE §3, bl-e0f0): the protocol number and the frames of every shape a foot speaks, copied from yog rather than derived from anything here. `corpus/tests.rs` pays what §3 says a client owes them — decode every frame, and round-trip every request byte for byte. It is the crate's one statement of what the FAR end says, which is why the stand-in engine reads its version from here and not from the pin it is testing. |
 | `src/test_support.rs` | `cfg(test)` only. The scratch directory, the fork lock, the stand-in engine, the recording notice sink (§3.7 — a serving foot writes to stderr, and a test cannot read that back), and the certificate mint the suite performs on the operator's behalf. |
+| `src/packaged_tests/embeds.rs` | `cfg(test)` only. **What the build reads, and whether it ships** (split from `packaged_tests.rs` by bl-bb7d): every compile-time embed under `src`, resolved against the file that names it and held to both halves of the policy — the class `is_ruled_in` admits and the path `cargo package --list` actually carries. It was a prohibition (*there are no embeds*) until the crate wanted one; a prohibition that has to be lifted the first time it binds was never the check. |
 | `src/packaged_tests.rs` | `cfg(test)` only. **The publication guard** (bl-d25a): what `cargo publish` would upload, read off the real `cargo package --list` and judged against the classes `Cargo.toml`'s `include` allowlist rules in — both directions, since a shape guard dies by matching nothing. It is in `src` rather than a `tests/` crate because it forks a child and the spawn boundary is `pub(crate)`; an integration crate could only reach a bare `Command::new`, which the confinement rules refuse. |
 
 | `src/mcp.rs` | **The bridge verb** (§6.2, bl-e104): `thrall mcp <tool> -- <server argv>`, an ordinary tool command whose program is this binary — input on stdin, the server spawned through the boundary, one `tools/call`, the capture on stdout, the server torn down. Its answer is an `invocation::Capture` and not a `cli::Verdict`, because it is being run AS a tool: the three facts are what the executor at the far end will post, and a failure still writes to stdout. |

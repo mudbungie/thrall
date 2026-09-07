@@ -101,6 +101,22 @@ fn both_help_spellings_print_the_usage_and_succeed() {
     }
 }
 
+/// **The example document is a thing to say** (bl-bb7d), which is what lets a
+/// box that has only the binary write its own `tools.json`: it is a compiled-in
+/// constant, so the decision is a value here and the entry point performs no
+/// read. The bytes it prints are held to the shipped file in
+/// `config/tests/example.rs` — this asserts the argv surface, not the document.
+#[test]
+fn the_example_document_is_printed_and_succeeds() {
+    let v = said(&["--example-tools"]);
+    assert_eq!(v.code, 0);
+    assert!(v.text.starts_with('['), "not a JSON document: {}", v.text);
+    assert!(
+        usage().contains("--example-tools"),
+        "the usage no longer names the flag, so nobody finds it"
+    );
+}
+
 /// **The one verb decides to serve, and says nothing.** Serving is not a
 /// sentence, so it is not a verdict — which is what keeps this file a pure
 /// function and the entry point a performer.

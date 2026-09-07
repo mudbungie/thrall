@@ -19,10 +19,16 @@
 //!   be refused on a real box is refused here first;
 //! - the README carries it **byte for byte**, so the block a reader copies and
 //!   the file a reader downloads cannot drift into two documents;
+//! - the BINARY carries it byte for byte too (bl-bb7d), because the install
+//!   route the README teaches is `cargo install`, which puts a binary on a box
+//!   and leaves this repository in the repository — so for as long as the
+//!   example was only a tracked file, the audience the example was written for
+//!   was exactly the audience that could not reach it;
 //! - the README states the contract the example cannot show — stdin, stdout,
 //!   exit code — because an operator who gets that wrong writes a file that
 //!   parses, advertises and returns nothing.
 
+use crate::cli::{self, Decided};
 use crate::config::{Local, TOOLS, read};
 use std::path::{Path, PathBuf};
 
@@ -124,6 +130,24 @@ fn the_readme_carries_the_example_verbatim() {
         "the README's `{TOOLS}` block is no longer the shipped example — one of \
          the two moved. docs/tools.example.json is the document; the README \
          block is its rendering, and they are one fact."
+    );
+}
+
+/// **The binary carries it byte for byte** (bl-bb7d). `thrall --example-tools`
+/// is the whole of how an operator who installed from the registry gets a
+/// starting document: `> <data root>/tools.json` and edit. A copy pasted into
+/// Rust would be a third document to keep in step, so what the flag prints is
+/// the file, compiled in — and what this asserts is that it still is.
+#[test]
+fn the_binary_prints_the_example_verbatim() {
+    let Decided::Say(said) = cli::run(vec!["--example-tools".to_owned()]) else {
+        panic!("--example-tools decided to do something rather than say something");
+    };
+    assert_eq!(said.code, 0);
+    assert_eq!(
+        said.text,
+        example().trim_end(),
+        "`thrall --example-tools` no longer prints the shipped document — a box          that installed from the registry has no other copy of it"
     );
 }
 

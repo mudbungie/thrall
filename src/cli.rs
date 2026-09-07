@@ -115,7 +115,7 @@ It never listens and it never speaks first.
 usage: thrall run
        thrall mcp pin -- <server argv...>
        thrall mcp <tool> -- <server argv...>
-       thrall [--version | --help]
+       thrall [--example-tools | --version | --help]
 
   run             serve every channel this box is provisioned for: present
                   what it offers, wait for work, run it, post the captures
@@ -139,6 +139,10 @@ usage: thrall run
                   is not a verb to type by hand — it is what a `command` in
                   tools.json names, so a bridged tool is a plain entry and this
                   box's document gains no key.
+  --example-tools print a complete example tool document, to edit into place:
+                  thrall --example-tools > <data root>/tools.json. A starting
+                  point and never a default — every entry names a command this
+                  box does not have until you write one — and it writes nothing.
   -V, --version   print the name and version
   -h, --help      print this
 
@@ -176,6 +180,9 @@ pub fn run(args: Vec<String>) -> Decided {
              server this box can spawn: thrall mcp fetch -- uvx mcp-server-fetch"
                 .to_string(),
         )),
+        ["--example-tools"] => {
+            Decided::Say(Verdict::ok(crate::config::EXAMPLE.trim_end().to_owned()))
+        }
         ["--version" | "-V"] => Decided::Say(Verdict::ok(version())),
         ["--help" | "-h"] => Decided::Say(Verdict::ok(usage())),
         [] => Decided::Say(Verdict::refused(

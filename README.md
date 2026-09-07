@@ -196,6 +196,18 @@ carrying `subject_cwd`, and one bridged MCP server — and it is the one below,
 byte for byte: a test holds the two together, so the example that ships is an
 example the gate reads.
 
+**The binary carries it too**, so an install that never cloned this repository
+still has it:
+
+```
+thrall --example-tools > <data root>/tools.json
+```
+
+That is a starting point and never a default — every entry names a command this
+box does not have until you write one, and thrall writes no file itself. The
+flag prints the same bytes as the block below and the same bytes as the shipped
+file; there is one document and three ways to read it.
+
 ```json
 [
   {

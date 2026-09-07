@@ -28,8 +28,15 @@
 //! [`the_list_is_not_vacuous`] fails a spawn that answered with a short list,
 //! and [`the_allowlist_sees_its_own_violations`] fails an [`is_ruled_in`] that
 //! has quietly become true of everything.
+//!
+//! **The allowlist's one cost is paid next door**, in [`embeds`]: a file the
+//! crate reads at COMPILE time must be ruled in here and named by `include`, or
+//! it builds on this box and on no other. That half moved out with bl-bb7d,
+//! when the crate gained its first embed and the question turned from *is there
+//! one* into *where does each one resolve*.
 
-use std::collections::BTreeSet;
+mod embeds;
+
 use std::path::{Path, PathBuf};
 
 /// The real answer to *"what would `cargo publish` upload?"*, one path per line.
@@ -62,9 +69,17 @@ fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 
-/// The classes ruled into the published crate: the crate's own Rust source, and
-/// the two files crates.io renders. `Cargo.toml.orig` and `.cargo_vcs_info.json`
+/// The classes ruled into the published crate: the crate's own Rust source, the
+/// two files crates.io renders, and the one file under `docs/` the crate itself
+/// reads at compile time (bl-bb7d). `Cargo.toml.orig` and `.cargo_vcs_info.json`
 /// are minted by cargo into the tarball and are not tree files at all.
+///
+/// **`docs/tools.example.json` is named and `docs/**` is not.** The rest of
+/// that directory is commentary addressed to a contributor — the design
+/// document, which is the largest file in the tree — and shipping it to every
+/// consumer of the binary is the defect this guard exists for. The example is
+/// ruled in for a reason that is not editorial at all: it is a build input, and
+/// `src/packaged_tests/embeds.rs` is what holds the two facts together.
 fn is_ruled_in(path: &str) -> bool {
     let named = matches!(
         path,
@@ -74,6 +89,7 @@ fn is_ruled_in(path: &str) -> bool {
             | ".cargo_vcs_info.json"
             | "README.md"
             | "LICENSE"
+            | "docs/tools.example.json"
     );
     named
         || path
@@ -108,6 +124,7 @@ fn the_files_a_registry_needs_ship() {
         "LICENSE",
         "src/lib.rs",
         "src/main.rs",
+        "docs/tools.example.json",
     ] {
         assert!(
             list.iter().any(|p| p == needed),
@@ -129,57 +146,6 @@ fn the_list_is_not_vacuous() {
          spawn is broken, not the tree",
         list.len()
     );
-}
-
-/// **The fail-closed list's one cost, paid.** `include` names `.rs` files under
-/// `src` and nothing else, so a compile-time embed of anything else would build
-/// here and fail to build for everyone who downloaded the crate. The sweep is
-/// over the tree rather than over a list, so it covers embeds that do not exist
-/// yet — and today the right answer is that there are none.
-#[test]
-fn nothing_the_build_reads_is_left_out_of_the_package() {
-    let embedding = sources_that_embed(&root().join("src"));
-    assert!(
-        embedding.is_empty(),
-        "these files read a build input at compile time. Every such input must \
-         be ruled into `include` in Cargo.toml and into is_ruled_in above, or \
-         the published crate cannot compile:\n{}",
-        embedding
-            .iter()
-            .map(|p| p.display().to_string())
-            .collect::<Vec<_>>()
-            .join("\n")
-    );
-}
-
-/// The two macro spellings that read a file at compile time, **assembled rather
-/// than written**: no pattern may match its own text, and a sweep that flags the
-/// file doing the sweeping is a sweep that can never be green. It is the same
-/// discipline `scripts/leak-rules.sh` holds for the disclosure rules, and the
-/// reason this file names neither macro literally anywhere.
-fn embed_spellings() -> [String; 2] {
-    ["bytes", "str"].map(|kind| format!("include_{kind}!"))
-}
-
-/// Every file under `dir` that names a compile-time embed, in one order.
-fn sources_that_embed(dir: &Path) -> BTreeSet<PathBuf> {
-    let mut found = BTreeSet::new();
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return found;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            found.extend(sources_that_embed(&path));
-        } else if std::fs::read_to_string(&path).is_ok_and(|text| {
-            embed_spellings()
-                .iter()
-                .any(|spelling| text.contains(spelling))
-        }) {
-            found.insert(path);
-        }
-    }
-    found
 }
 
 /// The negative direction for the restated policy: every excluded class, and
@@ -208,33 +174,14 @@ fn the_allowlist_sees_its_own_violations() {
     ] {
         assert!(!is_ruled_in(stray), "{stray} must not be ruled in");
     }
-    for shipped in ["src/main.rs", "src/channel/tls.rs", "LICENSE"] {
+    for shipped in [
+        "src/main.rs",
+        "src/channel/tls.rs",
+        "LICENSE",
+        "docs/tools.example.json",
+    ] {
         assert!(is_ruled_in(shipped), "{shipped} must be ruled in");
     }
-}
-
-/// The sweep must be able to SEE an embed, or its silence means nothing. It is
-/// pointed at this crate's own scratch directory, since `src` can no longer
-/// prove it.
-#[test]
-fn the_embed_sweep_sees_an_embed() {
-    let scratch = crate::test_support::Scratch::new();
-    let nested = scratch.path().join("nested");
-    std::fs::create_dir(&nested).expect("a directory");
-    let planted = nested.join("embeds.rs");
-    let [bytes, _] = embed_spellings();
-    std::fs::write(
-        &planted,
-        format!("const X: &[u8] = {bytes}(\"../x.bin\");\n"),
-    )
-    .expect("the plant is written");
-    std::fs::write(nested.join("plain.rs"), "const X: u8 = 1;\n").expect("a plain file");
-    assert_eq!(
-        sources_that_embed(scratch.path()),
-        BTreeSet::from([planted])
-    );
-    // A directory that is not there is an empty answer, not a panic.
-    assert!(sources_that_embed(&scratch.path().join("absent")).is_empty());
 }
 
 /// **The crate's front page names the route onto a box** (bl-b250).
