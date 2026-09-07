@@ -27,14 +27,16 @@
 //! decoders at the same strictness.
 //!
 //! **What a foot speaks is smaller than the protocol, so most bumps are not
-//! its business.** Between PROTOCOL 2 and 13 exactly one shape a foot decodes
+//! its business.** Between PROTOCOL 2 and 14 exactly one shape a foot decodes
 //! moved: `reply/advertised` gained `wrote` at 8. Every other bump is
 //! seat-facing — a conversation row's `failure` (3), the queue row's `flag`
 //! (4), `reply/governing`'s lineage keys (5), `reply/providers`' `effort` and
 //! `priority` (6), `reply/help`'s `surface` (7), `reply/transcript`'s `wounded`
 //! entry beside `reply/steps` losing `auth_failed` (9), `attention` becoming
 //! follow-class with no field moving at all (10), `reply/ops`' failure readings
-//! (11), the queue row's `says` (12), `reply/config`'s `settings` (13) — and a
+//! (11), the queue row's `says` (12), `reply/config`'s `settings` (13),
+//! `request/enroll`'s optional `address` beside `reply/clients`' optional
+//! `last_seen` (14) — and a
 //! foot decodes none of them. Every frame below is therefore byte for byte the
 //! text it was at 8; only the equality moved. It still cannot dial across any
 //! of them, because the preface is one integer compared for equality: the
@@ -42,7 +44,7 @@
 //! happens to read.
 
 /// **The protocol number, got from the engine.** yog's `src/wire/hello.rs`
-/// reads `pub const PROTOCOL: u32 = 13`, and this is that line copied.
+/// reads `pub const PROTOCOL: u32 = 14`, and this is that line copied.
 ///
 /// It is what the suite's stand-in engine states, so every channel test dials
 /// across the same equality a real one does — and
@@ -55,8 +57,9 @@
 /// fixture can see the far end — and the only thing that meets that skew is a
 /// real dial, which is why the sentence that dial earns has to read as an
 /// operator's upgrade prompt. This line is moved by hand, once per release
-/// train.
-pub(crate) const PROTOCOL: u32 = 13;
+/// train — and it has been moved three times now (bl-e0f0, bl-f88f, bl-dc5f),
+/// the last within hours of the one before it.
+pub(crate) const PROTOCOL: u32 = 14;
 
 /// `corpus/request/advertise.json`, stamped PROTOCOL 2 — the empty set, one
 /// ordinary element, and the element carrying §5.1's optional fourth fact.
