@@ -42,9 +42,8 @@
 # client process — so the count answered about the wrong program. A native unit's
 # cgroup holds the program.
 #
-# Nothing here is stored. "Which version is installed" is the binary's own
-# answer, "is a restart pending" is a kernel fact, and "is it busy" is the
-# cgroup's. There is no state file to drift, and nothing to reconcile if
+# Nothing here is stored. "Which version is installed" and "which is running"
+# are the two binaries' own answers, and "is it busy" is the cgroup's. There is no state file to drift, and nothing to reconcile if
 # somebody installs or restarts by hand.
 #
 # Exit 0 whenever the box is in a lawful state, including "newer version
@@ -181,18 +180,15 @@ latest_live() {
     done | sort -V | tail -1
 }
 
-# What is on disk. Asking the binary is the one authority: cargo's own
-# bookkeeping can disagree with the file after a hand install, and the file is
-# what the unit will exec. Absent is the empty string, which is a lawful answer:
-# a box being seated for the first time has no binary yet.
-installed() {
-    [ -x "$BIN" ] || return 0
-    "$BIN" --version 2>/dev/null | awk 'NR==1 {print $NF}'
-}
+# What version a file is, asked of the file: cargo's bookkeeping can disagree
+# with what is on disk after a hand install, and the file is what the unit
+# execs. Absent reads empty, which is a lawful answer — a box seated for the
+# first time has no binary, and a stopped unit has no running one.
+version_of() { [ -x "$1" ] || return 0; "$1" --version 2>/dev/null | awk 'NR==1 {print $NF}'; }
 
 want=$(latest_live)
 [ -n "$want" ] || die 'the registry index named no live version'
-have=$(installed)
+have=$(version_of "$BIN")
 
 changed=no
 if [ "$want" != "$have" ]; then
@@ -203,7 +199,7 @@ if [ "$want" != "$have" ]; then
     # and `--force` is set because the move may be a DOWNGRADE — the yank lever
     # above — and cargo refuses to move backwards otherwise.
     cargo install "$CRATE" --root "$ROOT" --locked --version "$want" --force
-    say "installed $(installed)"
+    say "installed $(version_of "$BIN")"
 else
     say "installed $have is current"
 fi
@@ -214,16 +210,26 @@ state=$(systemctl --user show -P ActiveState "$UNIT" 2>/dev/null || echo unknown
 [ -n "$state" ] || state=unknown
 pid=$(systemctl --user show -P MainPID "$UNIT" 2>/dev/null || echo 0)
 
-# "A restart is pending" is not a flag anybody writes — it is the running
-# process executing a different file than the one installed. The kernel holds
-# that fact: `/proc/<pid>/exe` still resolves to the replaced inode after an
-# install renames a new file over the path.
+# "A restart is pending" is not a flag anybody writes: it is the running foot
+# being an older VERSION than the one installed. Each half is self-reported —
+# the running foot through `/proc/<pid>/exe`, which is still the replaced file
+# after an install renamed a new one over the path, and the installed binary
+# through the path itself — and an unreadable half is `unknown`, which defers.
+#
+# **The version and not the inode, and that is the whole of bl-ad9c.** An inode
+# says "some other file is there now", which is the same question only while
+# this reconciler is the only writer of the install path. A hand `make install`
+# is a second writer — a new inode at no new published version — and under the
+# inode read the next tick restarted the foot onto it, killing whatever
+# invocation was executing at the moment the box looked idle enough to act. yog
+# met exactly that on a live engine (its bl-6b27). This file's rule is *the foot
+# should be running the newest live version*, and after step 1 the installed
+# binary IS that version, so comparing versions asks the rule itself.
 pending=unknown
-running_inode=
-[ "${pid:-0}" = 0 ] || running_inode=$(stat -Lc %i "/proc/$pid/exe" 2>/dev/null || true)
-installed_inode=$(stat -Lc %i "$BIN" 2>/dev/null || true)
-if [ -n "$running_inode" ] && [ -n "$installed_inode" ]; then
-    if [ "$running_inode" = "$installed_inode" ]; then pending=no; else pending=yes; fi
+running_version=$(version_of "/proc/${pid:-0}/exe")
+installed_version=$(version_of "$BIN")
+if [ -n "$running_version" ] && [ -n "$installed_version" ]; then
+    if [ "$running_version" = "$installed_version" ]; then pending=no; else pending=yes; fi
 fi
 
 # The busy read, and only when there is something to defer FOR: a foot that is
@@ -258,7 +264,7 @@ case "$(decide "$state" "$changed" "$pending" "$idle")" in
                 "$pending, idle: $idle); deferring the restart to the next tick"
         fi ;;
     restart)
-        say "starting $UNIT on $(installed) (was $state)"
+        say "starting $UNIT on $(version_of "$BIN") (was $state)"
         # `reset-failed` FIRST, always. A unit that tripped its start limit is
         # REFUSED a restart until the limit's interval expires — so without this
         # the recovery arm above cannot actually recover anything. On a healthy

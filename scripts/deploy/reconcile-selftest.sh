@@ -50,6 +50,21 @@ current()    { line 0.0.4 false; line 0.0.5 false; }
 tip_yanked() { line 0.0.4 false; line 0.0.5 true;  }
 all_yanked() { line 0.0.4 true;  line 0.0.5 true;  }
 
+# One report for every case, whichever world built it: a label reaches this
+# function on both arms, so a case can never leave the verdict by passing
+# quietly, and the three facts a failure needs are printed from one place.
+verdict() { # <0 ok | 1 failed> <label>
+    if [ "$1" = 0 ]; then
+        printf '  ok    %s\n' "$2"
+    else
+        printf '  FAIL  %s (exit %s)\n' "$2" "$code"
+        printf '%s\n' "$out" | sed 's/^/          | /'
+        printf '        cargo: %s\n' "${log:-<never invoked>}"
+        printf '        units: %s\n' "${units:-<never touched>}"
+        fails=1
+    fi
+}
+
 # Run the reconciler in a built world and hand the result to a checker, which
 # reads five globals: `$code` its exit status, `$out` its combined output, `$log`
 # the fake cargo's recorded argv, `$units` the fake systemctl's recorded argv,
@@ -112,15 +127,7 @@ EOF
     log=$(cat "$_work/cargo.log" 2>/dev/null || true)
     units=$(cat "$_work/units.log" 2>/dev/null || true)
 
-    if "$_check"; then
-        printf '  ok    %s\n' "$_label"
-    else
-        printf '  FAIL  %s (exit %s)\n' "$_label" "$code"
-        printf '%s\n' "$out" | sed 's/^/          | /'
-        printf '        cargo: %s\n' "${log:-<never invoked>}"
-        printf '        units: %s\n' "${units:-<never touched>}"
-        fails=1
-    fi
+    if "$_check"; then verdict 0 "$_label"; else verdict 1 "$_label"; fi
     rm -rf "$_work"
 }
 
@@ -204,13 +211,67 @@ out=$(HOME="$work/home" PATH="$work/bin:$PATH" "$SCRIPT" 2>&1); code=$?
 set -e
 log=$(cat "$work/cargo.log" 2>/dev/null || true)
 units=$(cat "$work/units.log" 2>/dev/null || true)
-if refused_with 'cannot reach the registry index' && never_restarted; then
-    printf '  ok    %s\n' 'registry unreachable -> refuses, changes nothing'
-else
-    printf '  FAIL  %s (exit %s)\n' 'registry unreachable -> refuses, changes nothing' "$code"
-    printf '%s\n' "$out" | sed 's/^/          | /'
-    fails=1
-fi
+reg_label='registry unreachable -> refuses, changes nothing'
+if refused_with 'cannot reach the registry index' && never_restarted
+    then verdict 0 "$reg_label"; else verdict 1 "$reg_label"; fi
+rm -rf "$work"
+
+# --- a same-version swap is not a publication (bl-ad9c) -----------------------
+# The one fact a fake world cannot invent: a live process whose
+# `/proc/<pid>/exe` is a real file. Two COPIES of one binary — one at the path
+# the unit execs, one running — are two inodes at ONE version, which is exactly
+# what a hand `make install` leaves behind. The retired inode read called that a
+# pending restart, so the next tick would have killed an in-flight invocation
+# for a dev build; the version read calls the box current and touches nothing.
+#
+# `git` stands in for thrall — the whole probe is `--version`, and git is the
+# one real binary every box running this gate has. It is held alive by a read on
+# a fifo this harness keeps open (`9<>`, never `9>`, which deadlocks against a
+# reader that has not opened yet).
+cases=$((cases + 1))
+work=$(mktemp -d "${TMPDIR:-/tmp}/thrall-selftest.XXXXXX")
+mkdir -p "$work/bin" "$work/home/.local/bin"
+stand_in=$(command -v git)
+cp "$stand_in" "$work/home/.local/bin/thrall"
+cp "$stand_in" "$work/bin/running-foot"
+ver=$("$work/bin/running-foot" --version 2>/dev/null | awk 'NR==1 {print $NF}')
+[ -n "$ver" ] || { echo 'deploy-selftest: the stand-in binary reports no version;' \
+    'this box cannot host the same-version-swap case' >&2; exit 1; }
+line "$ver" false > "$work/index.txt"
+mkfifo "$work/hold"
+exec 9<> "$work/hold"
+"$work/bin/running-foot" hash-object --stdin < "$work/hold" &
+foot=$!
+waited=0
+until [ "$(readlink "/proc/$foot/exe" 2>/dev/null)" = "$work/bin/running-foot" ]; do
+    waited=$((waited + 1))
+    [ "$waited" -lt 10 ] || { echo 'deploy-selftest: the stand-in never exec' >&2; exit 1; }
+    sleep 1
+done
+printf '#!/bin/sh\nexec cat "%s/index.txt"\n' "$work" > "$work/bin/curl"
+printf '#!/bin/sh\nprintf "%%s\\n" "$*" >> "%s/cargo.log"\n' "$work" > "$work/bin/cargo"
+# ControlGroup is deliberately NOT answered: under the retired inode read the
+# idle question WOULD be asked, and the ask itself lands in units.log — so "the
+# unit was never touched" reddens on the tree this case exists to catch.
+cat > "$work/bin/systemctl" <<EOF
+#!/bin/sh
+case "\$*" in
+  *"show -P ActiveState"*) echo active; exit 0 ;;
+  *"show -P MainPID"*)     echo $foot;  exit 0 ;;
+esac
+printf '%s\n' "\$*" >> "$work/units.log"
+EOF
+chmod 0755 "$work/bin/curl" "$work/bin/cargo" "$work/bin/systemctl"
+set +e
+out=$(HOME="$work/home" PATH="$work/bin:$PATH" "$SCRIPT" 2>&1); code=$?
+set -e
+kill "$foot" 2>/dev/null || true
+exec 9>&-
+log=$(cat "$work/cargo.log" 2>/dev/null || true)
+units=$(cat "$work/units.log" 2>/dev/null || true)
+swap_label='a hand install at the same version -> current, nothing touched'
+if [ "$code" = 0 ] && [ -z "$log" ] && never_restarted && said 'nothing to do'
+    then verdict 0 "$swap_label"; else verdict 1 "$swap_label"; fi
 rm -rf "$work"
 
 # The empty-set guard, the same two-direction discipline `make line-cap` and

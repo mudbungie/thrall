@@ -606,9 +606,15 @@ stopped it*:
 - **the unit is `inactive`** — stopped on purpose, not ours to move.
 - **the unit is `failed`** — no invocation to protect, and no point retrying the
   version that just failed; a version it has NOT run is the one useful act.
-- **the running foot already IS the installed binary** — nothing to do, read as
-  a kernel fact (`/proc/<pid>/exe`'s inode against the installed file's) rather
-  than a flag anybody writes.
+- **the running foot already IS the newest live version** — nothing to do, read
+  as the two binaries' own answers rather than a flag anybody writes: what
+  `/proc/<pid>/exe --version` says against what the installed file says. **The
+  version and not the inode** (bl-ad9c): an inode says only "some other file is
+  there now", which is the same question only while the reconciler is the sole
+  writer of the install path. A hand `make install` is a second writer — a new
+  inode at no new published version — and under the inode read the next tick
+  restarted the foot onto it, killing whatever invocation was executing at the
+  moment the box looked idle enough to act.
 - **an invocation is executing** — defer. thrall runs every tool as a child
   process (`src/spawn.rs`) and its own concurrency is threads, so an idle foot
   is exactly one process in the unit's cgroup and an invocation in flight is a
