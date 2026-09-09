@@ -1,6 +1,6 @@
 //! The preface: what this end states, and every way a peer can fail to agree.
 
-use super::{PROTOCOL, confirm, state};
+use super::{EDITION, FLOOR, PROTOCOL, confirm, state};
 use crate::channel::Failure;
 use crate::channel::frame;
 use serde_json::{Value, json};
@@ -12,15 +12,16 @@ fn stated(v: &Value) -> Vec<u8> {
     wire
 }
 
-/// What this end writes is one frame carrying one key.
+/// What this end writes is one frame carrying the major and the edition —
+/// REMOTE §3.2's two keys, and nothing else.
 #[test]
-fn this_end_states_one_integer_in_one_frame() {
+fn this_end_states_the_major_and_its_edition_in_one_frame() {
     let mut wire = Vec::new();
     state(&mut wire).expect("state");
     let mut read = wire.as_slice();
     assert_eq!(
         frame::read_value(&mut read).expect("read"),
-        Some(json!({ "protocol": PROTOCOL })),
+        Some(json!({ "protocol": PROTOCOL, "edition": EDITION })),
     );
     assert_eq!(
         frame::read_value(&mut read).ok(),
@@ -35,9 +36,38 @@ fn this_end_states_one_integer_in_one_frame() {
 /// literal copied from yog — rather than the pin this file is about, so the two
 /// have different sources here as they do on the wire.
 #[test]
-fn an_engine_of_this_version_is_confirmed() {
-    let wire = stated(&json!({ "protocol": crate::corpus::PROTOCOL }));
-    assert_eq!(confirm(&mut wire.as_slice()), Ok(()));
+fn an_engine_of_this_version_is_confirmed_and_answers_its_edition() {
+    let wire = stated(&json!({ "protocol": crate::corpus::PROTOCOL, "edition": 21 }));
+    assert_eq!(confirm(&mut wire.as_slice()), Ok(21));
+}
+
+/// **An engine that states no edition is read as the floor** (REMOTE §3.2),
+/// and so is one whose edition is not an edition: the fail-closed equality is
+/// the MAJOR's, and this key is no part of it. The floor credits the peer with
+/// the least it can be spelling, which is the direction that cannot invent a
+/// capability the far end does not have.
+#[test]
+fn an_engine_that_states_no_readable_edition_is_read_as_the_floor() {
+    for preface in [
+        json!({ "protocol": crate::corpus::PROTOCOL }),
+        json!({ "protocol": crate::corpus::PROTOCOL, "edition": "eight" }),
+        json!({ "protocol": crate::corpus::PROTOCOL, "edition": -1 }),
+        json!({ "protocol": crate::corpus::PROTOCOL, "edition": u64::from(u32::MAX) + 1 }),
+    ] {
+        let wire = stated(&preface);
+        assert_eq!(confirm(&mut wire.as_slice()), Ok(FLOOR), "{preface}");
+    }
+}
+
+/// **An unknown key in the preface is ignored** (REMOTE §3.2 rule 1). It is the
+/// rule the edition key itself arrived under: a build older than this one met
+/// exactly this frame and had to go on.
+#[test]
+fn a_key_this_end_has_not_heard_of_is_ignored() {
+    let wire = stated(&json!({
+        "protocol": crate::corpus::PROTOCOL, "edition": 19, "fhtagn": ["deeper"]
+    }));
+    assert_eq!(confirm(&mut wire.as_slice()), Ok(19));
 }
 
 /// A mismatch names BOTH versions and the remedy. That is the requirement, not

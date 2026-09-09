@@ -1,7 +1,7 @@
 //! One channel against something that speaks the protocol: a real listener, a
 //! real mTLS handshake, a real version preface, real frames.
 
-use super::hello::PROTOCOL;
+use super::hello::{EDITION, PROTOCOL};
 // The version the FAR end states, got from the engine rather than from this
 // crate's own pin: two sources, as on the wire (`crate::corpus`).
 use super::material::{CHAIN, KEY, Material, read_dir};
@@ -71,7 +71,7 @@ fn one_ask_states_a_version_carries_the_request_and_answers_the_reply() {
     assert_eq!(channel.ask(&request), Ok(vec![advertised()]));
     assert_eq!(
         engine.heard(),
-        vec![json!({ "protocol": PROTOCOL }), request],
+        vec![json!({ "protocol": PROTOCOL, "edition": EDITION }), request],
         "the preface rides beside the gesture, never inside it"
     );
 }

@@ -1,7 +1,9 @@
-//! **The version preface** (yog's `docs/REMOTE.md` §3): *"each end writes one
-//! frame, `{"protocol": <integer>}`, before it reads the peer's."* Both write
-//! before either reads, so neither waits on the other and there is no ordering
-//! rule to remember.
+//! **The version preface** (yog's `docs/REMOTE.md` §3, §3.2): *"each end
+//! writes one frame ... before it reads the peer's."* Both write before either
+//! reads, so neither waits on the other and there is no ordering rule to
+//! remember. The frame carries two keys — `protocol`, the major, compared for
+//! equality; and `edition`, what the writer can spell within it, discovered
+//! and never compared.
 //!
 //! **This is why thrall exists as a separate program and it is not decoration.**
 //! Until the four-component split one crate shipped both ends of every
@@ -45,59 +47,17 @@ use serde_json::{Value, json};
 
 use super::{Failure, frame};
 
-/// The protocol this build speaks.
-///
-/// **A new verb is not a bump.** A `Query`, an `Action` or a reply kind the
-/// peer has not heard of already refuses in band, naming it (REMOTE §3's strict
-/// decode) — the boundary correcting itself, not two protocols meeting. The
-/// integer moves when the *existing* shape changes meaning: the framing, the
-/// envelope, or what a spelling already in use is taken to say.
-///
-/// **The number is the engine's and there is nothing here to version.** It must
-/// read whatever yog's own repo-root `PROTOCOL` file reads, so it is stated a
-/// second time — as a literal copied from that file — in `crate::corpus`, which
-/// is what the suite's stand-in engine dials at. The two agreeing is a test
-/// (`corpus::tests`) rather than a tautology, and that is the whole of the
-/// defence: while the stand-in wrote its preface from *this* constant, both
-/// ends of every test agreed by construction and the pin sat five versions
-/// behind a live engine with the suite green (bl-e0f0).
-///
-/// **Most bumps are not a foot's business, and it can still not dial across a
-/// single one of them.** Of everything past 2, exactly one touched this crate's
-/// own surface — 8 (yog bl-66d4), the required `wrote` on `reply/advertised`.
-/// 3 through 7 and 9 through 18 moved seat-facing shapes this crate never
-/// decodes, 10 moved no field at all (`attention` became follow-class), and 17
-/// and 18 each moved a VALUE rather than a field — a new `signals` word, then a
-/// fourth `framing` word — that the shape ledger cannot see. The
-/// preface is one integer compared for equality, so the version states the
-/// engine's *build* and never which frames this end happens to read — which is
-/// why this constant has now drifted seven times (bl-e0f0, bl-f88f, bl-dc5f,
-/// bl-605f, bl-44b4, bl-272d, bl-dc8a) with the suite
-/// green: nothing on this side of the socket can see the far end move, and a
-/// real dial is the only thing that meets the skew. bl-dc8a is the first moved
-/// while the engine's number was still UNPUBLISHED, which is the order yog
-/// `docs/REMOTE.md` §3 asks for: a consumer's `main` carries the number, then
-/// the engine publishes, then the consumer does.
-///
-/// **It is not declared here.** The repo-root `PROTOCOL` file states it, one
-/// line, and `build.rs` compiles that into the constant re-exported below
-/// (bl-c618) — the same shape yog and every other consumer now carry. Bump it
-/// by editing that line; nothing under `src` says the number. It is a file
-/// because the release gates that read it are other repositories FETCHING one
-/// path out of a tree they do not build, and a Rust path is not a stable
-/// address for that: yog's own split of `src/wire/hello.rs` left the old path
-/// re-exporting, which a build cannot notice and a regex reads as no
-/// declaration, and it broke every gate in the suite at once.
-pub use protocol::PROTOCOL;
+/// The engine's three numbers, vendored.
+mod version;
 
-/// The generated constant, and nothing else: `build.rs` writes it from the
-/// repo-root `PROTOCOL` file on every build the file has moved.
-mod protocol {
-    include!(concat!(env!("OUT_DIR"), "/protocol.rs"));
-}
+pub use version::{EDITION, FLOOR, PROTOCOL};
 
-/// The preface's one key, and the whole of its shape.
+/// The preface's first key: the major, compared for equality.
 const KEY: &str = "protocol";
+
+/// Its second key (REMOTE §3.2): what the peer can spell within that major.
+/// Unlike [`KEY`] it is never compared — an edition is discovered, not agreed.
+const EDITION_KEY: &str = "edition";
 
 /// What a peer that stated no version is called in the sentence. An unversioned
 /// build, a frame that is not an object, a frame without the key and a peer
@@ -105,24 +65,52 @@ const KEY: &str = "protocol";
 /// served, and four sentences for one outcome is four sentences.
 const UNSTATED: &str = "no version";
 
-/// Write this build's preface. Called before this end reads, which is what
-/// makes the exchange deadlock-free without an ordering rule.
+/// Write this build's preface: the major, and the edition beside it. Called
+/// before this end reads, which is what makes the exchange deadlock-free
+/// without an ordering rule.
+///
+/// **Both ends write the edition** (REMOTE §3.2), so the key is stated even
+/// though nothing at the far end has to read it — a peer that ignores it is
+/// exercising rule 1, which is the same rule this end keeps on the way back.
 pub fn state(w: &mut dyn Write) -> io::Result<()> {
-    frame::write_value(w, &json!({ KEY: PROTOCOL }))
+    frame::write_value(w, &json!({ KEY: PROTOCOL, EDITION_KEY: EDITION }))
 }
 
 /// Read the engine's preface and refuse a mismatch — as the one `Err(String)`
 /// every other thing that can go wrong with this transport already arrives as,
 /// so nothing above here carries a case for it.
-pub fn confirm(r: &mut dyn Read) -> Result<(), Failure> {
+///
+/// **What it answers is the engine's EDITION** (REMOTE §3.2): the fact that
+/// says which post-floor fields that engine can spell. A foot reads no
+/// post-floor field today — every path in its vendored ledger is at or under
+/// the floor — so nothing above gates on the answer yet; it is decoded here
+/// rather than ignored because the defaulting is the rule, and a rule nothing
+/// returns is a rule nothing can test.
+pub fn confirm(r: &mut dyn Read) -> Result<u32, Failure> {
     let Some(preface) = arrived(r) else {
         return Err(Failure::Wire(mismatch(None)));
     };
     let peer = preface.get(KEY).and_then(Value::as_u64);
     if peer == Some(u64::from(PROTOCOL)) {
-        return Ok(());
+        return Ok(edition_of(&preface));
     }
     Err(Failure::Skew(mismatch(peer)))
+}
+
+/// **The peer's edition, defaulted at the [`FLOOR`]** — for an absent key, and
+/// for a value that is not an edition.
+///
+/// The absent case is REMOTE §3.2's rule; the unreadable case takes the same
+/// answer rather than a refusal, because the fail-closed equality is the
+/// MAJOR's and this key is not part of it. Reading a garbled edition as the
+/// floor credits the peer with the least it can be spelling, which is the
+/// direction that cannot invent a capability.
+fn edition_of(preface: &Value) -> u32 {
+    preface
+        .get(EDITION_KEY)
+        .and_then(Value::as_u64)
+        .and_then(|stated| u32::try_from(stated).ok())
+        .unwrap_or(FLOOR)
 }
 
 /// **The peer's preface frame, if one came at all.** `None` is the wire: a read

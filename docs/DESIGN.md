@@ -422,107 +422,94 @@ commit has. What it does not reach is stated where the rest of the disclosure
 posture is (§5.2): it is prevention, local and bypassable, and thrall has no
 published artifact for anything late to check.
 
-### 3.6 Version skew is real now
+### 3.6 Version skew is real, and the number is a major now (bl-6fcf)
 
 Separately installed ends make version skew possible for the first time. The
 handshake carries a protocol version, and a mismatch **refuses fail-closed,
 naming both versions**. A foot and an engine that disagree about the wire must
-not discover it one field at a time.
+not discover it one field at a time. Every word of that is unchanged; what
+changed is what a disagreement *is*.
 
-The version moves in lockstep with the engine's, and the engine's corpus
-ledger is what forces a move. **The pin is 18** (bl-dc8a), and a foot's own
-surface moved exactly twice on the way there: PROTOCOL 2 (bl-36f7) is the
-worktree lane's bump — the advertised element gained `subject_cwd` and the
-invocation gained `cwd`, both optional, both a change to a shape already in
-use — and PROTOCOL 8 (yog bl-66d4) is the `wrote` receipt §3.7 consumes. Every
-other bump is a seat-facing shape this crate never decodes: a conversation
-row's `failure` (3), the queue row's `flag` (4), `reply/governing`'s lineage
-keys (5), `reply/providers`' `effort` and `priority` (6), `reply/help`'s
-`surface` (7), `reply/transcript`'s `wounded` entry beside `reply/steps`
-losing `auth_failed` (9), `attention` becoming follow-class with **no field
-moving at all** (10), `reply/ops`' failure readings (11), the queue row's
-`says` (12), `reply/config`'s `settings` (13), `request/enroll`'s optional
-`address` beside `reply/clients`' optional `last_seen` (14),
-`reply/follow`'s tool window (15), `reply/ops`' rows gaining `client` (16),
-the §6 signal vocabulary gaining the word `truncated` beside a delivered
-row's optional `sender_name` / `from_name` (17), and **three shapes on one
-number** at 18 — `reply/follow`'s tool-window entry gaining `held` (yog
-bl-58bb), `reply/steps`' `framing` gaining a fourth word `in_flight` (yog
-bl-ab53), and `request/answer` with `reply/answered` gaining `scope` (yog
-bl-94a5), batched deliberately because under the release hold each extra
-number is another window in which no published suite composes. Two of those
-move no field at all, being new VALUES a strict decoder built against the
-previous number refuses by name, so the shape ledger cannot see them and the
-NUMBER is the authority.
-**A foot could dial across none
-of them**, because the preface is one integer compared for equality — the
-version states the engine's *build*, never which frames this end reads. So
-every vendored frame in §4's corpus is byte for byte the text it was at 8: the
-re-vendors for 13, 14, 15, 16, 17 and 18 moved the equality and nothing else —
-at 18 that was re-established by comparing all seven foot-decoded shapes
-against the engine's `corpus/` frame by frame, which found thirteen frames
-identical and every stamp unmoved (2/1/1/8/2/1/1).
+**`PROTOCOL` is a major-compatibility number** (yog `docs/REMOTE.md` §3.2, the
+authority — this section states only the foot's half). It moves on a break: a
+field removed or re-typed, a meaning changed under a spelling still in use, a
+field the engine newly requires on a request. **The pin is 19**, the last bump
+of the old kind and the first of the new. Every *addition* — a field, a word, an
+op, a reply kind — ships unbumped and is stamped an **edition** in the engine's
+shape ledger, which this crate vendors (`src/corpus/ledger/shapes.rs`) as it
+vendors the frames.
 
-**And the pin drifting is the ordinary case, not an accident.** It has now
-gone stale SEVEN times with the suite green (bl-e0f0 at 2, bl-f88f at 8,
-bl-dc5f at 13, bl-605f at 14, bl-44b4 at 15, bl-272d at 16, bl-dc8a at 17), and
-the interval is collapsing
-rather than
-lengthening: four of the six fall inside three sessions — bl-dc5f's pin was
-stale before its own release finished publishing, because the engine published
-in the window bl-dc5f was waiting in, and bl-44b4 was filed off a clean-room
-install of the published foot meeting a published engine one further version
-on. **bl-272d is the first to be filed off a DEAD UNIT rather than a failed
-dial**: a mismatch now exits instead of retrying (yog bl-5d62), so the foot
-walked its restart limit and `thrall.service` sat `failed` on both live boxes
-until the pin moved. And 16 was never an engine anyone could have met — yog
-published 15, then 17, so this crate's previous pin named a build that exists
-only on yog's `main`. Sixteen of the eighteen bumps are invisible to
-this crate by construction — a
-foot's surface is small, so it is *usually* a version behind on shapes it does
-not read, and *always* unable to dial while it is. Nothing on this side of the
-socket can close that: a fixture cannot see the far end, so the corpus test
-defends a bad re-vendor and never a moved engine. Two things follow, and
-neither is a mechanism this repo can install. The pin moves on the release
-train, after yog and before a foot is shipped; and the skew, when an operator
-does meet it, must arrive as a sentence that ends the channel rather than a
-retry — a fact only a new binary can change is not something to wait on.
+**Why that is the fix and not a convenience.** The pin went stale SEVEN times
+with the suite green (bl-e0f0 at 2, bl-f88f at 8, bl-dc5f at 13, bl-605f at 14,
+bl-44b4 at 15, bl-272d at 16, bl-dc8a at 17), five of them inside three sessions
+— and *sixteen of the eighteen bumps were invisible to this crate by
+construction*. A foot's surface is small, so it was usually a version behind on
+shapes it does not read, and always unable to dial while it was: bl-272d was
+filed off a `thrall.service` sitting `failed` on two boxes, and 16 was never an
+engine anyone could have met (yog published 15, then 17). Four of the five bumps
+in that week carried nothing but additions. Under the edition discipline none of
+the four moves the number, so none of them takes a foot off the wire.
 
-**bl-dc8a is the first of the seven that no operator paid for**, and the only
-thing that made it so was doing it in the order yog `docs/REMOTE.md` §3 already
-writes down: *the consumers' mains carry the number first, then yog publishes,
-then the consumers publish.* Landing the constant on `main` is held by neither
-gate — it is what yog's release hold (yog bl-bca2) waits for — so the move can
-always be made against yog's `main` rather than against a published engine, and
-the six before it were made against a published engine only because nothing
-prompted them until a unit failed. Nothing here can OBSERVE the engine moving;
-what it can do is stop treating a dead unit as the notification. The reading to
-take from the six is not that the pin will keep going stale but that the prompt
-was in the wrong place, and the standing residual is that this repository has
-no signal for a raise on yog's `main` — only a person who looks.
+**The stamps, the floor, and what this foot states.** `shapes.json` stamps every
+field PATH with the edition it appeared at and records a **floor** — the edition
+the major was cut at, 18. A path at or below the floor is present on every
+engine of this major and a reader may require it; a path above it is optional to
+read, and its reader owes it a default that is *the fact before the field
+existed*. **Every path a foot decodes is at or under the floor** — its newest
+stamp is 8 — so every reader here still requires its fields, and
+`corpus::ledger::tests` is what says so out loud rather than leaving it a
+coincidence. The preface now carries `edition` beside `protocol`: this build
+states **8**, which is what it can READ rather than when it was built, and a
+peer that states none is read as the floor. The engine's edition is decoded and
+dropped at `Channel::dial` — a foot reads no post-floor field, so there is
+nothing to grey and no absence to explain.
 
-**And pinning FORWARD is not the way out** (bl-dc5f). The obvious repair for a
-pin that keeps falling behind is to pin at yog's `main` rather than at yog's
-release. It does not work, because the preface is compared for EQUALITY: a foot
-ahead of the engine is refused in exactly the same sentence as a foot behind
-it. A foot works only in the window where both components have PUBLISHED the
-same number, and no edit on this side of the socket can widen that window. What
-would is upstream of both repositories — the two pins moving on one train, or a
-wire that stops being an equality — and stating that is worth more than a fix
-here that implies otherwise.
+**The by-hand re-vendor comparison is a replay now.** Every re-vendor up to 18
+was paid for by reading the engine's frames against this crate's, shape by shape
+— at 18 that was thirteen frames and seven stamps compared by eye.
+`src/corpus/replay.rs` is that reading mechanised, and it asks two questions no
+eye asked:
+
+- **Projection.** For every reply shape and every edition an engine of this
+  major can be at, delete every key stamped above it and decode: nothing
+  refuses. The stamps are the history, so one record replays to any point of it
+  and no archive of old fixtures is kept or goes stale.
+- **Word mutation.** For every string-typed path other than `kind`, put a token
+  no build has heard of in it and decode: nothing refuses. Free text passes
+  trivially; a vocabulary passes only through its catch-all — and `kind` is the
+  exception, because a kind a reader has never heard of means an ask started
+  being answered differently, which is a major by definition.
+
+Both directions are held, as everywhere else in this repository: the projection
+over the real ledger deletes nothing today, so the replay also projects a
+FIXTURE signature in which `wrote` arrived after the floor and asserts the key
+is gone and the strict reader refuses it. That refusal is the red the day yog
+stamps a foot-facing path above the floor, and it names the remedy: give that
+key a default.
+
+**What no fixture on this side can catch, and it is unchanged.** A fixture
+cannot see the far end, so the corpus defends a bad re-vendor and never a moved
+engine; only a real dial meets that. **And pinning FORWARD is still not the way
+out** (bl-dc5f): the preface is compared for EQUALITY, so a foot ahead of the
+engine is refused in the same sentence as a foot behind it. What the edition
+discipline buys is that the window in which both ends carry one number is now
+wide by default instead of narrow by accident — an engine an edition on is an
+engine this foot still dials. When the number does move, it moves in the order
+REMOTE §3 writes down: *the consumers' mains carry it first, then yog publishes,
+then the consumers publish.*
 
 **And the number is the engine's, so the suite states it as the engine's.**
-`src/corpus.rs` (§4) holds the protocol number and the frames of every shape a
-foot speaks as literal text copied from yog, and the stand-in engine dials at
-that. It has to: while the stand-in wrote its preface from
+`src/corpus.rs` (§4) holds the protocol number, the ledger and the frames of
+every shape a foot speaks as literal text copied from yog, and the stand-in
+engine dials at that. It has to: while the stand-in wrote its preface from
 `channel::hello::PROTOCOL`, both ends of every test were one constant wearing
 two names, agreeing at any value — so the pin sat five versions behind a live
-engine, unable to open one real channel, with the whole suite green (bl-e0f0).
-A fixture built out of the thing it stands in for cannot fail the one way that
+engine, unable to open one real channel, with the whole suite green (bl-e0f0). A
+fixture built out of the thing it stands in for cannot fail the one way that
 matters. Vendoring the corpus as `.rs` rather than as yog's `.json` files is
-`Cargo.toml`'s doing: JSON would have to be ruled into the `include` allowlist
-to survive a build from the registry, and would then ship a test fixture inside
-a released crate.
+`Cargo.toml`'s doing: JSON would have to be ruled into the `include` allowlist to
+survive a build from the registry, and would then ship a test fixture inside a
+released crate.
 
 ### 3.7 The set is keyed on the identity, and a working foot is absent
 
@@ -874,7 +861,8 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/main.rs` | The process entry and nothing else: argv in, stream selected by the code, exit. The single `tarpaulin.toml` exclusion. |
 | `src/channel.rs` | **The channel** (bl-a4a5): one wire to one engine. Dial per ask, hold only while waiting, never reconnect. There is an `ask` and there is nothing else — the shape of the file is the dial-in invariant. |
 | `src/channel/frame.rs` | The framing: a big-endian `u32` length, then that many bytes of JSON; a zero-length frame terminates an answer (REMOTE §3). |
-| `src/channel/hello.rs` | The version preface, and this end's half of it — state, confirm, refuse fail-closed naming both versions. The number itself is in no Rust file: the repo-root `PROTOCOL` file states it and `build.rs` compiles it into the constant this module re-exports (bl-c618), because the release gates that read it are other repositories fetching one path out of a tree they do not build. A foot never *admits*, because a foot is never dialled. It also draws §3.8's one distinction REMOTE does not: a preface that arrived and states a version this end cannot speak is skew, one that never arrived is the wire. |
+| `src/channel/hello.rs` | The version preface, and this end's half of it — state the major and the edition beside it (REMOTE §3.2), confirm, refuse fail-closed naming both versions. The engine's edition comes back from the confirmation, defaulted at the floor when it states none. The number itself is in no Rust file: the repo-root `PROTOCOL` file states it and `build.rs` compiles it into the constant this module re-exports (bl-c618), because the release gates that read it are other repositories fetching one path out of a tree they do not build. A foot never *admits*, because a foot is never dialled. It also draws §3.8's one distinction REMOTE does not: a preface that arrived and states a version this end cannot speak is skew, one that never arrived is the wire. |
+| `src/channel/hello/version.rs` | The three vendored numbers and nothing else (bl-6fcf): the major, the edition this build states, and the floor an absent one reads as. Split from the exchange because they are the ENGINE's facts copied, and a re-vendor rewrites this file alone. |
 | `src/channel/tls.rs` | The rustls client configuration: the operator CA as anchors, this box's leaf as its identity, `ring` named rather than defaulted. |
 | `src/channel/leaf.rs` | The foot grade, read off this box's own certificate — a DER walk, because thrall links no certificate library. |
 | `src/channel/material.rs` | What the operator carried here, and the three answers a directory can give: nothing, half, or a channel. |
@@ -898,6 +886,9 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/sys.rs` | **The confined `unsafe` file**, and it holds two things, both raw process effects `std` does not wrap. Signalling a process GROUP, which `std` has no spelling for at all (`Child::kill` is `SIGKILL` to one process, and there is no `Child::terminate`); the sign guard did not move when the group arrived (§3.5) — the negation is this file's, the callers pass a positive id. And putting a pipe into non-blocking mode (bl-6c14), which `std` spells for sockets and for nothing else — a `ChildStdout` has no `set_nonblocking`, and borrowing the socket one by wrapping the descriptor in a `UnixStream` would read the pipe with `recv(2)`, which a pipe refuses. Both are declared rather than depended on: `kill(2)` and `fcntl(2)` are in the libc `std` already links, so neither costs a crate, a build script or a lockfile line. |
 | `src/state.rs` | **The lock chokepoint.** Every `Mutex`/`RwLock` in the crate. Unbuilt, and it stayed that way: the only cross-thread hand-offs thrall has are a `JoinHandle`'s own answer (the pipes a child writes, the sentence a channel ends with), which need no lock. The suite's fork lock is **not** a tenant — a test's serialization lock is scaffolding, and the rule's own text sends it to `src/test_support.rs`. |
 | `src/corpus.rs` | `cfg(test)` only. **The engine's conformance corpus, vendored as literal text** (REMOTE §3, bl-e0f0): the protocol number and the frames of every shape a foot speaks, copied from yog rather than derived from anything here. `corpus/tests.rs` pays what §3 says a client owes them — decode every frame, and round-trip every request byte for byte. It is the crate's one statement of what the FAR end says, which is why the stand-in engine reads its version from here and not from the pin it is testing. |
+| `src/corpus/ledger.rs` | `cfg(test)` only. **The engine's shape ledger, vendored** (REMOTE §3.2, bl-6fcf, §3.6): the floor, the deprecation list, and the reads a replay walks a signature by. What a stamp is FOR lives here; what the stamps ARE is the file below. |
+| `src/corpus/ledger/shapes.rs` | `cfg(test)` only. The seven shapes a foot speaks, every field path stamped with the edition it appeared at, copied key for key out of `corpus/shapes.json`. A file of data, so a re-vendor's diff is the whole file and reads as one. |
+| `src/corpus/replay.rs` | `cfg(test)` only. **The two replays a consumer owes** (REMOTE §3.2, §3.6): projection — one record replayed at every edition an engine can be at, with every key stamped above it deleted — and word mutation, a token no build has heard of in every string-typed path but `kind`. It replaces the by-hand frame-by-frame comparison every re-vendor up to 18 was paid for. |
 | `src/test_support.rs` | `cfg(test)` only. The scratch directory, the fork lock, the stand-in engine, the recording notice sink (§3.7 — a serving foot writes to stderr, and a test cannot read that back), and the certificate mint the suite performs on the operator's behalf. |
 | `src/packaged_tests/embeds.rs` | `cfg(test)` only. **What the build reads, and whether it ships** (split from `packaged_tests.rs` by bl-bb7d): every compile-time embed under `src`, resolved against the file that names it and held to both halves of the policy — the class `is_ruled_in` admits and the path `cargo package --list` actually carries. It was a prohibition (*there are no embeds*) until the crate wanted one; a prohibition that has to be lifted the first time it binds was never the check. |
 | `src/packaged_tests.rs` | `cfg(test)` only. **The publication guard** (bl-d25a): what `cargo publish` would upload, read off the real `cargo package --list` and judged against the classes `Cargo.toml`'s `include` allowlist rules in — both directions, since a shape guard dies by matching nothing. It is in `src` rather than a `tests/` crate because it forks a child and the spawn boundary is `pub(crate)`; an integration crate could only reach a bare `Command::new`, which the confinement rules refuse. |

@@ -26,50 +26,48 @@
 //! already `cfg(test)`, cost a released build nothing, and are read by the same
 //! decoders at the same strictness.
 //!
-//! **What a foot speaks is smaller than the protocol, so most bumps are not
-//! its business.** Between PROTOCOL 2 and 18 exactly one shape a foot decodes
-//! moved: `reply/advertised` gained `wrote` at 8. Every other bump is
-//! seat-facing — a conversation row's `failure` (3), the queue row's `flag`
-//! (4), `reply/governing`'s lineage keys (5), `reply/providers`' `effort` and
-//! `priority` (6), `reply/help`'s `surface` (7), `reply/transcript`'s `wounded`
-//! entry beside `reply/steps` losing `auth_failed` (9), `attention` becoming
-//! follow-class with no field moving at all (10), `reply/ops`' failure readings
-//! (11), the queue row's `says` (12), `reply/config`'s `settings` (13),
-//! `request/enroll`'s optional `address` beside `reply/clients`' optional
-//! `last_seen` (14), `reply/follow`'s tool window (15), `reply/ops`' rows
-//! gaining `client` (16), the `signals` vocabulary gaining `truncated` beside a
-//! delivered row's optional `sender_name` / `from_name` (17), and three shapes
-//! on one number at 18 — `reply/follow`'s tool-window entry gaining `held`,
-//! `reply/steps`' `framing` gaining a fourth word `in_flight`, and
-//! `request/answer` with `reply/answered` gaining `scope` — and a
-//! foot decodes none of them. Every frame below is therefore byte for byte the
-//! text it was at 8; only the equality moved. It still cannot dial across any
-//! of them, because the preface is one integer compared for equality: the
-//! version is the *engine's build*, not a statement about the frames this end
-//! happens to read.
+//! **Three things are vendored, not one** (§3.2, bl-6fcf). The frames below;
+//! [`ledger`], the edition every field path appeared at, which is what turns
+//! *"a field was added"* from prose into an input; and the number, which is now
+//! a MAJOR and moves only on a break. [`replay`] is what spends the second on
+//! the first: one record projected to every edition an engine can be at, and
+//! read under a word no build has heard of.
 
-/// **The protocol number, got from the engine.** yog's repo-root `PROTOCOL`
-/// file reads `18`, and this is that number copied.
+/// The edition stamps: what appeared when, per field path.
+pub(crate) mod ledger;
+/// The projection and word-mutation replays REMOTE §3.2 asks a consumer for.
+mod replay;
+
+/// **The protocol number, got from the engine, and it is a MAJOR** (REMOTE
+/// §3.2). yog's repo-root `PROTOCOL` file reads `19`, and this is that number
+/// copied.
 ///
 /// It is what the suite's stand-in engine states, so every channel test dials
 /// across the same equality a real one does — and
 /// [`channel::hello::PROTOCOL`](crate::channel::hello::PROTOCOL) agreeing with
 /// it is a test rather than a tautology.
 ///
-/// **What it can and cannot catch.** Both constants live in this tree, so what
-/// the test defends is a re-vendor that moved the frames and forgot the pin. An
-/// engine that moved while this crate stood still is invisible to it — no
-/// fixture can see the far end — and the only thing that meets that skew is a
-/// real dial, which is why the sentence that dial earns has to read as an
-/// operator's upgrade prompt. This line is moved by hand, once per release
-/// train — and it has been moved seven times now (bl-e0f0, bl-f88f, bl-dc5f,
-/// bl-605f, bl-44b4, bl-272d, bl-dc8a), the last five inside three sessions, on
-/// three days' release trains. bl-dc8a is the first of the seven taken while
-/// the engine's number was unpublished, so it is the one that did not begin
-/// with a foot that could not dial.
-pub(crate) const PROTOCOL: u32 = 18;
+/// **What moves it now.** 18 → 19 was the last bump of the old kind and the
+/// first of the new: from here the integer moves only on a BREAK — a field
+/// removed or re-typed, a meaning changed under a spelling still in use, a
+/// field the engine newly requires on a request — and every addition ships
+/// unbumped, stamped an edition in [`ledger`] instead. So the seven re-vendors
+/// this line paid for between 2 and 18 (bl-e0f0, bl-f88f, bl-dc5f, bl-605f,
+/// bl-44b4, bl-272d, bl-dc8a), five of them inside three sessions and four of
+/// them for a field on a shape a foot never decodes, are the class §3.2 closed:
+/// none of the four would move this number today.
+///
+/// **What it still cannot catch, and what now stands beside it.** Both
+/// constants live in this tree, so what this pin defends is a re-vendor that
+/// moved the frames and forgot the number; an engine that moved while this
+/// crate stood still is invisible to a fixture, and only a real dial meets that
+/// skew. What changed is that the dial no longer has to: an engine one edition
+/// on is an engine this foot still speaks to, because the equality is on the
+/// major and the additions are what the replay already proved this crate reads
+/// through.
+pub(crate) const PROTOCOL: u32 = 19;
 
-/// `corpus/request/advertise.json`, stamped PROTOCOL 2 — the empty set, one
+/// `corpus/request/advertise.json`, edition 2 in [`ledger`] — the empty set, one
 /// ordinary element, and the element carrying §5.1's optional fourth fact.
 pub(crate) const ADVERTISE: [&str; 3] = [
     r#"{"op":"advertise","tools":[]}"#,
@@ -77,22 +75,22 @@ pub(crate) const ADVERTISE: [&str; 3] = [
     r#"{"op":"advertise","tools":[{"description":"run a command","input_schema":{"properties":{"command":{"minLength":1,"type":"string"}},"required":["command"],"type":"object"},"name":"Bash","subject_cwd":true}]}"#,
 ];
 
-/// `corpus/request/invocations.json`, stamped PROTOCOL 1. The follow-class read
+/// `corpus/request/invocations.json`, edition 1. The follow-class read
 /// carries no field at all — a connection drains its own queue.
 pub(crate) const INVOCATIONS: &str = r#"{"op":"invocations"}"#;
 
-/// `corpus/request/complete.json`, stamped PROTOCOL 1.
+/// `corpus/request/complete.json`, edition 1.
 pub(crate) const COMPLETE: &str = r#"{"capture":{"exit_code":3,"stderr":"warned\n","stdout":"hello\n"},"invocation":"inv-1","op":"complete"}"#;
 
-/// `corpus/reply/advertised.json`, stamped **PROTOCOL 8** — the bump this
-/// module was written for. `wrote` is required, and `false` is the ordinary
-/// re-presentation.
+/// `corpus/reply/advertised.json`, **edition 8** — the newest stamp this foot
+/// vendors, and the bump this module was written for. `wrote` is required
+/// because 8 is under the floor, and `false` is the ordinary re-presentation.
 pub(crate) const ADVERTISED: [&str; 2] = [
     r#"{"kind":"advertised","ok":true,"wrote":false}"#,
     r#"{"kind":"advertised","ok":true,"wrote":true}"#,
 ];
 
-/// `corpus/reply/invocations.json`, stamped PROTOCOL 2 — nothing queued, one
+/// `corpus/reply/invocations.json`, edition 2 — nothing queued, one
 /// ordinary row, and one carrying the worktree lane's `cwd`.
 pub(crate) const QUEUED: [&str; 3] = [
     r#"{"kind":"invocations","ok":true,"rows":[]}"#,
@@ -100,14 +98,14 @@ pub(crate) const QUEUED: [&str; 3] = [
     r#"{"kind":"invocations","ok":true,"rows":[{"cwd":"/w/home/agents/c-1","input":{"command":"printf made > out.txt"},"invocation":"inv-2","tool":"bash"}]}"#,
 ];
 
-/// `corpus/reply/routed.json`, stamped PROTOCOL 1 — the slot as it stands, with
+/// `corpus/reply/routed.json`, edition 1 — the slot as it stands, with
 /// the capture absent while the work is still out.
 pub(crate) const ROUTED: [&str; 2] = [
     r#"{"invocation":"inv-1","kind":"routed","ok":true}"#,
     r#"{"capture":{"exit_code":3,"stderr":"warned\n","stdout":"hello\n"},"invocation":"inv-2","kind":"routed","ok":true}"#,
 ];
 
-/// `corpus/reply/refusal.json`, stamped PROTOCOL 1 — the envelope with no
+/// `corpus/reply/refusal.json`, edition 1 — the envelope with no
 /// `kind`, which is the one shape a refusal may wear.
 pub(crate) const REFUSAL: &str = r#"{"error":"unknown op \"fhtagn\"","ok":false}"#;
 

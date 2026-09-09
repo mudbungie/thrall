@@ -3,8 +3,8 @@
 //!
 //! The repo-root `PROTOCOL` file states the integer this build speaks — one
 //! line, nothing else — and this script turns it into the constant
-//! `src/channel/hello.rs` includes. The file IS the source: there is no second
-//! copy of the number to hold equal to it.
+//! `src/channel/hello/version.rs` includes. The file IS the source: there is
+//! no second copy of the number to hold equal to it.
 //!
 //! **Why a file and not a Rust declaration.** This number is fetched by gates
 //! that do not build this crate — yog's release gate reads it off this

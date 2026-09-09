@@ -179,6 +179,15 @@ impl Channel {
     /// request goes out in the same breath as this end's preface — so
     /// confirming the engine's costs no round trip, and a mismatch refuses
     /// before a frame of the answer is decoded.
+    ///
+    /// **The engine's EDITION comes back from that confirmation and is dropped
+    /// here** (REMOTE §3.2). It is the fact that says which post-floor fields
+    /// the far end can spell, and a foot reads none: every path in its vendored
+    /// ledger is at or under the floor, so `stamp <= engine edition` holds for
+    /// every field it decodes on every engine of this major. Threading a value
+    /// no reader consults through the loop would be mechanism with no consumer;
+    /// the day a foot shape gains a post-floor field, this line is where it is
+    /// picked up.
     fn dial(&self, request: &Value) -> Result<StreamOwned<ClientConnection, TcpStream>, Failure> {
         let tcp = TcpStream::connect(&self.address)
             .and_then(|tcp| tcp.set_read_timeout(Some(READ_TIMEOUT)).map(|()| tcp))

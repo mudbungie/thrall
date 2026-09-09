@@ -39,10 +39,19 @@ does not matter who broke the test.
 
 ### A PROTOCOL bump is a four-repository act (bl-635b; yog bl-bca2)
 
+**And since bl-6fcf it is a RARE one.** yog `docs/REMOTE.md` §3.2 made the
+number a **major**: it moves only on a break, and every addition — a field, a
+word, an op, a reply kind — ships unbumped, stamped an *edition* in the corpus
+ledger this crate vendors (`src/corpus/ledger/shapes.rs`). Both gates below are
+unchanged, because both already fire only when the `PROTOCOL` file moves. What
+changed is that four of the five bumps in the week before the ruling would not
+move it at all. A bump is now a design ball with a migration note; an addition
+is a re-vendor of the ledger, which the replay in `src/corpus/replay.rs` judges.
+
 yog mints the wire protocol version. This crate, the seat (`lernie`) and the
 phone (`yog-android`) each **vendor** a copy of the number in a **repo-root
 `PROTOCOL` file** — one line, the integer, compiled into
-`src/channel/hello.rs`'s constant by `build.rs` and mirrored by hand in
+`src/channel/hello/version.rs`'s constant by `build.rs` and mirrored by hand in
 `src/corpus.rs` (bl-c618) — and the wire is
 fail-closed on a mismatch with no negotiation (yog `docs/REMOTE.md` §3 — the
 authority, and the one place the two-direction rule is written out). So the

@@ -21,6 +21,13 @@
 //! redial (`run::redial`) be driven over a real wire — drop, dial again, and
 //! be answered on the next connection.
 //!
+//! **It states the FLOOR as its edition** (REMOTE §3.2). An engine speaking
+//! this major is at the floor or above it by definition, so the floor is the
+//! least a real one can say and the ordinary case a foot meets. What a foot
+//! does with a higher one, and with none at all, is
+//! `channel::hello::tests`' — a value this end reads, not a value it needs a
+//! listener to produce.
+//!
 //! **It states the engine's protocol number, not this crate's** (bl-e0f0).
 //! Every fixture here dials at [`crate::corpus::PROTOCOL`], a literal copied
 //! from yog's repo-root `PROTOCOL` file. While it wrote its preface from
@@ -139,7 +146,10 @@ fn serve(
 ) {
     let conn = ServerConnection::new(Arc::clone(config)).expect("a server connection");
     let mut tls = StreamOwned::new(conn, tcp);
-    let _ = frame::write_value(&mut tls, &json!({ "protocol": protocol }));
+    let _ = frame::write_value(
+        &mut tls,
+        &json!({ "protocol": protocol, "edition": crate::corpus::ledger::FLOOR }),
+    );
     for _ in 0..FRAMES_IN {
         if let Ok(Some(said)) = frame::read_value(&mut tls) {
             seen.lock()

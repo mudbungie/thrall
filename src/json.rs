@@ -7,6 +7,33 @@
 //! mistyped value each refuse with a reason"* — held at the one place fields
 //! are read, so no caller carries a forgiving branch.
 //!
+//! **And strict is not the same as frozen: readers here GROW** (yog's
+//! `docs/REMOTE.md` §3.2). Since bl-e598 the wire's integer is a *major* and an
+//! addition ships without one, stamped an edition in the corpus ledger instead
+//! — so a reader must take a frame from an engine of another edition without
+//! refusing it. Four rules, and this file is where the next field meets them:
+//!
+//! 1. **An unknown key is ignored.** Structural here and nothing to keep: every
+//!    read below indexes by key and nothing enumerates an object.
+//! 2. **A key stamped ABOVE the ledger's floor reads as its default when
+//!    absent, and the default is the fact before the field existed.** No such
+//!    key exists in a shape a foot decodes — every path it vendors is at or
+//!    under the floor, which `corpus::ledger::tests` holds — so [`bool_of`] and
+//!    [`str_of`] are required for the reason stated on them and stay that way.
+//!    The FIRST post-floor field a foot reads is the one that must not use
+//!    them: it gets a reader of its own, named for the fact it defaults to,
+//!    and the projection replay (`corpus::replay`) is what goes red until it
+//!    does.
+//! 3. **An unknown word maps to a named catch-all**, carrying the word and
+//!    rendered honestly — never to the nearest known word, and never to a
+//!    refusal of the row it sits in. Nothing here decodes a vocabulary today:
+//!    the wire's only closed word set a foot reads is the reply `kind`, which
+//!    is rule 4's exception. A field that arrives spelling one is decoded to an
+//!    enum with an `Unknown(String)` arm, not matched to a `_ => Err(…)`.
+//! 4. **The reply `kind` stays strict** (`gestures::decode`): a reader asks
+//!    only what it paints, so a kind it has never heard of means an ask started
+//!    being answered differently — which is a major, not an addition.
+//!
 //! **Why a hand codec and not a derive.** `serde_json` is linked for the
 //! grammar; `serde`'s derive is not on the approved dependency set, and the
 //! surface here is small and closed enough that the refusals are worth writing
