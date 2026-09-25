@@ -1,6 +1,6 @@
 [package]
 name = "thrall"
-version = "0.0.19"
+version = "0.0.20"
 edition = "2024"
 description = "thrall: the foot — a tool-execution client for a yog server"
 license = "MIT"
