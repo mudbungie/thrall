@@ -2,9 +2,10 @@
 //! refuses, the call it writes, and the cache the third rung re-punches.
 
 use super::*;
+use crate::dht::tests::fake::Mood;
 use crate::rendezvous::item::Call;
 use crate::rendezvous::punch::Punch;
-use crate::test_support::roving::{commons, engine, pairing, presence, tuned};
+use crate::test_support::roving::{commons, commons_as, engine, pairing, presence, tuned};
 
 fn roving(tuning: Tuning) -> Roving {
     Roving::new(pairing(), tuning)
@@ -176,4 +177,52 @@ fn a_re_punch_nobody_answers_is_none() {
 fn a_nonce_is_fresh_and_the_clock_rises() {
     assert_ne!(nonce().expect("a"), nonce().expect("b"));
     assert!(unix_now() > 1_700_000_000);
+}
+
+/// The observed address joins the route-local ones at the punch port, never
+/// twice, and never at the port the commons saw.
+#[test]
+fn an_observed_address_is_listed_once_at_the_punch_port() {
+    let local: IpAddr = "192.0.2.5".parse().expect("ip");
+    let seen = |s: &str| s.parse::<SocketAddr>().expect("addr");
+    let far = seen("203.0.113.7:6881");
+    assert_eq!(
+        listed(vec![local], &[far, seen("[2001:db8::7]:1")], 9),
+        vec![
+            SocketAddr::new(local, 9),
+            seen("203.0.113.7:9"),
+            seen("[2001:db8::7]:9")
+        ]
+    );
+    assert_eq!(
+        listed(vec![local], &[seen("192.0.2.5:6881")], 9),
+        vec![SocketAddr::new(local, 9)],
+        "an observed address that is already local is not a second entry"
+    );
+    assert_eq!(listed(vec![], &[far], 9), vec![seen("203.0.113.7:9")]);
+    assert_eq!(listed(vec![local], &[], 9), vec![SocketAddr::new(local, 9)]);
+}
+
+/// The call a foot behind a NAT files carries where the commons saw it,
+/// through the seal and back; a walk that heard no claim adds nothing.
+#[test]
+fn the_filed_call_carries_the_observed_address_when_the_commons_named_one() {
+    let us: SocketAddr = "203.0.113.7:6881".parse().expect("addr");
+    for (mood, expect) in [(Mood::Claim(us), true), (Mood::Answer, false)] {
+        let (node, tuning) = commons_as(mood, vec![presence(dead_port(), 1)]);
+        let mut r = roving(tuning);
+        r.rendezvous().expect_err("nobody there");
+        let p = pairing();
+        let inbox = p.inbox_keypair().expect("keypair").public();
+        let filed = node
+            .held()
+            .into_iter()
+            .find(|i| i.key == inbox)
+            .expect("the call was filed");
+        let opened = Call::open(&p.seal_key(), &filed.value).expect("opens");
+        let punch = r.punch.as_ref().expect("bound").port();
+        let at = SocketAddr::new(us.ip(), punch);
+        assert_eq!(opened.endpoints.contains(&at), expect, "{opened:?}");
+        assert!(opened.endpoints.iter().all(|e| e.port() == punch));
+    }
 }

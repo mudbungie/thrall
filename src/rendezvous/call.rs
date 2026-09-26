@@ -19,7 +19,7 @@ use super::item::{Call, Presence};
 use super::pairing::Pairing;
 use super::punch::{Punch, local_ips};
 use crate::dht::{Config, Dht, Udp};
-use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
+use std::net::{IpAddr, SocketAddr, TcpStream, ToSocketAddrs};
 use std::time::{Duration, SystemTime};
 
 /// The engine starts an inbox read every fifteen seconds and punches for
@@ -110,10 +110,7 @@ impl Roving {
         let port = self.punch()?.port();
         let call = Call {
             nonce: nonce()?,
-            endpoints: local_ips()
-                .into_iter()
-                .map(|ip| SocketAddr::new(ip, port))
-                .collect(),
+            endpoints: listed(local_ips(), &dht.observed(), port),
         };
         let seq = unix_now().max(self.last_seq + 1);
         let signed = self.pairing.inbox_keypair()?.sign(
@@ -158,6 +155,27 @@ impl Roving {
             .map_err(|e| format!("DHT socket: {e}"))?;
         Dht::new(Box::new(udp), bootstrap, self.tuning.config.clone())
     }
+}
+
+/// The call's endpoint list (yog REMOTE §13.2, which rules that a list
+/// carry the OBSERVED endpoint; thrall bl-d340 after yog bl-efae): the
+/// route-local addresses, then every address the presence read's walk voted
+/// it saw this box at (`Dht::observed`) that is not already one of them —
+/// all at the punch port. Behind a carrier or tethered NAT the route-local
+/// ones are private, and the observed one is the only one the engine can
+/// punch to (§13.8). The observed PORT is the DHT socket's UDP mapping, not
+/// the punch port's TCP one, so only the address is taken and port
+/// preservation is trusted; a carrier that rewrites the port is the case
+/// this does not reach.
+fn listed(mut ips: Vec<IpAddr>, observed: &[SocketAddr], port: u16) -> Vec<SocketAddr> {
+    for ip in observed.iter().map(SocketAddr::ip) {
+        if !ips.contains(&ip) {
+            ips.push(ip);
+        }
+    }
+    ips.into_iter()
+        .map(|ip| SocketAddr::new(ip, port))
+        .collect()
 }
 
 /// A fresh call nonce.

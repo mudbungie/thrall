@@ -6,6 +6,7 @@ mod bootstrap;
 pub(crate) mod fake;
 mod frontier;
 mod items;
+mod observed;
 mod walks;
 mod window;
 

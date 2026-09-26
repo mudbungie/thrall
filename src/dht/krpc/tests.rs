@@ -44,6 +44,7 @@ fn a_reply_and_an_error_parse_and_everything_else_is_noise() {
         Message::Reply {
             tid: b"xy".to_vec(),
             r: Dict::from([entry("id", bytes(b"aaaaaaaaaaaaaaaaaaaa"))]),
+            ip: None,
         }
     );
     let error = parse(b"d1:eli203e12:bad argumente1:t1:z1:y1:ee").unwrap();
@@ -113,4 +114,34 @@ fn distance_is_xor_and_an_id_reads_as_hex() {
     assert_eq!(id(0xff).distance(&id(0x0f)), [0xf0; 20]);
     assert_eq!(NodeId::parse(&[1; 19]), None);
     assert_eq!(id(0xab).to_string(), "ab".repeat(20));
+}
+
+#[test]
+fn a_reply_states_the_observed_address_in_either_family_or_not_at_all() {
+    let reply_with = |ip: &[u8]| {
+        let mut d = b"d2:ip".to_vec();
+        d.extend(format!("{}:", ip.len()).into_bytes());
+        d.extend_from_slice(ip);
+        d.extend_from_slice(b"1:rd2:id1:ae1:t1:z1:y1:re");
+        match parse(&d) {
+            Some(Message::Reply { ip, .. }) => ip,
+            other => panic!("{other:?}"),
+        }
+    };
+    assert_eq!(
+        reply_with(&[203, 0, 113, 7, 0x1a, 0xe1]),
+        Some("203.0.113.7:6881".parse().unwrap())
+    );
+    let mut v6 = [0u8; 18];
+    v6[15] = 1;
+    v6[16..].copy_from_slice(&[0x1a, 0xe1]);
+    assert_eq!(reply_with(&v6), Some("[::1]:6881".parse().unwrap()));
+    for garbage in [&b""[..], b"x", b"12345", b"1234567", &[0u8; 20]] {
+        assert_eq!(reply_with(garbage), None, "{garbage:?}");
+    }
+    // An `ip` that is not a byte string is no claim either.
+    assert!(matches!(
+        parse(b"d2:ipi1e1:rd2:id1:ae1:t1:z1:y1:re"),
+        Some(Message::Reply { ip: None, .. })
+    ));
 }

@@ -38,6 +38,8 @@ pub(crate) struct Walk {
     /// at two addresses is two nodes, and iteration is closest first.
     pool: BTreeMap<([u8; 20], SocketAddr), Node>,
     pub(crate) out: Outcome,
+    /// Every answering node's BEP 42 claim, the door's included.
+    pub(crate) claims: Vec<SocketAddr>,
 }
 
 impl Walk {
@@ -49,6 +51,7 @@ impl Walk {
             replied: BTreeSet::new(),
             pool: BTreeMap::new(),
             out: Outcome::default(),
+            claims: Vec::new(),
         }
     }
 
@@ -83,12 +86,13 @@ impl Walk {
         !self.pool.is_empty() && self.replied.len() < self.k
     }
 
-    /// Take one answer in. The door's reply seeds the pool, but the door is never a result; a walk node's reply joins the
+    /// Take one answer in. The door's reply seeds the pool and its claim
+    /// votes, but the door is never a result; a walk node's reply joins the
     /// pool, the replied set and the outcome, and its error the outcome's
     /// errors. A reply that names no id is heard and is nothing.
     pub(crate) fn heard(&mut self, query: Query, message: Message) {
         match message {
-            Message::Reply { r, .. } => {
+            Message::Reply { r, ip, .. } => {
                 let Some(id) = r
                     .get(b"id".as_slice())
                     .and_then(|v| v.as_bytes())
@@ -100,6 +104,7 @@ impl Walk {
                     id,
                     addr: query.addr,
                 };
+                self.claims.extend(ip);
                 let this = (!query.door).then_some(node);
                 for near in krpc::nodes_of(&r).into_iter().chain(this) {
                     self.pool

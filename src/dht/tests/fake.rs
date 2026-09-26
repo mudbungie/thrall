@@ -16,7 +16,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::thread::JoinHandle;
 use std::time::Duration;
-use wire::{error, reply, routing};
+use wire::{claim, error, reply, routing};
 
 mod wire;
 
@@ -32,6 +32,9 @@ pub(crate) enum Mood {
     Anonymous,
     /// Replies under a transaction nobody opened.
     Stray,
+    /// Answers, and says (BEP 42's `ip`) the query came from this address —
+    /// true or not, which is the point: one node's word is only a claim.
+    Claim(SocketAddr),
     /// A mainline bootstrap router as yog measured it (REMOTE §13.7 ruling
     /// 3): answers `find_node`, silent to BEP 44's `get` and `put`.
     Router,
@@ -139,6 +142,7 @@ fn run(
             Mood::Anonymous => reply(&tid, Dict::new()),
             Mood::Stray => reply(b"stray", Dict::from([entry("id", bytes(&id.0))])),
             Mood::Answer | Mood::Router | Mood::Mute => answer(&tid, id, peers, &mut held, &q),
+            Mood::Claim(ip) => claim(answer(&tid, id, peers, &mut held, &q), ip),
         };
         drop(held);
         socket.send_to(&datagram, from).unwrap();

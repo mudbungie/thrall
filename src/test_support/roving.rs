@@ -70,8 +70,14 @@ impl Commons {
 
 /// A commons whose holder has `items`, and the tuning that walks it.
 pub(crate) fn commons(items: Vec<Mutable>) -> (Commons, Tuning) {
+    commons_as(Mood::Answer, items)
+}
+
+/// A commons whose holder answers in `mood` — a `Claim` says where it saw
+/// the walk come from.
+pub(crate) fn commons_as(mood: Mood, items: Vec<Mutable>) -> (Commons, Tuning) {
     let mut holder = FakeNode::bind(id(0x42));
-    holder.serve(vec![], Mood::Answer, items);
+    holder.serve(vec![], mood, items);
     let door = router(vec![holder.node()]);
     let tuning = tuned(vec![door.addr.to_string()]);
     (

@@ -1,11 +1,13 @@
 //! KRPC (BEP 5), the client's half only: the query shapes it sends and the two
 //! kinds of datagram it reads back — a reply and an error. A query arriving
 //! here is ignored, not answered: this end is never a node (REMOTE §13.2), so
-//! it holds no routing table for anyone and offers nothing to store.
+//! it holds no routing table for anyone and offers nothing to store. A reply
+//! may also say where its node saw the query come from (BEP 42's `ip`), which
+//! is one node's claim and is read as nothing more (`Dht::observed` votes).
 
 use super::bencode::{Dict, Value, bytes, entry};
 use std::fmt;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::net::{IpAddr, SocketAddr};
 
 /// A 160-bit DHT node id — the keyspace both nodes and targets live in.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -47,6 +49,8 @@ pub(crate) enum Message {
     Reply {
         tid: Vec<u8>,
         r: Dict,
+        /// BEP 42: the address this node says the query came from.
+        ip: Option<SocketAddr>,
     },
     Error {
         tid: Vec<u8>,
@@ -77,6 +81,7 @@ pub(crate) fn parse(datagram: &[u8]) -> Option<Message> {
         b"r" => Some(Message::Reply {
             tid,
             r: v.get("r")?.as_dict()?.clone(),
+            ip: v.get("ip").and_then(Value::as_bytes).and_then(compact_addr),
         }),
         b"e" => {
             let Value::List(e) = v.get("e")? else {
@@ -99,34 +104,34 @@ pub(crate) fn parse(datagram: &[u8]) -> Option<Message> {
 pub(crate) fn nodes_of(r: &Dict) -> Vec<Node> {
     let mut out = Vec::new();
     if let Some(Value::Bytes(b)) = r.get(b"nodes".as_slice()) {
-        out.extend(b.chunks_exact(26).filter_map(compact_v4));
+        out.extend(b.chunks_exact(26).filter_map(compact_node));
     }
     if let Some(Value::Bytes(b)) = r.get(b"nodes6".as_slice()) {
-        out.extend(b.chunks_exact(38).filter_map(compact_v6));
+        out.extend(b.chunks_exact(38).filter_map(compact_node));
     }
     out
 }
 
-fn compact_v4(c: &[u8]) -> Option<Node> {
-    let id = NodeId::parse(c.get(..20)?)?;
-    let ip = Ipv4Addr::from(<[u8; 4]>::try_from(c.get(20..24)?).ok()?);
+/// A 20-byte id, then a compact address.
+fn compact_node(c: &[u8]) -> Option<Node> {
     Some(Node {
-        id,
-        addr: SocketAddr::new(IpAddr::V4(ip), port_of(c.get(24..26)?)?),
+        id: NodeId::parse(c.get(..20)?)?,
+        addr: compact_addr(c.get(20..)?)?,
     })
 }
 
-fn compact_v6(c: &[u8]) -> Option<Node> {
-    let id = NodeId::parse(c.get(..20)?)?;
-    let ip = Ipv6Addr::from(<[u8; 16]>::try_from(c.get(20..36)?).ok()?);
-    Some(Node {
-        id,
-        addr: SocketAddr::new(IpAddr::V6(ip), port_of(c.get(36..38)?)?),
-    })
-}
-
-fn port_of(b: &[u8]) -> Option<u16> {
-    <[u8; 2]>::try_from(b).ok().map(u16::from_be_bytes)
+/// A compact address: the IP's own bytes (4 or 16) and a big-endian port —
+/// six bytes or eighteen, and any other length is nothing.
+pub(crate) fn compact_addr(b: &[u8]) -> Option<SocketAddr> {
+    let (ip, port) = b.split_at_checked(b.len().checked_sub(2)?)?;
+    let ip = <[u8; 4]>::try_from(ip)
+        .map(IpAddr::from)
+        .or_else(|_| <[u8; 16]>::try_from(ip).map(IpAddr::from))
+        .ok()?;
+    Some(SocketAddr::new(
+        ip,
+        u16::from_be_bytes(port.try_into().ok()?),
+    ))
 }
 
 #[cfg(test)]

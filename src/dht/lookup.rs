@@ -8,9 +8,9 @@
 //! silent is never asked again and leaves the frontier. Bounded twice over
 //! against a hostile commons: a query ends at its deadline, and the walk at
 //! `max_queries` however many "closer" nodes the answers keep inventing.
-//! yog's walk also keeps each answering node's BEP 42 `ip` claim for its
-//! observed-address vote; a foot publishes no presence, so it has no vote
-//! and reads no claim.
+//! Each node that answers may also say where it saw the query come from;
+//! the walk keeps those claims, one per answering node, for
+//! [`Dht::observed`] to vote on (yog bl-efae, thrall bl-d340).
 
 use super::Dht;
 use super::bencode::{Dict, bytes, entry};
@@ -28,7 +28,7 @@ impl Dht {
     /// opens onto is asked `q`. One walk, not a lookup and then a second one.
     ///
     /// The bootstrap is a door and never a result (yog bl-9408): its answers seed
-    /// the pool, but it is not a node near the target
+    /// the pool and its `ip` claims vote, but it is not a node near the target
     /// and nothing it says is in the [`Outcome`]. So a walk whose learned
     /// nodes were all silent — measured one walk in five from the deployed
     /// engine box, the one answering router naming a single node eight times —
@@ -88,6 +88,7 @@ impl Dht {
                 break;
             }
         }
+        self.claims = walk.claims;
         let mut out = walk.out;
         if out.replies.is_empty() && out.errors.is_empty() {
             return Err(format!("no DHT node answered {q} for {target}"));

@@ -928,9 +928,23 @@ and all four of the defects yog then measured were here too:
   answered from yog's deployed box.
 
 Live, from yog's box after all four: lookup median ~6.5 s, `put` ~7.5 s,
-`get` ~7.5 s. yog's walk also reads each node's BEP 42 `ip` claim for its
-observed-address vote; a foot publishes no presence, so that half is not
-ported.
+`get` ~7.5 s.
+
+**The observed address** (bl-d340, porting yog bl-efae). Every answering
+node's reply may carry BEP 42's `ip` — where it saw the query come from, in
+either family's compact form — and the walk keeps one claim per answering
+node, the door's included. `Dht::observed` is the vote over the LAST walk:
+per family, the endpoint the most nodes named, and nothing for a family
+whose top count is tied or that no node spoke to; a dark walk clears it. A
+foot publishes no presence, but its sealed call is an endpoint list too, and
+yog REMOTE §13.2 rules that such a list carry the observed endpoint — behind
+a carrier or tethered NAT the route-local addresses are private and the
+observed one is the only one the engine can punch to (§13.8). So the call
+appends each observed ADDRESS not already listed, at the punch port: the
+observed port is the DHT socket's UDP mapping, not the punch port's TCP one,
+so only the address is taken and port preservation is trusted (a carrier
+that rewrites the port is the case this does not reach, §13.8). The sealed
+byte format is unchanged — it was always a list.
 
 **Interoperation is asserted, not assumed.** `rendezvous::pairing::tests`,
 `rendezvous::item::tests` and `dht::mutable::tests` hold bytes the ENGINE's
@@ -954,7 +968,8 @@ the order that costs least, and stops at the first that answers:
    disk (REMOTE §13.4's runtime half of §8's `:0` discipline).
 4. **The full rendezvous** (`rendezvous::call`) — `get` the engine's presence
    under `(rendezvous.pub, presence salt)` and open it; `put` a sealed call —
-   an 8-byte nonce, then this box's route-local addresses at its punch port —
+   an 8-byte nonce, then this box's route-local addresses and the presence
+   read's observed address (above) at its punch port —
    signed under the inbox keypair with a rising `seq`; then punch.
 
 **The punch** (`rendezvous::punch`; REMOTE §13.3): bind one port with the two
@@ -1039,9 +1054,9 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/rendezvous/item.rs` | The two sealed items: the presence this end opens and the call it seals — `nonce ‖ ciphertext ‖ tag`, the fixed-width endpoint list. Tested against bytes the engine sealed. |
 | `src/rendezvous/punch.rs` | The TCP simultaneous open from one port: the listeners, the connectors, v6 first, the first stream kept. The one socket a foot listens on (§2). |
 | `src/rendezvous/call.rs` | The act — presence, call, punch — and the RAM cache the third rung re-punches at; every duration a `Tuning` field a test can shorten. |
-| `src/dht.rs` | **The DHT client** (REMOTE §13.2, §13.7 ruling 2): a pure client of the mainline DHT, never a node; the root holds `Config` and the client, and re-exports the shape the rendezvous consumes. Mirrored from yog's `src/dht`. |
+| `src/dht.rs` | **The DHT client** (REMOTE §13.2, §13.7 ruling 2): a pure client of the mainline DHT, never a node; the root holds `Config`, the client and its observed-address vote, and re-exports the shape the rendezvous consumes. Mirrored from yog's `src/dht`. |
 | `src/dht/bencode.rs` | Bencode: one enum, a canonical encoder, a strict bounded decoder. |
-| `src/dht/krpc.rs` | KRPC, the client's half: the query shape, the reply and error read back, compact nodes. |
+| `src/dht/krpc.rs` | KRPC, the client's half: the query shape, the reply (with its BEP 42 `ip` claim) and error read back, compact nodes and addresses. |
 | `src/dht/mutable.rs` | BEP 44's signed mutable item, its target and the exact bytes a signature covers. |
 | `src/dht/lookup.rs` | The iterative walk: the door, the frontier loop and its end, bounded by per-query deadlines and a query cap (bl-921e). |
 | `src/dht/frontier.rs` | A walk's state — every node heard of, asked, replied — and the frontier read off it against the flight. |
