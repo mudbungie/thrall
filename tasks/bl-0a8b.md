@@ -1,7 +1,8 @@
 +++
 title = "the foot half of the punched wire: rendezvous material on an entry, the four-rung dial ladder, held punched connections with ping discard and the silence hangup, and a redial that re-enters the ladder"
 created = 1790392652
-updated = 1790392652
+updated = 1790392653
+claimant = "Urinalyses-R"
 priority = 2
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
 +++
