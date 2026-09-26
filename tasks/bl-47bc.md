@@ -1,7 +1,8 @@
 +++
 title = "the foot's DHT door re-asks every bootstrap address when the frontier runs dry, silent ones included, burning the query cap; and a put that reached no token holder says no node stored the item (port yog bl-f519)"
 created = 1790395751
-updated = 1790395751
+updated = 1790395752
+claimant = "Urinalyses-Z8"
 priority = 2
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
 +++
