@@ -11,11 +11,14 @@
 use super::super::bencode::{Dict, Value, bytes, entry};
 use super::super::krpc::{Node, NodeId};
 use super::super::mutable::Mutable;
-use std::net::{IpAddr, SocketAddr, UdpSocket};
+use std::net::{SocketAddr, UdpSocket};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::thread::JoinHandle;
 use std::time::Duration;
+use wire::{error, reply, routing};
+
+mod wire;
 
 pub(crate) const TOKEN: &[u8] = b"tok";
 
@@ -29,6 +32,15 @@ pub(crate) enum Mood {
     Anonymous,
     /// Replies under a transaction nobody opened.
     Stray,
+    /// A mainline bootstrap router as yog measured it (REMOTE §13.7 ruling
+    /// 3): answers `find_node`, silent to BEP 44's `get` and `put`.
+    Router,
+    /// The one router that answered from yog's deployed engine box (yog
+    /// bl-d00f): a `Router` whose every `find_node` answer is ONE of its
+    /// peers repeated eight times, the next peer on the next query.
+    Rotor,
+    /// Answers everything but `put`: offers a token and never spends it.
+    Mute,
 }
 
 /// The node's BEP 44 store, shared with the test so it can read back what a
@@ -104,23 +116,31 @@ fn run(
     stop: &AtomicBool,
 ) {
     let mut buf = vec![0u8; 8192];
+    let mut turn = 0usize;
     while !stop.load(Ordering::Relaxed) {
         let Ok((n, from)) = socket.recv_from(&mut buf) else {
             continue;
         };
         let q = Value::decode(&buf[..n]).unwrap();
         let tid = q.get("t").unwrap().as_bytes().unwrap().to_vec();
+        let verb = q.get("q").unwrap().as_bytes().unwrap().to_vec();
+        let mut held = items.lock().unwrap_or_else(PoisonError::into_inner);
         let datagram = match mood {
             Mood::Silent => continue,
+            Mood::Router | Mood::Rotor if verb != b"find_node" => continue,
+            Mood::Mute if verb == b"put" => continue,
+            Mood::Rotor => {
+                turn += 1;
+                let one = vec![peers[(turn - 1) % peers.len()]; 8];
+                answer(&tid, id, &one, &mut held, &q)
+            }
             Mood::Garbage => b"not bencode".to_vec(),
             Mood::Refuse => error(&tid, 201, "refused"),
             Mood::Anonymous => reply(&tid, Dict::new()),
             Mood::Stray => reply(b"stray", Dict::from([entry("id", bytes(&id.0))])),
-            Mood::Answer => {
-                let mut held = items.lock().unwrap_or_else(PoisonError::into_inner);
-                answer(&tid, id, peers, &mut held, &q)
-            }
+            Mood::Answer | Mood::Router | Mood::Mute => answer(&tid, id, peers, &mut held, &q),
         };
+        drop(held);
         socket.send_to(&datagram, from).unwrap();
     }
 }
@@ -181,45 +201,4 @@ fn answer(tid: &[u8], id: NodeId, peers: &[Node], items: &mut Vec<Mutable>, q: &
         }
         _ => error(tid, 204, "unknown method"),
     }
-}
-
-/// `nodes` and `nodes6` in compact form, from the peers this node advertises.
-fn routing(peers: &[Node]) -> Dict {
-    let (mut v4, mut v6) = (Vec::new(), Vec::new());
-    for n in peers {
-        match n.addr.ip() {
-            IpAddr::V4(ip) => {
-                v4.extend_from_slice(&n.id.0);
-                v4.extend_from_slice(&ip.octets());
-                v4.extend_from_slice(&n.addr.port().to_be_bytes());
-            }
-            IpAddr::V6(ip) => {
-                v6.extend_from_slice(&n.id.0);
-                v6.extend_from_slice(&ip.octets());
-                v6.extend_from_slice(&n.addr.port().to_be_bytes());
-            }
-        }
-    }
-    Dict::from([entry("nodes", bytes(&v4)), entry("nodes6", bytes(&v6))])
-}
-
-fn reply(tid: &[u8], r: Dict) -> Vec<u8> {
-    Value::Dict(Dict::from([
-        entry("t", bytes(tid)),
-        entry("y", bytes(b"r")),
-        entry("r", Value::Dict(r)),
-    ]))
-    .encode()
-}
-
-fn error(tid: &[u8], code: i64, message: &str) -> Vec<u8> {
-    Value::Dict(Dict::from([
-        entry("t", bytes(tid)),
-        entry("y", bytes(b"e")),
-        entry(
-            "e",
-            Value::List(vec![Value::Int(code), bytes(message.as_bytes())]),
-        ),
-    ]))
-    .encode()
 }

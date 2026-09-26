@@ -22,10 +22,21 @@ use crate::dht::{Config, Dht, Udp};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::time::{Duration, SystemTime};
 
-/// The engine reads its inbox every fifteen seconds and punches for twenty
-/// after it reads a call (yog's `Cadence`), so a client window that stopped
-/// at twenty would miss the engine's whole window when the poll came late.
-/// The sum, and a stated default to be revisited on evidence.
+/// The engine starts an inbox read every fifteen seconds and punches for
+/// twenty after the read that finds a call (yog's `Cadence`), so a client
+/// window that stopped at twenty would miss the engine's whole window when
+/// the poll came late. The sum, and a stated default.
+///
+/// **It still holds with the read's own length counted** (bl-921e). This
+/// window opens when `put` returns, so the call is already stored; the worst
+/// case is a read that just missed it, the next starting up to fifteen
+/// seconds later and landing when its walk ends. A walk is bounded by
+/// `max_queries / alpha` deadlines — 64 / 8 × 1 s, ~8 s, plus the door's
+/// re-asks — and measured live at ~7.5 s for a `get` (yog REMOTE §13.7
+/// ruling 3, after yog bl-d9c1). So the engine starts punching by ~24 s and
+/// the two windows overlap for ~11 s. Before the window walk a `get` ran to
+/// ~20 s at the query cap, which put the engine's start at the very edge of
+/// this window — the margin the port bought, not a reason to shrink it.
 const WINDOW: Duration = Duration::from_secs(35);
 
 /// The knobs one rendezvous runs on.

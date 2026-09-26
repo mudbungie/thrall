@@ -22,11 +22,17 @@ fn a_walk_stops_at_its_query_cap() {
     let mut dht = client(
         vec![nodes[0].addr],
         Config {
-            max_queries: 1,
+            max_queries: 3,
             ..quick()
         },
     );
-    assert_eq!(dht.lookup(id(0xff)).unwrap(), vec![nodes[0].node()]);
+    // The bootstrap and two more — `C` and `B`, never a fourth: `D`, two hops
+    // out and learned from `B`, is never asked, because the window counts
+    // every query against the cap as it sends it.
+    assert_eq!(
+        dht.lookup(id(0xff)).unwrap(),
+        vec![nodes[2].node(), nodes[1].node()]
+    );
 }
 
 #[test]
@@ -48,13 +54,13 @@ fn a_silent_commons_is_an_error() {
 }
 
 #[test]
-fn a_zero_round_never_waits() {
+fn a_zero_deadline_never_waits() {
     let mut a = FakeNode::bind(id(0));
     a.serve(vec![], Mood::Answer, vec![]);
     let mut dht = client(
         vec![a.addr],
         Config {
-            round: Duration::ZERO,
+            deadline: Duration::ZERO,
             ..quick()
         },
     );
@@ -67,9 +73,10 @@ fn a_zero_round_never_waits() {
 
 #[test]
 fn a_node_that_refuses_is_heard_but_is_no_result() {
-    let mut a = FakeNode::bind(id(0));
+    let mut a = FakeNode::bind(id(1));
     a.serve(vec![], Mood::Refuse, vec![]);
-    let mut dht = client(vec![a.addr], quick());
+    let door = router(vec![a.node()]);
+    let mut dht = client(vec![door.addr], quick());
     assert_eq!(dht.lookup(id(0xff)).unwrap(), vec![]);
 }
 
@@ -83,9 +90,10 @@ fn noise_on_the_socket_is_not_an_answer() {
     stray.serve(vec![], Mood::Stray, vec![]);
     let mut a = FakeNode::bind(id(4));
     a.serve(vec![], Mood::Answer, vec![]);
-    let bootstrap = vec![garbage.addr, anonymous.addr, stray.addr, a.addr];
+    let noisy = [&garbage, &anonymous, &stray, &a];
+    let door = router(noisy.iter().map(|n| n.node()).collect());
     let mut dht = client(
-        bootstrap,
+        vec![door.addr],
         Config {
             alpha: 4,
             ..quick()

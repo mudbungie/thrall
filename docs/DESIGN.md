@@ -901,6 +901,37 @@ through `ring`, which rustls already linked; `socket2` for the punch port's
 `SO_REUSEADDR`/`SO_REUSEPORT`, the one new crate, approved by operator ruling
 2026-09-23 (`Cargo.toml` records the terms).
 
+**The walk is yog's as measured, not BEP 5's as written** (bl-921e, porting
+yog bl-f6e1, bl-9408, bl-d00f and bl-d9c1; the evidence is yog REMOTE §13.7
+ruling 3's four tables). It was mirrored before yog walked the live mainline,
+and all four of the defects yog then measured were here too:
+
+- **The bootstrap is a door, never a result.** It is asked `find_node`
+  whatever the walk's verb is — the routers never answer BEP 44's `get` — and
+  its answers seed the pool, but it is not a node near the target: a walk
+  whose learned nodes are all silent is the dark-commons `Err`, not an empty
+  success.
+- **The walk converges on a frontier, not the pool**: the K closest nodes that
+  replied, are not yet asked, or are still in the air. A node silent past its
+  deadline, one that answered only an error (live, a `get` refused as an
+  unknown query), and one this socket cannot send to (a v6 address from a v4
+  socket, which spends no query) leave it. One `(id, address)` is one node,
+  so the router's one node named eight times is learned once.
+- **A dry frontier re-asks the door** while fewer than K nodes past it have
+  replied and it has ever named anyone, up to `max_queries` — the one answering
+  router names a single random node per ask, so re-asking draws fresh seeds.
+- **A sliding window, not lockstep rounds**: up to α walk queries in the air,
+  each with its own deadline, the next node asked the moment any answers or
+  times out; `put` sends to every token holder at once. Defaults α 8, K 8,
+  deadline 1 s, `max_queries` 64.
+- **Four bootstrap routers**, yog's list, since only one of the first two
+  answered from yog's deployed box.
+
+Live, from yog's box after all four: lookup median ~6.5 s, `put` ~7.5 s,
+`get` ~7.5 s. yog's walk also reads each node's BEP 42 `ip` claim for its
+observed-address vote; a foot publishes no presence, so that half is not
+ported.
+
 **Interoperation is asserted, not assumed.** `rendezvous::pairing::tests`,
 `rendezvous::item::tests` and `dht::mutable::tests` hold bytes the ENGINE's
 own code produced from known inputs — the four derivations, a sealed presence
@@ -933,7 +964,13 @@ the connection** — the engine serves every stream it obtains and lets the
 unspoken ones die in the handshake, so this end keeps the first and needs no
 negotiation over which. The window is thirty-five seconds: the engine reads
 its inbox every fifteen and punches for twenty after a call, so a client that
-stopped at twenty would miss the engine's whole window when the poll came late.
+stopped at twenty would miss the engine's whole window when the poll came late. It
+still holds with the engine's read counted (bl-921e): the call is stored when
+`put` returns and this window opens, a read that just missed it is followed
+within fifteen seconds by one that lands when its walk ends — bounded near
+`max_queries / α` deadlines, ~8 s, and measured ~7.5 s — so the engine punches
+by ~24 s and the windows overlap by ~11 s. The lockstep walk's ~20 s `get`
+had put the engine's start at the window's very edge.
 A stated default, to be revisited on evidence (REMOTE §13.7 ruling 3).
 
 **What is held is what was punched.** A direct connection stays one per ask —
@@ -1006,7 +1043,9 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/dht/bencode.rs` | Bencode: one enum, a canonical encoder, a strict bounded decoder. |
 | `src/dht/krpc.rs` | KRPC, the client's half: the query shape, the reply and error read back, compact nodes. |
 | `src/dht/mutable.rs` | BEP 44's signed mutable item, its target and the exact bytes a signature covers. |
-| `src/dht/lookup.rs` | The iterative walk, bounded by a round's deadline and a query cap. |
+| `src/dht/lookup.rs` | The iterative walk: the door, the frontier loop and its end, bounded by per-query deadlines and a query cap (bl-921e). |
+| `src/dht/frontier.rs` | A walk's state — every node heard of, asked, replied — and the frontier read off it against the flight. |
+| `src/dht/flight.rs` | The sliding window: one query sent with its own deadline, and the wait for the flight's next event. |
 | `src/dht/items.rs` | `get` and `put` over the walk. |
 | `src/dht/transport.rs` | The datagram seam: one trait, and the std UDP socket that fills it. |
 | `src/spawn.rs` | **The spawn boundary.** Every child process is built AND forked here — nowhere else builds a `Command`, and nowhere else spends one. It decides three things a spawn site could forget: the git-environment scrub, the **process group** the child is born leading (bl-a78e, §3.5), and the fork lock the suite needs. **Founded by bl-a4a5**, before it had a production tenant, which is the point of the row: a boundary rule that arrives after the first spawn site is a rule that has to be argued with. |
@@ -1018,8 +1057,8 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/corpus/replay.rs` | `cfg(test)` only. **The two replays a consumer owes** (REMOTE §3.2, §3.6): projection — one record replayed at every edition an engine can be at, with every key stamped above it deleted — and word mutation, a token no build has heard of in every string-typed path but `kind`. It replaces the by-hand frame-by-frame comparison every re-vendor up to 18 was paid for. |
 | `src/test_support.rs` | `cfg(test)` only. The scratch directory, the fork lock, the stand-in engine, the recording notice sink (§3.7 — a serving foot writes to stderr, and a test cannot read that back), and the certificate mint the suite performs on the operator's behalf. |
 | `src/test_support/engine/punched.rs` | `cfg(test)` only. The stand-in engine's punched end: a punch port that listens, and a whole script served over ONE held connection — an answer, a vanish, a silence — so the ladder, the ping discard and the hangup are driven over a real punched wire. |
-| `src/test_support/roving.rs` | `cfg(test)` only. The operator's rendezvous act performed by the suite — the two files, the engine's presence item signed as the engine signs it — and a one-node fake commons on loopback UDP with the tuning that walks it in milliseconds. |
-| `src/dht/tests/fake.rs` | `cfg(test)` only. A fake DHT node on loopback UDP: scripted routing, a BEP 44 store that checks what a real node checks, and a mood for each way the commons misbehaves. It listens, which is why it is scaffolding. |
+| `src/test_support/roving.rs` | `cfg(test)` only. The operator's rendezvous act performed by the suite — the two files, the engine's presence item signed as the engine signs it — and a fake commons on loopback UDP — a router door that answers only `find_node` and the node past it holding the items — with the tuning that walks it in milliseconds. |
+| `src/dht/tests/fake.rs` | `cfg(test)` only. A fake DHT node on loopback UDP: scripted routing, a BEP 44 store that checks what a real node checks, and a mood for each way the commons misbehaves — the measured router, rotor and mute among them. It listens, which is why it is scaffolding; its datagrams are `fake/wire.rs`. |
 | `src/packaged_tests/embeds.rs` | `cfg(test)` only. **What the build reads, and whether it ships** (split from `packaged_tests.rs` by bl-bb7d): every compile-time embed under `src`, resolved against the file that names it and held to both halves of the policy — the class `is_ruled_in` admits and the path `cargo package --list` actually carries. It was a prohibition (*there are no embeds*) until the crate wanted one; a prohibition that has to be lifted the first time it binds was never the check. |
 | `src/packaged_tests.rs` | `cfg(test)` only. **The publication guard** (bl-d25a): what `cargo publish` would upload, read off the real `cargo package --list` and judged against the classes `Cargo.toml`'s `include` allowlist rules in — both directions, since a shape guard dies by matching nothing. It is in `src` rather than a `tests/` crate because it forks a child and the spawn boundary is `pub(crate)`; an integration crate could only reach a bare `Command::new`, which the confinement rules refuse. |
 

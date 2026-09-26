@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use crate::dht::mutable::Mutable;
 use crate::dht::tests::fake::{FakeNode, Mood};
-use crate::dht::tests::{id, quick};
+use crate::dht::tests::{id, quick, router};
 use crate::dht::{Config, Keypair};
 use crate::rendezvous::call::Tuning;
 use crate::rendezvous::item::Presence;
@@ -53,12 +53,34 @@ pub(crate) fn presence(port: u16, seq: i64) -> Mutable {
         .expect("signed")
 }
 
-/// A one-node commons holding `items`, and the tuning that walks it.
-pub(crate) fn commons(items: Vec<Mutable>) -> (FakeNode, Tuning) {
-    let mut node = FakeNode::bind(id(0x42));
-    node.serve(vec![], Mood::Answer, items);
-    let tuning = tuned(vec![node.addr.to_string()]);
-    (node, tuning)
+/// The commons as the live mainline is shaped (yog REMOTE §13.7 ruling 3):
+/// a bootstrap router that answers only `find_node`, and the one node past
+/// it that holds the items. Both live as long as this does.
+pub(crate) struct Commons {
+    holder: FakeNode,
+    _door: FakeNode,
+}
+
+impl Commons {
+    /// Everything the holder stores right now.
+    pub(crate) fn held(&self) -> Vec<Mutable> {
+        self.holder.held()
+    }
+}
+
+/// A commons whose holder has `items`, and the tuning that walks it.
+pub(crate) fn commons(items: Vec<Mutable>) -> (Commons, Tuning) {
+    let mut holder = FakeNode::bind(id(0x42));
+    holder.serve(vec![], Mood::Answer, items);
+    let door = router(vec![holder.node()]);
+    let tuning = tuned(vec![door.addr.to_string()]);
+    (
+        Commons {
+            holder,
+            _door: door,
+        },
+        tuning,
+    )
 }
 
 /// A tuning that walks `bootstrap` quickly and punches for under a second.

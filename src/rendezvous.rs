@@ -20,10 +20,15 @@ pub(crate) mod pairing;
 pub(crate) mod punch;
 
 /// The mainline DHT's bootstrap nodes, resolved at the moment of a call —
-/// a name lookup is a network act, and opening a channel dials nothing.
+/// a name lookup is a network act, and opening a channel dials nothing. The
+/// four standard long-lived routers, yog's list: from its deployed engine box
+/// only one of the first two answered at all (yog REMOTE §13.7 ruling 3,
+/// bl-9408), so a silent router should cost a quarter of the roster, not half.
 pub(crate) fn mainline() -> Vec<String> {
     vec![
         "router.bittorrent.com:6881".to_owned(),
         "dht.transmissionbt.com:6881".to_owned(),
+        "router.utorrent.com:6881".to_owned(),
+        "dht.aelitis.com:6881".to_owned(),
     ]
 }

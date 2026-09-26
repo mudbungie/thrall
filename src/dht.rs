@@ -21,13 +21,18 @@
 //!
 //! Four files under this root, one concern each: `bencode` the encoding,
 //! `krpc` the datagram shapes, `mutable` the signed item, `transport` the
-//! socket seam; `lookup` is the walk and `items` the two BEP 44 verbs over
-//! it. Synchronous throughout — `std::net` with socket timeouts, no tokio —
+//! socket seam; `lookup` is the walk, `frontier` its state, `flight` the
+//! window of queries in the air, and `items` the two BEP 44 verbs over it.
+//! **The walk is yog's as measured on the live mainline** (REMOTE §13.7
+//! ruling 3; thrall bl-921e ported yog bl-f6e1, bl-9408, bl-d00f and
+//! bl-d9c1): same frontier, same window, same defaults. Synchronous throughout — `std::net` with socket timeouts, no tokio —
 //! and every duration is a [`Config`] field a test can shorten, so the fake
 //! DHT the suite runs on loopback UDP answers in milliseconds where the
 //! commons answers in seconds.
 
 pub(crate) mod bencode;
+mod flight;
+mod frontier;
 mod items;
 pub(crate) mod krpc;
 mod lookup;
@@ -40,22 +45,23 @@ pub(crate) use krpc::NodeId;
 pub(crate) use mutable::Keypair;
 pub(crate) use transport::{Transport, Udp};
 
-#[cfg(test)]
-use bencode::{Dict, bytes, entry};
 use ring::rand::SecureRandom;
 use std::net::SocketAddr;
 use std::time::Duration;
 
 /// The walk's parameters — stated so a test can shrink them and a caller
-/// can widen them; the defaults are BEP 5's.
+/// can widen them. K is BEP 5's; the deadline and α are yog's measurements
+/// (REMOTE §13.7 ruling 3): on the live mainline p99 of answers landed inside
+/// 0.9 s, and with ~40% of queried nodes silent a window of 8 walked in about
+/// half the time BEP 5's 3 did, losing no result (yog bl-d9c1).
 #[derive(Clone, Debug)]
 pub(crate) struct Config {
-    /// Queries in flight per round.
+    /// Walk queries in the air at once — the sliding window.
     pub(crate) alpha: usize,
     /// How many closest nodes a walk converges on and a `put` writes to.
     pub(crate) k: usize,
-    /// How long one round waits for its answers.
-    pub(crate) round: Duration,
+    /// How long one query waits for its answer before its slot is refilled.
+    pub(crate) deadline: Duration,
     /// The most queries one walk may send, however the commons answers.
     pub(crate) max_queries: usize,
 }
@@ -63,9 +69,9 @@ pub(crate) struct Config {
 impl Default for Config {
     fn default() -> Config {
         Config {
-            alpha: 3,
+            alpha: 8,
             k: 8,
-            round: Duration::from_secs(2),
+            deadline: Duration::from_secs(1),
             max_queries: 64,
         }
     }
@@ -101,15 +107,12 @@ impl Dht {
     }
 
     /// The nodes nearest `target`, closest first — BEP 5's `find_node` walk.
-    /// The two BEP 44 verbs walk with `get` instead, so this is the suite's
+    /// Never a bootstrap address, and `Err` rather than an empty answer when
+    /// no node past the bootstrap answered. The two BEP 44 verbs walk with `get` instead, so this is the suite's
     /// view of the walk alone.
     #[cfg(test)]
     pub(crate) fn lookup(&mut self, target: NodeId) -> Result<Vec<Node>, String> {
-        let out = self.search(
-            target,
-            "find_node",
-            Dict::from([entry("target", bytes(&target.0))]),
-        )?;
+        let out = self.search(target, "find_node")?;
         Ok(out
             .replies
             .into_iter()

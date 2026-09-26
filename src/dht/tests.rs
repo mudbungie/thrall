@@ -2,9 +2,12 @@
 //! real [`Udp`] transport — and against two stand-in transports for the
 //! socket failures loopback will not produce on demand.
 
+mod bootstrap;
 pub(crate) mod fake;
+mod frontier;
 mod items;
 mod walks;
+mod window;
 
 use super::mutable::Mutable;
 use super::*;
@@ -16,7 +19,7 @@ pub(crate) fn quick() -> Config {
     Config {
         alpha: 3,
         k: 3,
-        round: Duration::from_millis(300),
+        deadline: Duration::from_millis(300),
         max_queries: 64,
     }
 }
@@ -28,6 +31,14 @@ fn client(bootstrap: Vec<SocketAddr>, config: Config) -> Dht {
 
 pub(crate) fn id(fill: u8) -> NodeId {
     NodeId([fill; 20])
+}
+
+/// A mainline bootstrap router at `0x00` (yog REMOTE §13.7 ruling 3): it
+/// answers `find_node` with `peers` and nothing else.
+pub(crate) fn router(peers: Vec<Node>) -> FakeNode {
+    let mut r = FakeNode::bind(id(0x00));
+    r.serve(peers, Mood::Router, vec![]);
+    r
 }
 
 /// A bootstrap node at `0x00` advertising `B` (`0x0f`) and `C` (`0x10`), `B`
@@ -58,11 +69,11 @@ fn serve(nodes: &mut [FakeNode; 4], items_on_c: Vec<Mutable>, items_on_d: Vec<Mu
 }
 
 #[test]
-fn the_defaults_are_the_beps() {
+fn the_defaults_are_the_measured_window_and_deadline() {
     let c = Config::default();
     assert_eq!(
-        (c.alpha, c.k, c.round, c.max_queries),
-        (3, 8, Duration::from_secs(2), 64)
+        (c.alpha, c.k, c.deadline, c.max_queries),
+        (8, 8, Duration::from_secs(1), 64)
     );
 }
 
