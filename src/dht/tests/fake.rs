@@ -1,0 +1,225 @@
+//! A fake DHT node on loopback UDP — the far end every walk in this corpus
+//! talks to (REMOTE §13.5: designed for from the first line). One thread per
+//! node, a scripted routing answer, a BEP 44 store that checks what a real
+//! node checks (token, signature, sequence), and a `Mood` for each way a
+//! node on the commons misbehaves.
+//!
+//! **It listens**, which is the one thing thrall must never do (DESIGN §2) —
+//! and that is precisely why it is scaffolding and not the crate proper: what
+//! it stands in for is the commons.
+
+use super::super::bencode::{Dict, Value, bytes, entry};
+use super::super::krpc::{Node, NodeId};
+use super::super::mutable::Mutable;
+use std::net::{IpAddr, SocketAddr, UdpSocket};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, PoisonError};
+use std::thread::JoinHandle;
+use std::time::Duration;
+
+pub(crate) const TOKEN: &[u8] = b"tok";
+
+#[derive(Clone, Copy)]
+pub(crate) enum Mood {
+    Answer,
+    Silent,
+    Garbage,
+    Refuse,
+    /// Replies without stating an id.
+    Anonymous,
+    /// Replies under a transaction nobody opened.
+    Stray,
+}
+
+/// The node's BEP 44 store, shared with the test so it can read back what a
+/// client put there.
+pub(crate) type Store = Arc<Mutex<Vec<Mutable>>>;
+
+pub(crate) struct FakeNode {
+    socket: Option<UdpSocket>,
+    pub(crate) addr: SocketAddr,
+    pub(crate) id: NodeId,
+    pub(crate) items: Store,
+    stop: Arc<AtomicBool>,
+    thread: Option<JoinHandle<()>>,
+}
+
+impl FakeNode {
+    pub(crate) fn bind(id: NodeId) -> FakeNode {
+        let socket = UdpSocket::bind("127.0.0.1:0").unwrap();
+        socket
+            .set_read_timeout(Some(Duration::from_millis(20)))
+            .unwrap();
+        let addr = socket.local_addr().unwrap();
+        FakeNode {
+            socket: Some(socket),
+            addr,
+            id,
+            items: Store::default(),
+            stop: Arc::new(AtomicBool::new(false)),
+            thread: None,
+        }
+    }
+
+    pub(crate) fn node(&self) -> Node {
+        Node {
+            id: self.id,
+            addr: self.addr,
+        }
+    }
+
+    pub(crate) fn serve(&mut self, peers: Vec<Node>, mood: Mood, items: Vec<Mutable>) {
+        let socket = self.socket.take().unwrap();
+        *self.items.lock().unwrap_or_else(PoisonError::into_inner) = items;
+        let (id, stop, store) = (self.id, Arc::clone(&self.stop), Arc::clone(&self.items));
+        self.thread = Some(std::thread::spawn(move || {
+            run(&socket, id, &peers, mood, &store, &stop);
+        }));
+    }
+
+    /// Everything the node holds right now.
+    pub(crate) fn held(&self) -> Vec<Mutable> {
+        self.items
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+}
+
+impl Drop for FakeNode {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Relaxed);
+        if let Some(t) = self.thread.take() {
+            t.join().unwrap();
+        }
+    }
+}
+
+fn run(
+    socket: &UdpSocket,
+    id: NodeId,
+    peers: &[Node],
+    mood: Mood,
+    items: &Store,
+    stop: &AtomicBool,
+) {
+    let mut buf = vec![0u8; 8192];
+    while !stop.load(Ordering::Relaxed) {
+        let Ok((n, from)) = socket.recv_from(&mut buf) else {
+            continue;
+        };
+        let q = Value::decode(&buf[..n]).unwrap();
+        let tid = q.get("t").unwrap().as_bytes().unwrap().to_vec();
+        let datagram = match mood {
+            Mood::Silent => continue,
+            Mood::Garbage => b"not bencode".to_vec(),
+            Mood::Refuse => error(&tid, 201, "refused"),
+            Mood::Anonymous => reply(&tid, Dict::new()),
+            Mood::Stray => reply(b"stray", Dict::from([entry("id", bytes(&id.0))])),
+            Mood::Answer => {
+                let mut held = items.lock().unwrap_or_else(PoisonError::into_inner);
+                answer(&tid, id, peers, &mut held, &q)
+            }
+        };
+        socket.send_to(&datagram, from).unwrap();
+    }
+}
+
+fn answer(tid: &[u8], id: NodeId, peers: &[Node], items: &mut Vec<Mutable>, q: &Value) -> Vec<u8> {
+    let a = q.get("a").unwrap();
+    let mut r = Dict::from([entry("id", bytes(&id.0))]);
+    match q.get("q").unwrap().as_bytes().unwrap() {
+        b"find_node" => {
+            r.extend(routing(peers));
+            reply(tid, r)
+        }
+        b"get" => {
+            r.extend(routing(peers));
+            r.insert(b"token".to_vec(), bytes(TOKEN));
+            let target = NodeId::parse(a.get("target").unwrap().as_bytes().unwrap()).unwrap();
+            if let Some(item) = items.iter().find(|i| i.target() == target) {
+                r.insert(b"k".to_vec(), bytes(&item.key));
+                r.insert(b"seq".to_vec(), Value::Int(item.seq));
+                r.insert(b"sig".to_vec(), bytes(&item.sig));
+                r.insert(b"v".to_vec(), bytes(&item.value));
+            }
+            reply(tid, r)
+        }
+        b"put" => {
+            if a.get("token").unwrap().as_bytes().unwrap() != TOKEN {
+                return error(tid, 203, "bad token");
+            }
+            let item = Mutable {
+                key: a.get("k").unwrap().as_bytes().unwrap().try_into().unwrap(),
+                salt: a
+                    .get("salt")
+                    .map(|s| s.as_bytes().unwrap().to_vec())
+                    .unwrap_or_default(),
+                seq: a.get("seq").unwrap().as_int().unwrap(),
+                value: a.get("v").unwrap().as_bytes().unwrap().to_vec(),
+                sig: a
+                    .get("sig")
+                    .unwrap()
+                    .as_bytes()
+                    .unwrap()
+                    .try_into()
+                    .unwrap(),
+            };
+            if !item.verify() {
+                return error(tid, 206, "invalid signature");
+            }
+            let target = item.target();
+            if items
+                .iter()
+                .any(|i| i.target() == target && i.seq >= item.seq)
+            {
+                return error(tid, 302, "sequence number less than current");
+            }
+            items.retain(|i| i.target() != target);
+            items.push(item);
+            reply(tid, r)
+        }
+        _ => error(tid, 204, "unknown method"),
+    }
+}
+
+/// `nodes` and `nodes6` in compact form, from the peers this node advertises.
+fn routing(peers: &[Node]) -> Dict {
+    let (mut v4, mut v6) = (Vec::new(), Vec::new());
+    for n in peers {
+        match n.addr.ip() {
+            IpAddr::V4(ip) => {
+                v4.extend_from_slice(&n.id.0);
+                v4.extend_from_slice(&ip.octets());
+                v4.extend_from_slice(&n.addr.port().to_be_bytes());
+            }
+            IpAddr::V6(ip) => {
+                v6.extend_from_slice(&n.id.0);
+                v6.extend_from_slice(&ip.octets());
+                v6.extend_from_slice(&n.addr.port().to_be_bytes());
+            }
+        }
+    }
+    Dict::from([entry("nodes", bytes(&v4)), entry("nodes6", bytes(&v6))])
+}
+
+fn reply(tid: &[u8], r: Dict) -> Vec<u8> {
+    Value::Dict(Dict::from([
+        entry("t", bytes(tid)),
+        entry("y", bytes(b"r")),
+        entry("r", Value::Dict(r)),
+    ]))
+    .encode()
+}
+
+fn error(tid: &[u8], code: i64, message: &str) -> Vec<u8> {
+    Value::Dict(Dict::from([
+        entry("t", bytes(tid)),
+        entry("y", bytes(b"e")),
+        entry(
+            "e",
+            Value::List(vec![Value::Int(code), bytes(message.as_bytes())]),
+        ),
+    ]))
+    .encode()
+}

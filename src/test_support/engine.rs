@@ -55,6 +55,9 @@ use serde_json::{Value, json};
 
 use crate::channel::{frame, material, tls};
 
+/// The punched end of the stand-in: one held connection, a whole script.
+pub(crate) mod punched;
+
 /// How many frames a foot writes per connection: its preface, then its
 /// request.
 const FRAMES_IN: usize = 2;
@@ -170,7 +173,7 @@ fn serve(
 /// certificate the operator CA issued. Requiring one is the point — a stand-in
 /// that accepted an anonymous connection would prove nothing about the channel
 /// thrall actually opens.
-fn server_config(dir: &Path) -> Arc<ServerConfig> {
+pub(super) fn server_config(dir: &Path) -> Arc<ServerConfig> {
     let provider = Arc::new(rustls::crypto::ring::default_provider());
     let anchors = tls::anchors(&dir.join(material::ANCHORS)).expect("the operator CA");
     let verifier =

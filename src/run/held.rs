@@ -45,7 +45,7 @@ use super::hold::{Ending, Failed, tell};
 /// a foot that kept answering into that would be posting captures nobody is
 /// waiting for.
 pub(super) fn answer(
-    channel: &Channel,
+    channel: &mut Channel,
     invocation: &Invocation,
     capture: &Capture,
 ) -> Result<(), Failed> {
@@ -86,7 +86,7 @@ impl Held {
     /// at all: the ending carries the same capture to the next dial, so the
     /// rule holds unchanged across a flapping wire and this process still holds
     /// exactly one.
-    pub(super) fn post(self, channel: &Channel) -> Option<Ending> {
+    pub(super) fn post(self, channel: &mut Channel) -> Option<Ending> {
         match tell(channel, &gestures::complete(&self.id, &self.capture)) {
             Err(Failed::Wire(said)) => Some(Ending::Again {
                 said,

@@ -99,7 +99,7 @@ const DISARMED: &str = "this box's advertised set was not the set in force and h
 /// capture posted ahead of it lands on a slot still held with no capture and
 /// the driver collects a result this box computed once.
 pub(crate) fn hold(
-    channel: &Channel,
+    channel: &mut Channel,
     set: &[Local],
     handoff: Handoff,
     notice: &Notice,
@@ -154,7 +154,7 @@ pub(crate) fn hold(
 /// advertisement with something other than the advertisement's receipt has not
 /// said the set landed, and a foot that read on regardless would be waiting for
 /// work under a set nobody confirmed.
-fn present(channel: &Channel, presenting: &Value) -> Result<bool, Failed> {
+fn present(channel: &mut Channel, presenting: &Value) -> Result<bool, Failed> {
     match tell(channel, presenting)? {
         Reply::Advertised { wrote } => Ok(wrote),
         other => Err(Failed::Unusable(format!(
@@ -165,7 +165,7 @@ fn present(channel: &Channel, presenting: &Value) -> Result<bool, Failed> {
 
 /// **The follow-class read**: this machine's next work, or the empty answer of
 /// a hold that ended quietly. Both are ordinary; only a channel failure is not.
-fn waited(channel: &Channel) -> Result<Vec<Invocation>, Failed> {
+fn waited(channel: &mut Channel) -> Result<Vec<Invocation>, Failed> {
     match tell(channel, &gestures::invocations())? {
         Reply::Invocations(rows) => Ok(rows),
         other => Err(Failed::Unusable(format!(
@@ -189,7 +189,7 @@ fn waited(channel: &Channel) -> Result<Vec<Invocation>, Failed> {
 /// with no frame in it belongs to the third: the terminator is a zero-length
 /// frame the engine deliberately wrote, where a peer that went away is a read
 /// error instead.
-pub(super) fn tell(channel: &Channel, request: &Value) -> Result<Reply, Failed> {
+pub(super) fn tell(channel: &mut Channel, request: &Value) -> Result<Reply, Failed> {
     let stream = channel.ask(request).map_err(Failed::from)?;
     let last = stream.last().ok_or_else(|| {
         Failed::Unusable("the engine ended the stream without answering".to_owned())

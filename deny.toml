@@ -2,10 +2,9 @@
 #
 # Verified against cargo-deny 0.20.2 (pin any CI to this exact version). The
 # allow-list is exhaustive over the committed Cargo.lock — every license that
-# actually appears in the tree, nothing speculative. thrall has no dependencies
-# today, so the graph is thrall itself; re-run `cargo deny check` after any
-# dependency change and fix drift here by config, never by patching a
-# dependency.
+# actually appears in the tree, nothing speculative. Re-run `cargo deny check`
+# after any dependency change and fix drift here by config, never by patching
+# a dependency.
 
 [advisories]
 # Reject crates whose published version has been yanked from the registry.
@@ -20,7 +19,8 @@ ignore = []
 # EXHAUSTIVE OVER THE COMMITTED `Cargo.lock`, and derived from it rather than
 # guessed at. The list was `["MIT"]` while the graph was thrall alone; bl-a4a5
 # linked `rustls` (with `ring`) and `serde_json`, and every entry below is a
-# licence some crate in the resulting lockfile actually carries. A speculative
+# licence some crate in the resulting lockfile actually carries; bl-0a8b named
+# `ring` directly and added `socket2`, neither of which brought a new value. A speculative
 # allow-list is an allow-list nobody read, and it is worst on the day it
 # silently covers a crate no approval ever named — so widen this only with the
 # ball that links the crate, and re-derive it from the lockfile that ball

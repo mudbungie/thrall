@@ -21,14 +21,14 @@ use crate::test_support::Notices;
 #[test]
 fn a_re_assertion_that_wrote_says_the_box_was_disarmed() {
     let (notices, sink) = Notices::new();
-    let (_scratch, _engine, channel) = wired(vec![
+    let (_scratch, _engine, mut channel) = wired(vec![
         advertised(),
         work(vec![row("i-1", "Bash")]),
         receipt("i-1"),
         restored(),
         refusal("stop"),
     ]);
-    assert_eq!(said(hold(&channel, &set(), echo, &sink, None)), "stop");
+    assert_eq!(said(hold(&mut channel, &set(), echo, &sink, None)), "stop");
     let said = notices.heard();
     assert_eq!(said.len(), 1, "{said:?}");
     assert!(said[0].contains("was not the set in force"), "{said:?}");
@@ -45,7 +45,7 @@ fn a_re_assertion_that_wrote_says_the_box_was_disarmed() {
 #[test]
 fn a_disarming_is_said_and_the_channel_goes_on() {
     let (notices, sink) = Notices::new();
-    let (_scratch, engine, channel) = wired(vec![
+    let (_scratch, engine, mut channel) = wired(vec![
         advertised(),
         work(vec![row("i-1", "Bash")]),
         receipt("i-1"),
@@ -53,7 +53,7 @@ fn a_disarming_is_said_and_the_channel_goes_on() {
         work(vec![]),
         refusal("stop"),
     ]);
-    assert_eq!(said(hold(&channel, &set(), echo, &sink, None)), "stop");
+    assert_eq!(said(hold(&mut channel, &set(), echo, &sink, None)), "stop");
     assert_eq!(
         super::ops(&engine),
         [
@@ -75,14 +75,14 @@ fn a_disarming_is_said_and_the_channel_goes_on() {
 #[test]
 fn a_re_assertion_that_compared_is_silent() {
     let (notices, sink) = Notices::new();
-    let (_scratch, _engine, channel) = wired(vec![
+    let (_scratch, _engine, mut channel) = wired(vec![
         advertised(),
         work(vec![row("i-1", "Bash")]),
         receipt("i-1"),
         advertised(),
         refusal("stop"),
     ]);
-    assert_eq!(said(hold(&channel, &set(), echo, &sink, None)), "stop");
+    assert_eq!(said(hold(&mut channel, &set(), echo, &sink, None)), "stop");
     assert_eq!(notices.heard(), Vec::<String>::new());
 }
 
@@ -94,8 +94,8 @@ fn a_re_assertion_that_compared_is_silent() {
 #[test]
 fn a_write_on_the_first_presentation_is_ordinary_and_silent() {
     let (notices, sink) = Notices::new();
-    let (_scratch, _engine, channel) = wired(vec![restored(), refusal("stop")]);
-    assert_eq!(said(hold(&channel, &set(), echo, &sink, None)), "stop");
+    let (_scratch, _engine, mut channel) = wired(vec![restored(), refusal("stop")]);
+    assert_eq!(said(hold(&mut channel, &set(), echo, &sink, None)), "stop");
     assert_eq!(notices.heard(), Vec::<String>::new());
 }
 
@@ -106,9 +106,9 @@ fn a_write_on_the_first_presentation_is_ordinary_and_silent() {
 /// inventing the reading as well.
 #[test]
 fn an_answer_that_is_not_the_receipt_ends_the_channel() {
-    let (_scratch, _engine, channel) = wired(vec![work(vec![])]);
+    let (_scratch, _engine, mut channel) = wired(vec![work(vec![])]);
     let said = said(hold(
-        &channel,
+        &mut channel,
         &set(),
         echo,
         &crate::test_support::aside(),

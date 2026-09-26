@@ -11,6 +11,9 @@ use crate::test_support::engine::Engine;
 use crate::test_support::{Scratch, mint};
 use serde_json::{Value, json};
 
+/// The dial ladder: the rungs, the held connection, the ping and the hangup.
+mod ladder;
+
 /// A scratch box with an engine standing at the far end, answering the n-th
 /// dial with the n-th entry of `script`.
 fn wired(protocol: u32, script: Vec<Vec<Value>>) -> (Scratch, Engine, Material) {
@@ -66,7 +69,7 @@ fn a_channel_refuses_to_open_on_a_leaf_that_is_not_a_foot() {
 #[test]
 fn one_ask_states_a_version_carries_the_request_and_answers_the_reply() {
     let (_scratch, engine, held) = wired(ENGINE, vec![vec![advertised()]]);
-    let channel = Channel::open(&held).expect("opened");
+    let mut channel = Channel::open(&held).expect("opened");
     let request = json!({"op": "advertise", "tools": []});
     assert_eq!(channel.ask(&request), Ok(vec![advertised()]));
     assert_eq!(
@@ -82,7 +85,7 @@ fn one_ask_states_a_version_carries_the_request_and_answers_the_reply() {
 fn an_answer_of_many_frames_reads_back_through_the_same_ask() {
     let rows = vec![json!({"n": 1}), json!({"n": 2}), json!({"n": 3})];
     let (_scratch, _engine, held) = wired(ENGINE, vec![rows.clone()]);
-    let channel = Channel::open(&held).expect("opened");
+    let mut channel = Channel::open(&held).expect("opened");
     assert_eq!(channel.ask(&json!({"op": "invocations"})), Ok(rows));
 }
 
@@ -91,7 +94,7 @@ fn an_answer_of_many_frames_reads_back_through_the_same_ask() {
 #[test]
 fn each_ask_is_its_own_connection() {
     let (_scratch, engine, held) = wired(ENGINE, vec![vec![advertised()], vec![advertised()]]);
-    let channel = Channel::open(&held).expect("opened");
+    let mut channel = Channel::open(&held).expect("opened");
     for op in ["advertise", "invocations"] {
         assert!(channel.ask(&json!({ "op": op })).is_ok());
     }
@@ -109,7 +112,7 @@ fn each_ask_is_its_own_connection() {
 #[test]
 fn an_engine_that_answers_nothing_ends_the_stream() {
     let (_scratch, _engine, held) = wired(ENGINE, vec![vec![]]);
-    let channel = Channel::open(&held).expect("opened");
+    let mut channel = Channel::open(&held).expect("opened");
     assert_eq!(channel.ask(&json!({"op": "invocations"})), Ok(Vec::new()));
 }
 
@@ -118,7 +121,7 @@ fn an_engine_that_answers_nothing_ends_the_stream() {
 #[test]
 fn an_engine_of_another_protocol_refuses_and_names_both_versions() {
     let (_scratch, _engine, held) = wired(ENGINE + 1, vec![vec![advertised()]]);
-    let channel = Channel::open(&held).expect("opened");
+    let mut channel = Channel::open(&held).expect("opened");
     let Failure::Skew(refusal) = channel
         .ask(&json!({"op": "advertise"}))
         .expect_err("refused")
@@ -142,7 +145,7 @@ fn an_engine_of_another_protocol_refuses_and_names_both_versions() {
 fn an_engine_that_is_not_there_names_the_address_it_dialled() {
     let scratch = Scratch::new();
     let held = mint::provisioned(scratch.path(), "127.0.0.1:1");
-    let channel = Channel::open(&held).expect("opened");
+    let mut channel = Channel::open(&held).expect("opened");
     let refusal = said(
         channel
             .ask(&json!({"op": "advertise"}))
@@ -160,7 +163,7 @@ fn an_engine_the_anchors_do_not_cover_never_reaches_the_boundary() {
     let elsewhere = Scratch::new();
     mint::material(elsewhere.path());
     held.anchors = elsewhere.join(super::material::ANCHORS);
-    let channel = Channel::open(&held).expect("opened");
+    let mut channel = Channel::open(&held).expect("opened");
     assert!(channel.ask(&json!({"op": "advertise"})).is_err());
     assert_eq!(engine.heard(), Vec::<Value>::new(), "nothing was said");
 }
@@ -175,7 +178,7 @@ fn a_leaf_the_engine_will_not_accept_never_reaches_the_boundary() {
     mint::material(elsewhere.path());
     held.chain = elsewhere.join(CHAIN);
     held.key = elsewhere.join(KEY);
-    let channel = Channel::open(&held).expect("opened");
+    let mut channel = Channel::open(&held).expect("opened");
     assert!(channel.ask(&json!({"op": "advertise"})).is_err());
     assert_eq!(engine.heard(), Vec::<Value>::new(), "nothing was said");
     assert!(scratch.path().is_dir());
@@ -197,7 +200,7 @@ fn an_engine_that_vanishes_names_the_leg_and_the_address() {
     let held = read_dir(scratch.path())
         .expect("readable")
         .expect("provisioned");
-    let channel = Channel::open(&held).expect("opened");
+    let mut channel = Channel::open(&held).expect("opened");
     let said = said(
         channel
             .ask(&json!({"op": "advertise", "tools": []}))

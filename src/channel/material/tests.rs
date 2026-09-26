@@ -1,6 +1,7 @@
 //! The three answers a directory can give.
 
 use super::{ADDRESS, ANCHORS, CHAIN, KEY, read_dir};
+use crate::rendezvous::pairing;
 use crate::test_support::Scratch;
 use std::path::Path;
 
@@ -85,4 +86,29 @@ fn an_address_that_says_nothing_refuses_however_it_says_it() {
     std::fs::create_dir(tmp.path().join(ADDRESS)).expect("mkdir");
     let refusal = read_dir(tmp.path()).expect_err("refused");
     assert!(refusal.contains("half-provisioned"), "{refusal}");
+}
+
+/// **The rendezvous pairing rides beside the four files** (REMOTE §13.2): an
+/// entry without it is today's entry and roves nowhere, one with both files
+/// carries the pairing, and half of it is the same refusal half a trust
+/// store earns.
+#[test]
+fn the_rendezvous_pairing_is_read_beside_the_material_or_absent() {
+    let tmp = Scratch::new();
+    provision(tmp.path(), "engine.example:9000");
+    let plain = read_dir(tmp.path())
+        .expect("readable")
+        .expect("provisioned");
+    assert_eq!(plain.rendezvous, None, "no roving, and not a failure");
+    crate::test_support::roving::carried(tmp.path());
+    let roving = read_dir(tmp.path())
+        .expect("readable")
+        .expect("provisioned");
+    assert_eq!(
+        roving.rendezvous,
+        Some(crate::test_support::roving::pairing())
+    );
+    std::fs::remove_file(tmp.path().join(pairing::SALT)).expect("rm");
+    let refusal = read_dir(tmp.path()).expect_err("half");
+    assert!(refusal.contains(pairing::SALT), "{refusal}");
 }

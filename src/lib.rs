@@ -25,9 +25,16 @@
 //! server on this box and answers as an ordinary tool command, so a bridged
 //! tool is a plain entry of the document above and the engine learns nothing.
 //!
+//! **And the punched wire** (DESIGN §3.11, bl-0a8b; yog REMOTE §13): an entry
+//! carrying the [`rendezvous`] pairing reaches an engine no address can — the
+//! [`dht`] client reads its presence and files a call, the punch crosses a
+//! NAT, and the channel holds what it punched. The dial ladder in
+//! `channel::ladder` is what a redial re-enters.
+//!
 //! **thrall is complete as a foot at that point** — advertise, wait, execute,
 //! answer — and what remains is what it deliberately is not: it holds no world,
-//! it never listens, it never asks and it never acts.
+//! it never listens (the punch port excepted, §2), it never asks and it never
+//! acts.
 
 pub mod channel;
 pub mod cli;
@@ -41,6 +48,12 @@ pub mod paths;
 pub mod run;
 pub mod serve;
 pub mod tools;
+
+/// **The DHT client** — a pure client of the mainline DHT, never a node.
+pub(crate) mod dht;
+
+/// **The client rendezvous** — presence, the call, the punch, the cache.
+pub(crate) mod rendezvous;
 
 /// **The spawn boundary** — every child process is built and forked here.
 pub(crate) mod spawn;

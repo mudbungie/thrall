@@ -76,7 +76,7 @@ fn a_dropped_channel_is_dialled_again() {
     let (waits, pause) = Waits::new();
     let (notices, sink) = Notices::new();
     assert_eq!(
-        redial(&entry_at(scratch.path()), &set(), echo, &sink, &pause),
+        redial(entry_at(scratch.path()).open(), &set(), echo, &sink, &pause),
         "stop"
     );
     assert_eq!(waits.heard(), [FIRST]);
@@ -115,7 +115,7 @@ fn a_refused_read_is_waited_out_and_named() {
     let (waits, pause) = Waits::new();
     let (notices, sink) = Notices::new();
     assert_eq!(
-        redial(&entry_at(scratch.path()), &set(), echo, &sink, &pause),
+        redial(entry_at(scratch.path()).open(), &set(), echo, &sink, &pause),
         "stop"
     );
     assert_eq!(waits.heard(), [PREDECESSOR]);
@@ -139,7 +139,7 @@ fn an_ending_that_is_over_stops_the_channel_with_no_wait() {
     let (waits, pause) = Waits::new();
     let (notices, sink) = Notices::new();
     assert_eq!(
-        redial(&entry_at(scratch.path()), &set(), echo, &sink, &pause),
+        redial(entry_at(scratch.path()).open(), &set(), echo, &sink, &pause),
         "a rival holds this set"
     );
     assert_eq!(waits.heard(), Vec::<Duration>::new());
@@ -157,7 +157,7 @@ fn an_entry_that_cannot_be_opened_is_over_before_any_dial() {
         channel: Err("this entry is empty".to_owned()),
     };
     assert_eq!(
-        redial(&entry, &set(), echo, &aside(), &pause),
+        redial(entry.open(), &set(), echo, &aside(), &pause),
         "this entry is empty"
     );
     assert_eq!(waits.heard(), Vec::<Duration>::new());
@@ -194,7 +194,13 @@ fn waits_over(script: Vec<Option<serde_json::Value>>) -> Vec<Duration> {
     let _engine = flapping_at(scratch.path(), script);
     let (waits, pause) = Waits::new();
     assert_eq!(
-        redial(&entry_at(scratch.path()), &set(), echo, &aside(), &pause),
+        redial(
+            entry_at(scratch.path()).open(),
+            &set(),
+            echo,
+            &aside(),
+            &pause
+        ),
         "stop"
     );
     waits.heard()
@@ -223,7 +229,13 @@ fn a_disarming_is_not_remembered_across_a_redial() {
     );
     let (notices, sink) = Notices::new();
     assert_eq!(
-        redial(&entry_at(scratch.path()), &set(), echo, &sink, &unwaited()),
+        redial(
+            entry_at(scratch.path()).open(),
+            &set(),
+            echo,
+            &sink,
+            &unwaited()
+        ),
         "stop"
     );
     let said = notices.heard();

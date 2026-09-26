@@ -36,6 +36,8 @@ use std::time::Duration;
 pub(crate) mod engine;
 /// The operator's out-of-channel act, performed by the suite.
 pub(crate) mod mint;
+/// The rendezvous material and the commons, stood in for.
+pub(crate) mod roving;
 
 /// The binary-wide fork lock. See [`crate::spawn::output`] for the ETXTBSY
 /// race it closes and why the discipline belongs at the fork rather than at the

@@ -47,8 +47,8 @@ fn a_version_the_two_ends_do_not_share_is_over_and_not_the_wire() {
     let held = read_dir(scratch.path())
         .expect("readable")
         .expect("provisioned");
-    let channel = Channel::open(&held).expect("opened");
-    let Ending::Over(said) = hold(&channel, &set(), echo, &aside(), None) else {
+    let mut channel = Channel::open(&held).expect("opened");
+    let Ending::Over(said) = hold(&mut channel, &set(), echo, &aside(), None) else {
         panic!("a version this foot cannot speak is not worth another dial");
     };
     assert!(
@@ -84,7 +84,7 @@ fn it_is_neither_waited_out_nor_dialled_again() {
     let _engine = ahead(scratch.path(), 2);
     let (waits, pause) = Waits::new();
     let (notices, sink) = Notices::new();
-    let said = redial(&entry_at(scratch.path()), &set(), echo, &sink, &pause);
+    let said = redial(entry_at(scratch.path()).open(), &set(), echo, &sink, &pause);
     assert!(said.contains("upgrade the older component"), "{said}");
     assert_eq!(waits.heard(), [], "it waited to dial an engine again");
     assert!(

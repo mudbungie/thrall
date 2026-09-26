@@ -162,6 +162,8 @@ mod fan;
 mod redial;
 /// When a box says a channel has stopped.
 mod report;
+/// The lifetime over a punched wire: the redial re-enters the ladder.
+mod roving;
 /// The version the two ends do not share: the ending no dial improves.
 mod skew;
 /// The capture the wire swallowed, and the dial that posts it.

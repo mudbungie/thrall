@@ -72,7 +72,13 @@ fn a_swallowed_capture_is_posted_first_on_the_next_dial() {
     );
     let (waits, pause) = Waits::new();
     assert_eq!(
-        crate::run::redial::redial(&entry_at(scratch.path()), &set(), counted, &aside(), &pause),
+        crate::run::redial::redial(
+            entry_at(scratch.path()).open(),
+            &set(),
+            counted,
+            &aside(),
+            &pause
+        ),
         "stop"
     );
     assert_eq!(
@@ -127,7 +133,13 @@ fn a_refused_re_post_is_dropped_and_the_channel_reads_on() {
     );
     let (_waits, pause) = Waits::new();
     assert_eq!(
-        crate::run::redial::redial(&entry_at(scratch.path()), &set(), echo, &aside(), &pause),
+        crate::run::redial::redial(
+            entry_at(scratch.path()).open(),
+            &set(),
+            echo,
+            &aside(),
+            &pause
+        ),
         "stop",
         "the refusal ended nothing: the channel ran on to its own ending"
     );
@@ -169,12 +181,13 @@ fn a_re_post_the_wire_swallowed_again_is_still_held() {
             )),
         ],
     );
-    let channel = channel_at(scratch.path());
-    let Ending::Again { held, .. } = hold(&channel, &set(), echo, &aside(), None) else {
+    let mut channel = channel_at(scratch.path());
+    let Ending::Again { held, .. } = hold(&mut channel, &set(), echo, &aside(), None) else {
         panic!("a dropped completion must be worth another dial");
     };
     let carried = held.expect("the capture the wire swallowed");
-    let Ending::Again { held, .. } = hold(&channel, &set(), echo, &aside(), Some(carried)) else {
+    let Ending::Again { held, .. } = hold(&mut channel, &set(), echo, &aside(), Some(carried))
+    else {
         panic!("a dropped re-post must be worth another dial");
     };
     let carried = held.expect("a wire failure is not an answer");
@@ -190,7 +203,8 @@ fn a_re_post_the_wire_swallowed_again_is_still_held() {
         },
         "the same capture, unchanged by a second drop"
     );
-    let Ending::Again { held, .. } = hold(&channel, &set(), echo, &aside(), Some(carried)) else {
+    let Ending::Again { held, .. } = hold(&mut channel, &set(), echo, &aside(), Some(carried))
+    else {
         panic!("the refused read is this box's own predecessor");
     };
     assert!(

@@ -32,9 +32,9 @@ use serde_json::json;
 #[test]
 fn a_refused_read_is_this_box_s_own_predecessor_and_is_dialled_again() {
     let refused = "client \"foot-1\" already holds a read on this engine";
-    let (_scratch, engine, channel) = wired(vec![advertised(), refusal(refused)]);
+    let (_scratch, engine, mut channel) = wired(vec![advertised(), refusal(refused)]);
     assert_eq!(
-        hold(&channel, &set(), echo, &aside(), None),
+        hold(&mut channel, &set(), echo, &aside(), None),
         Ending::Again {
             said: refused.to_owned(),
             predecessor: true,
@@ -53,9 +53,9 @@ fn a_refused_read_is_this_box_s_own_predecessor_and_is_dialled_again() {
 #[test]
 fn a_refused_advertisement_is_over_and_not_a_predecessor() {
     let refused = "this box's set is held by a serving connection";
-    let (_scratch, _engine, channel) = wired(vec![refusal(refused)]);
+    let (_scratch, _engine, mut channel) = wired(vec![refusal(refused)]);
     assert_eq!(
-        hold(&channel, &set(), echo, &aside(), None),
+        hold(&mut channel, &set(), echo, &aside(), None),
         Ending::Over(refused.to_owned())
     );
 }
@@ -65,13 +65,13 @@ fn a_refused_advertisement_is_over_and_not_a_predecessor() {
 #[test]
 fn a_refused_completion_is_over() {
     let refused = "no invocation \"i-1\" is in flight";
-    let (_scratch, _engine, channel) = wired(vec![
+    let (_scratch, _engine, mut channel) = wired(vec![
         advertised(),
         work(vec![row("i-1", "Bash")]),
         refusal(refused),
     ]);
     assert_eq!(
-        hold(&channel, &set(), echo, &aside(), None),
+        hold(&mut channel, &set(), echo, &aside(), None),
         Ending::Over(refused.to_owned())
     );
 }
@@ -80,8 +80,8 @@ fn a_refused_completion_is_over() {
 /// not the wire, so another dial earns the same unusable answer.
 #[test]
 fn an_unusable_answer_is_over() {
-    let (_scratch, _engine, channel) = wired(vec![advertised(), advertised()]);
-    let Ending::Over(said) = hold(&channel, &set(), echo, &aside(), None) else {
+    let (_scratch, _engine, mut channel) = wired(vec![advertised(), advertised()]);
+    let Ending::Over(said) = hold(&mut channel, &set(), echo, &aside(), None) else {
         panic!("an unusable answer must end the channel");
     };
     assert!(said.contains("not this machine's work"), "{said}");
@@ -99,13 +99,13 @@ fn a_wire_that_goes_away_is_dialled_again() {
     let held = read_dir(scratch.path())
         .expect("readable")
         .expect("provisioned");
-    let channel = Channel::open(&held).expect("opened");
+    let mut channel = Channel::open(&held).expect("opened");
     let Ending::Again {
         said,
         predecessor,
         served,
         ..
-    } = hold(&channel, &set(), echo, &aside(), None)
+    } = hold(&mut channel, &set(), echo, &aside(), None)
     else {
         panic!("a dropped wire must be worth another dial");
     };
@@ -128,8 +128,8 @@ fn an_answered_read_marks_the_channel_as_having_served() {
     let held = read_dir(scratch.path())
         .expect("readable")
         .expect("provisioned");
-    let channel = Channel::open(&held).expect("opened");
-    let Ending::Again { served, .. } = hold(&channel, &set(), echo, &aside(), None) else {
+    let mut channel = Channel::open(&held).expect("opened");
+    let Ending::Again { served, .. } = hold(&mut channel, &set(), echo, &aside(), None) else {
         panic!("a dropped wire must be worth another dial");
     };
     assert!(served, "the engine answered a read before the wire dropped");
@@ -146,9 +146,9 @@ fn a_stream_that_answered_nothing_is_over() {
     let held = read_dir(scratch.path())
         .expect("readable")
         .expect("provisioned");
-    let channel = Channel::open(&held).expect("opened");
+    let mut channel = Channel::open(&held).expect("opened");
     assert_eq!(
-        hold(&channel, &set(), echo, &aside(), None),
+        hold(&mut channel, &set(), echo, &aside(), None),
         Ending::Over("the engine ended the stream without answering".to_owned())
     );
 }
@@ -172,10 +172,10 @@ fn a_completion_the_wire_swallowed_is_dialled_again() {
     let held = read_dir(scratch.path())
         .expect("readable")
         .expect("provisioned");
-    let channel = Channel::open(&held).expect("opened");
+    let mut channel = Channel::open(&held).expect("opened");
     let Ending::Again {
         predecessor, held, ..
-    } = hold(&channel, &set(), echo, &aside(), None)
+    } = hold(&mut channel, &set(), echo, &aside(), None)
     else {
         panic!("a dropped completion must be worth another dial");
     };
@@ -205,13 +205,13 @@ fn a_completion_the_wire_swallowed_is_dialled_again() {
 #[test]
 fn a_completion_the_engine_refused_carries_nothing() {
     let refused = "no invocation \"i-1\" is in flight";
-    let (_scratch, engine, channel) = wired(vec![
+    let (_scratch, engine, mut channel) = wired(vec![
         advertised(),
         work(vec![row("i-1", "Bash")]),
         refusal(refused),
     ]);
     assert_eq!(
-        hold(&channel, &set(), echo, &aside(), None),
+        hold(&mut channel, &set(), echo, &aside(), None),
         Ending::Over(refused.to_owned())
     );
     assert_eq!(

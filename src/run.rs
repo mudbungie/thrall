@@ -152,7 +152,7 @@ fn served(
     notice: &Notice,
     pause: &Pause,
 ) -> String {
-    let said = redial::redial(entry, set, handoff, notice, pause);
+    let said = redial::redial(entry.open(), set, handoff, notice, pause);
     notice(&said);
     said
 }

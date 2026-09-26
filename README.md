@@ -13,7 +13,8 @@ dials in to an engine somewhere else. Its entire wire surface is three acts:
 
 That is the whole of it. A thrall asks nothing and acts on nothing. It cannot
 start a conversation, read a transcript, spawn an agent, or address any part of
-the server other than its own queue. It never listens on a port; **the engine
+the server other than its own queue. It never listens on a port — the punch port an entry behind a NAT binds for
+its own simultaneous open is the one stated exception (`docs/DESIGN.md` §2); **the engine
 never speaks first**.
 
 ## Why it is a separate program
@@ -153,7 +154,8 @@ shared library, no state directory thrall creates for itself — beyond whatever
 the operator's own `tools.json` entries spawn. So the whole install is a binary
 plus the two files the operator writes by hand: *The tool document* below, and
 one channel directory under `<data root>/wire/workspaces/` holding the
-certificate an engine's operator issued.
+certificate an engine's operator issued — and, for an engine that cannot be
+dialled, the rendezvous pairing (*Reaching an engine behind a NAT*, below).
 
 The other route is **the image** (below), for a box that takes images rather
 than toolchains. Either way, *Deployment* at the end of this file is how a foot
@@ -162,6 +164,31 @@ releases — and it installs by exactly the command above, on the box, on a time
 
 `make install` is the contributor's route and not this one: it builds the
 working tree and puts that binary on this machine.
+
+## Reaching an engine behind a NAT
+
+A channel directory holds four files — `ca.pem`, `client.pem`, `client.key`
+and `address` — and dials the address. An engine behind a residential NAT with
+no port-forward cannot be dialled (yog `docs/REMOTE.md` §13), so its operator
+carries two more files into the same directory, exactly as they carry the
+certificate:
+
+| File | Holds |
+|---|---|
+| `rendezvous.pub` | the engine's rendezvous public key, 32 bytes, hex |
+| `pairing.salt` | the pairing salt the two ends share, 32 bytes, hex |
+
+Both or neither. With them, a dial that the address does not answer falls
+through: the foot reads the engine's presence off the BitTorrent mainline DHT,
+writes a sealed call into the engine's inbox there, and both ends punch a TCP
+connection toward each other. The connection is then **held** between asks
+rather than dialled per ask, the engine's keepalive pings are discarded, two
+minutes of silence hangs it up, and a hang-up is dialled again through the same
+ladder — held connection, direct address, a re-punch at the last endpoints, the
+full rendezvous. `address` stays required: it is the name the engine's
+certificate is verified against, whichever way the connection was made. A
+channel without the two files never touches the DHT and never binds a port.
+`docs/DESIGN.md` §3.11 is the design; the protocol is REMOTE §13.
 
 ## The tool document
 

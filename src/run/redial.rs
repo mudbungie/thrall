@@ -44,7 +44,7 @@ use std::time::Duration;
 
 use super::hold::{Ending, hold};
 use super::{Handoff, Notice, Pause};
-use crate::channel::entries::Entry;
+use crate::channel::Channel;
 use crate::config::Local;
 
 /// **The first wait after a channel drops**, and the floor the series returns
@@ -74,19 +74,23 @@ pub(super) const PREDECESSOR: Duration = Duration::from_secs(32);
 
 /// **Serve one channel for as long as this process lives.**
 ///
-/// The entry is opened once and not per dial: opening reads no file and dials
-/// nothing — it is a fact about this box's own material — so a failure there is
+/// The entry is opened once and not per dial — `opened` is that one act's
+/// answer, handed down by `run::served`: opening reads no file and dials
+/// nothing, it is a fact about this box's own material, so a failure there is
 /// this box's configuration and never an engine, and asking it again would ask
 /// the same question. Everything after it is the engine's, and that is the part
-/// that is asked again.
+/// that is asked again — **through the whole dial ladder each time** (DESIGN
+/// §3.11): a held connection that dropped, the direct address, a re-punch at
+/// the endpoints the run has cached, and only then the commons. That is what
+/// makes a cellular flap cost a punch window rather than a channel.
 pub(crate) fn redial(
-    entry: &Entry,
+    opened: Result<Channel, String>,
     set: &[Local],
     handoff: Handoff,
     notice: &Notice,
     pause: &Pause,
 ) -> String {
-    let channel = match entry.open() {
+    let mut channel = match opened {
         Ok(channel) => channel,
         Err(reason) => return reason,
     };
@@ -98,7 +102,7 @@ pub(crate) fn redial(
     // than the next channel's first act.
     let mut held = None;
     loop {
-        match hold(&channel, set, handoff, notice, held.take()) {
+        match hold(&mut channel, set, handoff, notice, held.take()) {
             Ending::Over(said) => return said,
             Ending::Again {
                 said,
