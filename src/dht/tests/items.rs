@@ -108,6 +108,22 @@ fn put_with_no_token_holder_is_an_error() {
     let e = dht.put(item.clone()).unwrap_err();
     assert_eq!(
         e,
+        format!("no DHT node near {} offered a write token", item.target())
+    );
+}
+
+/// A holder that offers a token and never answers `put` is the other zero:
+/// the item went out and nobody stored it (yog bl-f519 told the two apart).
+#[test]
+fn put_to_holders_that_never_answer_is_an_error() {
+    let mut mute = FakeNode::bind(id(1));
+    mute.serve(vec![], Mood::Mute, vec![]);
+    let door = router(vec![mute.node()]);
+    let mut dht = client(vec![door.addr], quick());
+    let item = keypair().sign(vec![], 1, b"x".to_vec()).unwrap();
+    let e = dht.put(item.clone()).unwrap_err();
+    assert_eq!(
+        e,
         format!("no DHT node stored the item at {}", item.target())
     );
 }

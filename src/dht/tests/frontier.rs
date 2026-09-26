@@ -134,3 +134,30 @@ fn a_walk_short_of_k_replies_asks_the_door_again() {
         vec![second.node(), first.node()]
     );
 }
+
+/// The live dark walk's shape (yog bl-f519): of the bootstrap addresses, one
+/// is silent every time and one is the rotor naming a single node per answer
+/// — here three silent seeds before a live one. Re-asking both at every door
+/// round spent the cap of nine on the silent router and ended dark after the
+/// third seed; knocking only where the door answered leaves the query that
+/// reaches the live seed.
+#[test]
+fn a_silent_router_leaves_the_door_after_its_first_deadline() {
+    let silent = [
+        node(0x41, Mood::Silent, vec![]),
+        node(0x42, Mood::Silent, vec![]),
+        node(0x43, Mood::Silent, vec![]),
+    ];
+    let live = node(0x44, Mood::Answer, vec![]);
+    let dead_router = node(0x01, Mood::Silent, vec![]);
+    let mut rotor = FakeNode::bind(id(0x00));
+    let seeds = silent.iter().map(FakeNode::node).chain([live.node()]);
+    rotor.serve(seeds.collect(), Mood::Rotor, vec![]);
+    let config = Config {
+        max_queries: 9,
+        deadline: Duration::from_millis(100),
+        ..quick()
+    };
+    let mut dht = client(vec![dead_router.addr, rotor.addr], config);
+    assert_eq!(dht.lookup(id(0xff)).unwrap(), vec![live.node()]);
+}

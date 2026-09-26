@@ -18,6 +18,7 @@ use super::flight::Flight;
 pub(crate) use super::frontier::Outcome;
 use super::frontier::Walk;
 use super::krpc::NodeId;
+use std::net::SocketAddr;
 
 impl Dht {
     /// Walk toward `target` asking `q` of every node on the way — except the
@@ -64,6 +65,13 @@ impl Dht {
     /// dark that the next ask would have opened. A door that is silent or
     /// names nobody leaves the pool empty and is not re-asked, so a dark
     /// commons costs one deadline.
+    ///
+    /// A re-ask knocks only at the bootstrap addresses that answered (yog
+    /// bl-f519). Traced from the deployed engine box, three of the five
+    /// addresses the roster resolves to were silent every time, so a walk
+    /// that re-asked all five spent three queries in five of every door
+    /// round on routers that never answer — in the walks that ended dark,
+    /// most of the cap — and ran out of queries before a live seed came up.
     pub(crate) fn search(&mut self, target: NodeId, q: &str) -> Result<Outcome, String> {
         if self.bootstrap.is_empty() {
             return Err("no bootstrap node to ask".into());
@@ -97,12 +105,20 @@ impl Dht {
         Ok(out)
     }
 
-    /// Ask every bootstrap address `find_node`. Answers the queries it
-    /// spent, and never less than one: a door whose every send was refused
-    /// still spends a query of the cap, so a walk cannot knock at it forever.
+    /// Ask `find_node` of every bootstrap address the walk still knocks at —
+    /// all of them the first time, then only those that answered. Answers
+    /// the queries it spent, and never less than one: a door whose every
+    /// send was refused still spends a query of the cap, so a walk cannot
+    /// knock at it forever.
     fn door(&mut self, walk: &mut Walk, flight: &mut Flight, args: &Dict) -> usize {
         let mut sent = 0usize;
-        for addr in self.bootstrap.clone() {
+        let knock: Vec<SocketAddr> = self
+            .bootstrap
+            .iter()
+            .copied()
+            .filter(|a| walk.knocks(*a))
+            .collect();
+        for addr in knock {
             walk.asked.insert(addr);
             sent += usize::from(self.ask(flight, addr, true, "find_node", args.clone()));
         }

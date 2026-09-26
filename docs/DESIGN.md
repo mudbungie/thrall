@@ -920,6 +920,16 @@ and all four of the defects yog then measured were here too:
 - **A dry frontier re-asks the door** while fewer than K nodes past it have
   replied and it has ever named anyone, up to `max_queries` — the one answering
   router names a single random node per ask, so re-asking draws fresh seeds.
+  **A re-ask knocks only where the door answered** (yog bl-f519): a bootstrap
+  address silent past its first deadline leaves the door for the rest of the
+  walk, as a silent node leaves the frontier. From yog's deployed box the
+  roster resolves to five addresses of which three never answer, and
+  re-asking all five spent three of every five door queries on nothing — in
+  the walks that ended dark, most of the cap.
+- **`put` names which zero it met** (yog bl-f519). A walk that reached no
+  token holder sends nothing and fails *no DHT node near T offered a write
+  token*; *no DHT node stored the item* is kept for holders that were sent the
+  item and none stored it. The two used to read as one.
 - **A sliding window, not lockstep rounds**: up to α walk queries in the air,
   each with its own deadline, the next node asked the moment any answers or
   times out; `put` sends to every token holder at once. Defaults α 8, K 8,
@@ -1058,10 +1068,10 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/dht/bencode.rs` | Bencode: one enum, a canonical encoder, a strict bounded decoder. |
 | `src/dht/krpc.rs` | KRPC, the client's half: the query shape, the reply (with its BEP 42 `ip` claim) and error read back, compact nodes and addresses. |
 | `src/dht/mutable.rs` | BEP 44's signed mutable item, its target and the exact bytes a signature covers. |
-| `src/dht/lookup.rs` | The iterative walk: the door, the frontier loop and its end, bounded by per-query deadlines and a query cap (bl-921e). |
-| `src/dht/frontier.rs` | A walk's state — every node heard of, asked, replied — and the frontier read off it against the flight. |
+| `src/dht/lookup.rs` | The iterative walk: the door (re-asked only at the addresses that answered, yog bl-f519), the frontier loop and its end, bounded by per-query deadlines and a query cap (bl-921e). |
+| `src/dht/frontier.rs` | A walk's state — every node heard of, asked, replied, and the door addresses that answered — and the frontier read off it against the flight. |
 | `src/dht/flight.rs` | The sliding window: one query sent with its own deadline, and the wait for the flight's next event. |
-| `src/dht/items.rs` | `get` and `put` over the walk. |
+| `src/dht/items.rs` | `get` and `put` over the walk; a `put` whose walk found no token holder is its own error and sends nothing (yog bl-f519). |
 | `src/dht/transport.rs` | The datagram seam: one trait, and the std UDP socket that fills it. |
 | `src/spawn.rs` | **The spawn boundary.** Every child process is built AND forked here — nowhere else builds a `Command`, and nowhere else spends one. It decides three things a spawn site could forget: the git-environment scrub, the **process group** the child is born leading (bl-a78e, §3.5), and the fork lock the suite needs. **Founded by bl-a4a5**, before it had a production tenant, which is the point of the row: a boundary rule that arrives after the first spawn site is a rule that has to be argued with. |
 | `src/sys.rs` | **The confined `unsafe` file**, and it holds two things, both raw process effects `std` does not wrap. Signalling a process GROUP, which `std` has no spelling for at all (`Child::kill` is `SIGKILL` to one process, and there is no `Child::terminate`); the sign guard did not move when the group arrived (§3.5) — the negation is this file's, the callers pass a positive id. And putting a pipe into non-blocking mode (bl-6c14), which `std` spells for sockets and for nothing else — a `ChildStdout` has no `set_nonblocking`, and borrowing the socket one by wrapping the descriptor in a `UnixStream` would read the pipe with `recv(2)`, which a pipe refuses. Both are declared rather than depended on: `kill(2)` and `fcntl(2)` are in the libc `std` already links, so neither costs a crate, a build script or a lockfile line. |

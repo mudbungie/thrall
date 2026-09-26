@@ -25,7 +25,10 @@ impl Dht {
 
     /// Store `item` at the K closest nodes that offered a write token; answers
     /// how many acknowledged. Zero is an error naming the first refusal —
-    /// a stale sequence number, say — or the silence.
+    /// a stale sequence number, say — or the silence; a walk that reached no
+    /// token holder at all (every node near the target silent or refusing
+    /// `get`) is its own error, sent nothing, and is not a silent `put`
+    /// (yog bl-f519: the two read as one, and were mistaken for each other).
     pub(crate) fn put(&mut self, item: Mutable) -> Result<usize, String> {
         let target = item.target();
         let out = self.search(target, "get")?;
@@ -35,6 +38,9 @@ impl Dht {
             .filter_map(|(n, r)| Some((*n, r.get(b"token".as_slice())?.as_bytes()?.to_vec())))
             .take(self.config.k)
             .collect();
+        if holders.is_empty() {
+            return Err(format!("no DHT node near {target} offered a write token"));
+        }
         let mut flight = Flight::new();
         for (node, token) in holders {
             self.ask(&mut flight, node.addr, false, "put", item.put_args(&token));
