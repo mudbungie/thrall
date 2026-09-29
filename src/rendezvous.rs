@@ -7,7 +7,8 @@
 //! facts both ends compute from the pairing salt, [`item`] seals and opens
 //! the two items the commons carries, [`punch`] is the TCP simultaneous open
 //! from one port, and [`call`] is the act itself — read presence, write a
-//! call, punch — plus the RAM cache the ladder's third rung re-punches at.
+//! call, punch — plus the RAM cache the ladder's third rung re-punches at;
+//! [`say`] is every line the ladder says as it climbs, and never an address.
 //!
 //! **A foot touches the commons only at the moment it wants a connection**
 //! (REMOTE §13.4). Nothing here publishes, polls or holds a thread: every
@@ -18,6 +19,7 @@ pub(crate) mod call;
 pub(crate) mod item;
 pub(crate) mod pairing;
 pub(crate) mod punch;
+pub(crate) mod say;
 
 /// The mainline DHT's bootstrap nodes, resolved at the moment of a call —
 /// a name lookup is a network act, and opening a channel dials nothing. The

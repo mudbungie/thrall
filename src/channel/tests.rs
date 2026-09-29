@@ -13,6 +13,8 @@ use serde_json::{Value, json};
 
 /// The dial ladder: the rungs, the held connection, the ping and the hangup.
 mod ladder;
+/// What the ladder says as it climbs, into a captured sink.
+mod said;
 
 /// A scratch box with an engine standing at the far end, answering the n-th
 /// dial with the n-th entry of `script`.

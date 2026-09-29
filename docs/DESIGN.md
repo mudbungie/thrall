@@ -1015,6 +1015,42 @@ purpose: rustls has no clean resume from a half-read record, so a timeout is
 shortening the bound rather than by faking time. The hangup is the wire, and
 the wire is dialled again (§3.8).
 
+**What the ladder says** (`rendezvous::say`, bl-3958; the engine's half is
+yog bl-355c, REMOTE §13.4 "The operator's view of the loop"). A dial that
+fails silently is indistinguishable from one that never ran, so a roving
+entry's ladder says each step through the channel's §3.7 notice sink —
+stderr, under the channel's own name — one line apiece:
+
+    rendezvous: direct rung connected — no punch needed
+    rendezvous: direct rung refused — <n> address(es) tried (1 v4)
+    rendezvous: direct rung timed out — <n> address(es) tried (1 v6, 1 v4)
+    rendezvous: presence read — seq <s>, <k> endpoint(s) (1 v4)
+    rendezvous: presence not read — <class>
+    rendezvous: call nonce <n> written — seq <s>, <k> endpoint(s) (1 v6, 1 v4), <a> ack(s)
+    rendezvous: call nonce <n> not written — the DHT walk failed (reason withheld: it names nodes)
+    rendezvous: punch for call nonce <n> at <k> endpoint(s) (1 v4) — window 35s
+    rendezvous: re-punch at <k> cached endpoint(s) (1 v4) — window 35s
+    rendezvous: punch landed (1 v4)
+    rendezvous: punch expired after 35s with no stream
+    rendezvous: held line kept — the punched connection carries the next ask
+    rendezvous: held line dropped — the <send|receive> failed (<silent past the hangup|closed by the far end|a transport error>)
+    rendezvous: ping discarded off the held line
+
+A presence `<class>` is one of four fixed phrases — no walk could start, the
+walk failed, none is published, the item does not open under this pairing.
+**Counts, sequence numbers, nonces and address families, never an address, a
+key, a salt or a sealed byte**, and a DHT failure is said without its reason,
+because the walk's refusals name the nodes asked. **A repeated outcome is said
+once**: each family remembers its last line and stays quiet while the next is
+the same, so a roving entry whose direct address answers — dialled per ask —
+says so once, a box with no network does not re-say its ladder every minute,
+and a held line says its first ping and not the next hundred (a held line kept
+or dropped lets the next ping be said). An entry that does not rove says
+nothing here: its one rung's only outcome is already the channel's sentence.
+The line that would warn before spending the window when every address the
+call carries is an overlay or tunnel address waits on yog bl-f612, which
+decides what that class is.
+
 **What a foot does not do.** It does not publish presence, poll anything or
 hold a thread for the commons: a foot touches the DHT only at the moment it
 wants a connection, on that channel's own thread. It does not keep the engine
@@ -1037,6 +1073,7 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/channel.rs` | **The channel** (bl-a4a5): one wire to one engine. There is an `ask` and there is nothing else — the shape of the file is the dial-in invariant. A dialled connection is one per ask, held only while waiting; a punched one is held across asks (§3.11, bl-0a8b), its pings discarded and its silence bounded. Knows nothing about being dialled again. |
 | `src/channel/failure.rs` | Why a channel could not carry a gesture, in the two classes that differ in what to do next — the wire, and version skew (split from `channel.rs` by bl-0a8b at the pre-split band). |
 | `src/channel/ladder.rs` | **The dial ladder** (§3.11): the direct address under a bound, the re-punch at cached endpoints, the full rendezvous — in that order, stopping at the first that answers, and saying whether what answered was punched. An entry without rendezvous material has a one-rung ladder. |
+| `src/channel/speak.rs` | The channel's half of §3.11's lines (bl-3958): the sink the loop hands down (`speak_to`), and the held line lost and the ping discarded — the two things only the channel sees. Split from `channel.rs` at the pre-split band. |
 | `src/channel/frame.rs` | The framing: a big-endian `u32` length, then that many bytes of JSON; a zero-length frame terminates an answer (REMOTE §3). |
 | `src/channel/hello.rs` | The version preface, and this end's half of it — state the major and the edition beside it (REMOTE §3.2), confirm, refuse fail-closed naming both versions. The engine's edition comes back from the confirmation, defaulted at the floor when it states none. The number itself is in no Rust file: the repo-root `PROTOCOL` file states it and `build.rs` compiles it into the constant this module re-exports (bl-c618), because the release gates that read it are other repositories fetching one path out of a tree they do not build. A foot never *admits*, because a foot is never dialled. It also draws §3.8's one distinction REMOTE does not: a preface that arrived and states a version this end cannot speak is skew, one that never arrived is the wire. |
 | `src/channel/hello/version.rs` | The three vendored numbers and nothing else (bl-6fcf): the major, the edition this build states, and the floor an absent one reads as. Split from the exchange because they are the ENGINE's facts copied, and a re-vendor rewrites this file alone. |
@@ -1063,6 +1100,7 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/rendezvous/pairing.rs` | The two rendezvous files an entry carries — the engine's public key and the pairing salt — and the four HKDF derivations both ends compute from the salt. Tested against the engine's own bytes. |
 | `src/rendezvous/item.rs` | The two sealed items: the presence this end opens and the call it seals — `nonce ‖ ciphertext ‖ tag`, the fixed-width endpoint list. Tested against bytes the engine sealed. |
 | `src/rendezvous/punch.rs` | The TCP simultaneous open from one port: the listeners, the connectors, v6 first, the first stream kept. The one socket a foot listens on (§2). |
+| `src/rendezvous/say.rs` | **What the ladder says** (§3.11, bl-3958): every line a roving channel says as it climbs, built here and nowhere else so none can carry an address, and the speaker that says a repeated outcome once. |
 | `src/rendezvous/call.rs` | The act — presence, call, punch — and the RAM cache the third rung re-punches at; every duration a `Tuning` field a test can shorten. |
 | `src/dht.rs` | **The DHT client** (REMOTE §13.2, §13.7 ruling 2): a pure client of the mainline DHT, never a node; the root holds `Config`, the client and its observed-address vote, and re-exports the shape the rendezvous consumes. Mirrored from yog's `src/dht`. |
 | `src/dht/bencode.rs` | Bencode: one enum, a canonical encoder, a strict bounded decoder. |

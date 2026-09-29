@@ -18,6 +18,7 @@
 use super::item::{Call, Presence};
 use super::pairing::Pairing;
 use super::punch::{Punch, local_ips};
+use super::say::{self, Kind, Say};
 use crate::dht::{Config, Dht, Udp};
 use std::net::{IpAddr, SocketAddr, TcpStream, ToSocketAddrs};
 use std::time::{Duration, SystemTime};
@@ -73,6 +74,9 @@ pub(crate) struct Roving {
     /// The last sequence written, so two calls in one second still move
     /// forward — a node refuses a `seq` that does not.
     last_seq: i64,
+    /// What the ladder says as it climbs (`say`), silent until a loop hands
+    /// the channel its sink.
+    pub(crate) say: Say,
 }
 
 impl Roving {
@@ -83,6 +87,7 @@ impl Roving {
             punch: None,
             cached: None,
             last_seq: 0,
+            say: Say::silent(),
         }
     }
 
@@ -91,19 +96,36 @@ impl Roving {
     /// nothing landed — either way the ladder falls to the full rendezvous.
     pub(crate) fn repunch(&mut self) -> Option<TcpStream> {
         let targets = self.cached.clone()?;
-        let window = self.tuning.window;
-        self.punch().ok()?.punch(targets, window)
+        self.punched(None, targets).ok()?
     }
 
-    /// **The fourth rung**: presence, call, punch.
+    /// **The fourth rung**: presence, call, punch — each step said as it
+    /// ends (`say`), a DHT failure without its reason.
     pub(crate) fn rendezvous(&mut self) -> Result<TcpStream, String> {
-        let mut dht = self.dht()?;
+        let unread = |why: &str| say::presence_unread(why);
+        let mut dht = self
+            .dht()
+            .map_err(|e| self.missed(Kind::Presence, unread(say::NO_WALK), e))?;
         let seal_key = self.pairing.seal_key();
-        let item = dht
-            .get(self.pairing.key, self.pairing.presence_salt())?
-            .ok_or("no presence is published under the engine's rendezvous key")?;
-        let presence = Presence::open(&seal_key, &item.value)
-            .ok_or("the presence item does not open under this pairing")?;
+        let got = dht.get(self.pairing.key, self.pairing.presence_salt());
+        let item = got
+            .map_err(|e| self.missed(Kind::Presence, unread(say::WALK), e))?
+            .ok_or_else(|| {
+                self.missed(
+                    Kind::Presence,
+                    unread(say::NONE),
+                    "no presence is published under the engine's rendezvous key".to_owned(),
+                )
+            })?;
+        let presence = Presence::open(&seal_key, &item.value).ok_or_else(|| {
+            self.missed(
+                Kind::Presence,
+                unread(say::SEALED),
+                "the presence item does not open under this pairing".to_owned(),
+            )
+        })?;
+        let line = say::presence_read(item.seq, &presence.endpoints);
+        self.say.say(Kind::Presence, line);
         if presence.endpoints.is_empty() {
             return Err("the engine's presence names no endpoint".to_owned());
         }
@@ -118,15 +140,44 @@ impl Roving {
             seq,
             call.seal(&seal_key)?,
         )?;
-        dht.put(signed)?;
+        let unwritten = say::call_unwritten(call.nonce);
+        let acks = dht
+            .put(signed)
+            .map_err(|e| self.missed(Kind::Call, unwritten, e))?;
+        let line = say::call_written(call.nonce, seq, &call.endpoints, acks);
+        self.say.say(Kind::Call, line);
         self.last_seq = seq;
         self.cached = Some(presence.endpoints.clone());
-        let window = self.tuning.window;
         let targets = presence.endpoints;
         let count = targets.len();
-        self.punch()?.punch(targets, window).ok_or_else(|| {
+        self.punched(Some(call.nonce), targets)?.ok_or_else(|| {
             format!("no SYN crossed toward {count} engine endpoint(s) inside the window")
         })
+    }
+
+    /// One punch toward `targets`, said as it starts and as it ends.
+    fn punched(
+        &mut self,
+        nonce: Option<u64>,
+        targets: Vec<SocketAddr>,
+    ) -> Result<Option<TcpStream>, String> {
+        let window = self.tuning.window;
+        self.punch()?;
+        self.say
+            .say(Kind::Punch, say::punch_started(nonce, &targets, window));
+        let landed = self.punch()?.punch(targets, window);
+        let line = landed.as_ref().map_or_else(
+            || say::expired(window),
+            |tcp| say::landed(tcp.peer_addr().ok()),
+        );
+        self.say.say(Kind::Landed, line);
+        Ok(landed)
+    }
+
+    /// Say `line` and hand back the refusal it stands for.
+    fn missed(&mut self, kind: Kind, line: String, why: String) -> String {
+        self.say.say(kind, line);
+        why
     }
 
     /// The punch port, bound once.

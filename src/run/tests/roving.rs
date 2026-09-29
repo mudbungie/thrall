@@ -38,13 +38,37 @@ fn a_dropped_held_connection_is_dialled_again_through_the_ladder() {
     let (notices, sink) = Notices::new();
     assert_eq!(redial(Ok(channel), &set(), echo, &sink, &pause), "stop");
     assert_eq!(waits.heard(), [FIRST]);
-    let said = notices.heard();
-    assert_eq!(said.len(), 1, "{said:?}");
+    let heard = notices.heard();
+    let (ladder, said): (Vec<String>, Vec<String>) = heard
+        .iter()
+        .cloned()
+        .partition(|l| l.starts_with("rendezvous: "));
+    assert_eq!(said.len(), 1, "{heard:?}");
     assert!(
         said[0].contains("the channel to the engine failed"),
         "{said:?}"
     );
     assert!(said[0].contains("again in 1s"), "{said:?}");
+    // The ladder speaks into the same sink (bl-3958): the redial's second
+    // climb says its re-punch and the new held line, and the direct rung —
+    // refused again, the same outcome — is not said twice.
+    let after: Vec<&String> = heard
+        .iter()
+        .skip_while(|l| !said.contains(l))
+        .skip(1)
+        .collect();
+    assert_eq!(
+        after,
+        [
+            "rendezvous: re-punch at 1 cached endpoint(s) (1 v4) — window 800ms",
+            "rendezvous: held line kept — the punched connection carries the next ask",
+        ],
+        "{heard:?}"
+    );
+    assert_eq!(
+        ladder.iter().filter(|l| l.contains("direct rung")).count(),
+        1
+    );
     let prefaces = engine
         .heard()
         .iter()

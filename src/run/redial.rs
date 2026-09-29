@@ -94,6 +94,9 @@ pub(crate) fn redial(
         Ok(channel) => channel,
         Err(reason) => return reason,
     };
+    // The ladder's rungs are said into the same sink as this loop's own
+    // sentences, under the same name (`rendezvous::say`, bl-3958).
+    channel.speak_to(notice);
     let mut series = FIRST;
     // The one thing that crosses a redial, and it crosses forward rather than
     // being remembered: a capture the wire swallowed, posted by the next dial

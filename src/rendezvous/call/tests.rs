@@ -7,12 +7,12 @@ use crate::rendezvous::item::Call;
 use crate::rendezvous::punch::Punch;
 use crate::test_support::roving::{commons, commons_as, engine, pairing, presence, tuned};
 
-fn roving(tuning: Tuning) -> Roving {
+pub(super) fn roving(tuning: Tuning) -> Roving {
     Roving::new(pairing(), tuning)
 }
 
 /// A port nothing listens on.
-fn dead_port() -> u16 {
+pub(super) fn dead_port() -> u16 {
     let gone = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
     let port = gone.local_addr().expect("addr").port();
     drop(gone);
@@ -226,3 +226,6 @@ fn the_filed_call_carries_the_observed_address_when_the_commons_named_one() {
         assert!(opened.endpoints.iter().all(|e| e.port() == punch));
     }
 }
+
+/// What the act says, arm by arm, into a captured sink.
+mod said;

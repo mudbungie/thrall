@@ -18,7 +18,7 @@ fn advertised() -> Value {
 }
 
 /// A roving entry: the operator carried the pairing beside the four files.
-fn roving_entry(dir: &Path, address: &str) -> crate::channel::material::Material {
+pub(super) fn roving_entry(dir: &Path, address: &str) -> crate::channel::material::Material {
     mint::material(dir);
     roving::carried(dir);
     std::fs::write(dir.join(super::super::material::ADDRESS), address).expect("address");

@@ -57,10 +57,13 @@ mod ladder;
 pub mod leaf;
 /// What the operator carried to this box.
 pub mod material;
+/// What a roving channel says of its held line, into the loop's sink.
+mod speak;
 /// The mTLS configuration.
 pub mod tls;
 
 use crate::rendezvous::call::{Roving, Tuning};
+use crate::rendezvous::say::{self, Kind};
 pub use failure::Failure;
 use material::Material;
 
@@ -156,15 +159,17 @@ impl Channel {
     /// failure there is the wire, the next dial climbs the ladder, and nothing
     /// here retries inside one ask.
     pub fn ask(&mut self, request: &Value) -> Result<Vec<Value>, Failure> {
-        let (mut tls, punched) = match self.held.take() {
-            Some(mut tls) => {
-                frame::write_value(&mut tls, request)
-                    .map_err(|e| Failure::Wire(self.failed("send", &e)))?;
-                (tls, true)
-            }
-            None => self.dial(request)?,
+        let (mut tls, punched, fresh) = if let Some(mut tls) = self.held.take() {
+            frame::write_value(&mut tls, request).map_err(|e| self.lost("send", &e, true))?;
+            (tls, true, false)
+        } else {
+            let (tls, punched) = self.dial(request)?;
+            (tls, punched, punched)
         };
-        let answer = self.answer(&mut tls)?;
+        let answer = self.answer(&mut tls, punched)?;
+        if fresh {
+            self.say(Kind::Held, say::held_kept());
+        }
         if punched {
             self.held = Some(tls);
         }
@@ -174,11 +179,11 @@ impl Channel {
     /// Every frame of one answer, in order, up to the terminator — and never
     /// a ping, which the engine writes into a held connection's silence
     /// (REMOTE §13.4) and which is never the start of a reply stream.
-    fn answer(&self, tls: &mut Tls) -> Result<Vec<Value>, Failure> {
+    fn answer(&mut self, tls: &mut Tls, punched: bool) -> Result<Vec<Value>, Failure> {
         let mut stream = Vec::new();
         loop {
-            match frame::read_value(tls).map_err(|e| Failure::Wire(self.failed("receive", &e)))? {
-                Some(chunk) if is_ping(&chunk) => {}
+            match frame::read_value(tls).map_err(|e| self.lost("receive", &e, punched))? {
+                Some(chunk) if is_ping(&chunk) => self.say(Kind::Ping, say::ping()),
                 Some(chunk) => stream.push(chunk),
                 None => return Ok(stream),
             }
