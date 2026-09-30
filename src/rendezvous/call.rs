@@ -1,6 +1,6 @@
 //! **The act** (REMOTE §13.2–§13.4): read the engine's presence off the
 //! commons, write a sealed call into the inbox, and punch — and the RAM
-//! cache that lets the ladder's third rung re-punch without a DHT round trip.
+//! cache that lets the ladder's third rung re-call without reading presence.
 //!
 //! **Every duration is a [`Tuning`] field**, stated as the defaults REMOTE
 //! §13.7 ruling 3 records and a test's to shorten, so the suite drives a
@@ -10,18 +10,20 @@
 //! network act.
 //!
 //! **What worked stays RAM for the run and never disk** (REMOTE §13.4, the
-//! runtime half of §8's `:0` discipline): the engine endpoints the last
-//! presence named, and the punch port this end bound once. A redial after a
-//! drop punches those endpoints first, which is the whole of what makes a
-//! cellular flap cost a punch window rather than a poll period.
+//! runtime half of §8's `:0` discipline): the engine endpoints of the last
+//! call that landed, the sequence it was written under, and the punch port
+//! this end bound once. A redial after a drop writes a fresh call to those
+//! endpoints before it reads presence again — one walk rather than two
+//! (REMOTE §13.3, ruling yog bl-278f) — and a re-call nobody answers clears
+//! them, because the presence they came from is then the suspect.
 
-use super::item::{Call, Presence};
+use super::item::Presence;
 use super::pairing::Pairing;
-use super::punch::{Punch, local_ips};
+use super::punch::Punch;
 use super::say::{self, Kind, Say};
 use crate::dht::{Config, Dht, Udp};
-use std::net::{IpAddr, SocketAddr, TcpStream, ToSocketAddrs};
-use std::time::{Duration, SystemTime};
+use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
+use std::time::Duration;
 
 /// The engine starts an inbox read every fifteen seconds and punches for
 /// twenty after the read that finds a call (yog's `Cadence`), so a client
@@ -69,7 +71,8 @@ pub(crate) struct Roving {
     pub(crate) tuning: Tuning,
     /// The punch port, bound on the first rendezvous and held for the run.
     punch: Option<Punch>,
-    /// The engine endpoints the last presence named — the third rung's.
+    /// The engine endpoints of the last call that landed — the re-call's
+    /// input, cleared by a re-call that does not.
     cached: Option<Vec<SocketAddr>>,
     /// The last sequence written, so two calls in one second still move
     /// forward — a node refuses a `seq` that does not.
@@ -91,12 +94,21 @@ impl Roving {
         }
     }
 
-    /// **The third rung**: a punch at the endpoints the last rendezvous
-    /// read, touching no DHT. `None` where there is no cache to punch at or
-    /// nothing landed — either way the ladder falls to the full rendezvous.
-    pub(crate) fn repunch(&mut self) -> Option<TcpStream> {
-        let targets = self.cached.clone()?;
-        self.punched(None, targets).ok()?
+    /// **The third rung, a re-call** (yog REMOTE §13.3, ruling bl-278f): a
+    /// fresh call written from the cached presence and punched — one DHT
+    /// walk, not two, and no presence read. `None` where nothing is cached or
+    /// the call did not land; **a re-call that does not land clears the
+    /// cache**, so the rung under it — and every climb after — reads presence
+    /// again.
+    ///
+    /// It is a call and never a bare re-punch: an engine behind a NAT holds
+    /// no mapping once the served stream has ended and sends no SYN outside
+    /// a call's window, so a punch at cached endpoints with no call behind it
+    /// is one-sided and lands on nothing (measured on yog bl-65dc).
+    pub(crate) fn recall(&mut self) -> Option<TcpStream> {
+        let engine = self.cached.take()?;
+        let mut dht = self.dht().ok()?;
+        self.called(&mut dht, engine, true).ok()?
     }
 
     /// **The fourth rung**: presence, call, punch — each step said as it
@@ -106,7 +118,6 @@ impl Roving {
         let mut dht = self
             .dht()
             .map_err(|e| self.missed(Kind::Presence, unread(say::NO_WALK), e))?;
-        let seal_key = self.pairing.seal_key();
         let got = dht.get(self.pairing.key, self.pairing.presence_salt());
         let item = got
             .map_err(|e| self.missed(Kind::Presence, unread(say::WALK), e))?
@@ -117,7 +128,7 @@ impl Roving {
                     "no presence is published under the engine's rendezvous key".to_owned(),
                 )
             })?;
-        let presence = Presence::open(&seal_key, &item.value).ok_or_else(|| {
+        let presence = Presence::open(&self.pairing.seal_key(), &item.value).ok_or_else(|| {
             self.missed(
                 Kind::Presence,
                 unread(say::SEALED),
@@ -129,36 +140,17 @@ impl Roving {
         if presence.endpoints.is_empty() {
             return Err("the engine's presence names no endpoint".to_owned());
         }
-        let port = self.punch()?.port();
-        let call = Call {
-            nonce: nonce()?,
-            endpoints: listed(local_ips(), &dht.observed(), port),
-        };
-        let seq = unix_now().max(self.last_seq + 1);
-        let signed = self.pairing.inbox_keypair()?.sign(
-            self.pairing.inbox_salt(),
-            seq,
-            call.seal(&seal_key)?,
-        )?;
-        let unwritten = say::call_unwritten(call.nonce);
-        let acks = dht
-            .put(signed)
-            .map_err(|e| self.missed(Kind::Call, unwritten, e))?;
-        let line = say::call_written(call.nonce, seq, &call.endpoints, acks);
-        self.say.say(Kind::Call, line);
-        self.last_seq = seq;
-        self.cached = Some(presence.endpoints.clone());
-        let targets = presence.endpoints;
-        let count = targets.len();
-        self.punched(Some(call.nonce), targets)?.ok_or_else(|| {
-            format!("no SYN crossed toward {count} engine endpoint(s) inside the window")
-        })
+        let count = presence.endpoints.len();
+        self.called(&mut dht, presence.endpoints, false)?
+            .ok_or_else(|| {
+                format!("no SYN crossed toward {count} engine endpoint(s) inside the window")
+            })
     }
 
     /// One punch toward `targets`, said as it starts and as it ends.
     fn punched(
         &mut self,
-        nonce: Option<u64>,
+        nonce: u64,
         targets: Vec<SocketAddr>,
     ) -> Result<Option<TcpStream>, String> {
         let window = self.tuning.window;
@@ -208,40 +200,7 @@ impl Roving {
     }
 }
 
-/// The call's endpoint list (yog REMOTE §13.2, which rules that a list
-/// carry the OBSERVED endpoint; thrall bl-d340 after yog bl-efae): the
-/// route-local addresses, then every address the presence read's walk voted
-/// it saw this box at (`Dht::observed`) that is not already one of them —
-/// all at the punch port. Behind a carrier or tethered NAT the route-local
-/// ones are private, and the observed one is the only one the engine can
-/// punch to (§13.8). The observed PORT is the DHT socket's UDP mapping, not
-/// the punch port's TCP one, so only the address is taken and port
-/// preservation is trusted; a carrier that rewrites the port is the case
-/// this does not reach.
-fn listed(mut ips: Vec<IpAddr>, observed: &[SocketAddr], port: u16) -> Vec<SocketAddr> {
-    for ip in observed.iter().map(SocketAddr::ip) {
-        if !ips.contains(&ip) {
-            ips.push(ip);
-        }
-    }
-    ips.into_iter()
-        .map(|ip| SocketAddr::new(ip, port))
-        .collect()
-}
-
-/// A fresh call nonce.
-fn nonce() -> Result<u64, String> {
-    let mut bytes = [0u8; 8];
-    crate::dht::random(&mut bytes)?;
-    Ok(u64::from_be_bytes(bytes))
-}
-
-/// Seconds since the epoch — the natural rising `seq`.
-fn unix_now() -> i64 {
-    SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX))
-}
+mod write;
 
 #[cfg(test)]
 mod tests;

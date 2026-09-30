@@ -80,9 +80,11 @@ pub(super) const PREDECESSOR: Duration = Duration::from_secs(32);
 /// this box's configuration and never an engine, and asking it again would ask
 /// the same question. Everything after it is the engine's, and that is the part
 /// that is asked again — **through the whole dial ladder each time** (DESIGN
-/// §3.11): a held connection that dropped, the direct address, a re-punch at
-/// the endpoints the run has cached, and only then the commons. That is what
-/// makes a cellular flap cost a punch window rather than a channel.
+/// §3.11): a held connection that dropped, the direct address, a re-call
+/// from the presence the run has cached — one DHT walk, a call and a punch —
+/// and only then the full rendezvous. The wait between climbs is [`next`]'s
+/// and the ladder does not touch it. That is what makes a cellular flap cost
+/// a call and a punch window rather than a channel.
 pub(crate) fn redial(
     opened: Result<Channel, String>,
     set: &[Local],

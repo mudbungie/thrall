@@ -7,7 +7,7 @@
 //! facts both ends compute from the pairing salt, [`item`] seals and opens
 //! the two items the commons carries, [`punch`] is the TCP simultaneous open
 //! from one port, and [`call`] is the act itself — read presence, write a
-//! call, punch — plus the RAM cache the ladder's third rung re-punches at;
+//! call, punch — plus the RAM cache the ladder's third rung re-calls from;
 //! [`say`] is every line the ladder says as it climbs, and never an address.
 //!
 //! **A foot touches the commons only at the moment it wants a connection**

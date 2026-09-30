@@ -1,7 +1,7 @@
 //! **The dial ladder, rung by rung** (DESIGN §3.11): a direct address that
 //! answers, one that does not and the rendezvous under it, the held
 //! connection that comes back, the ping discarded off it, the silence that
-//! hangs it up, and the re-punch that needs no commons.
+//! hangs it up, and the re-call that needs no presence read.
 
 use super::super::material::read_dir;
 use super::super::{Channel, Failure, READ_TIMEOUT};
@@ -141,11 +141,12 @@ fn silence_past_the_bound_hangs_up_as_the_wire() {
     assert!(channel.held.is_none(), "a hung-up connection is not held");
 }
 
-/// **The third rung**: a held connection that drops is re-punched at the
-/// endpoints the run cached, and the commons is not consulted — the fake node
-/// is gone by then, so a walk would refuse.
+/// **The third rung** (ruling yog bl-278f): a held connection that drops is
+/// re-called from the cached presence — the commons is re-tuned to one that
+/// holds no presence, so a read would refuse — and exactly one call is
+/// written there before the second connection lands.
 #[test]
-fn a_dropped_held_connection_is_re_punched_without_the_commons() {
+fn a_dropped_held_connection_is_re_called_without_reading_presence() {
     let scratch = Scratch::new();
     let held = roving_entry(scratch.path(), "127.0.0.1:1");
     let engine = Punched::start(
@@ -156,14 +157,15 @@ fn a_dropped_held_connection_is_re_punched_without_the_commons() {
             Turn::Answer(vec![advertised()]),
         ],
     );
-    let (node, tuning) = commons(vec![presence(engine.port(), 1)]);
+    let (_node, tuning) = commons(vec![presence(engine.port(), 1)]);
     let mut channel = Channel::open(&held).expect("opened");
     channel.tune(READ_TIMEOUT, tuning);
     assert_eq!(
         channel.ask(&json!({"op": "advertise"})),
         Ok(vec![advertised()])
     );
-    drop(node);
+    let (empty, tuning) = commons(vec![]);
+    channel.tune(READ_TIMEOUT, tuning);
     let Err(Failure::Wire(said)) = channel.ask(&json!({"op": "invocations"})) else {
         panic!("the engine vanished");
     };
@@ -173,6 +175,7 @@ fn a_dropped_held_connection_is_re_punched_without_the_commons() {
         Ok(vec![advertised()])
     );
     assert_eq!(connections(&engine), 2, "a second connection landed");
+    assert_eq!(empty.held().len(), 1, "exactly one call, and no presence");
 }
 
 /// **Every rung refusing is one sentence naming them all**, so an operator

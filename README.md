@@ -184,8 +184,8 @@ writes a sealed call into the engine's inbox there, and both ends punch a TCP
 connection toward each other. The connection is then **held** between asks
 rather than dialled per ask, the engine's keepalive pings are discarded, two
 minutes of silence hangs it up, and a hang-up is dialled again through the same
-ladder — held connection, direct address, a re-punch at the last endpoints, the
-full rendezvous. `address` stays required: it is the name the engine's
+ladder — held connection, direct address, a re-call from the cached presence
+(a fresh call, no presence read), the full rendezvous. `address` stays required: it is the name the engine's
 certificate is verified against, whichever way the connection was made. A
 channel without the two files never touches the DHT and never binds a port.
 `docs/DESIGN.md` §3.11 is the design; the protocol is REMOTE §13.

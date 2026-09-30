@@ -4,7 +4,7 @@
 //! ```text
 //! the live held connection      — `Channel::ask`, before this file is reached
 //! the entry's direct address    — one bounded connect
-//! a re-punch at cached endpoints — a punch window, no DHT round trip
+//! a re-call from cached presence — one DHT walk, a punch window
 //! the full rendezvous           — presence, call, punch
 //! ```
 //!
@@ -13,6 +13,13 @@
 //! the failure. The lower rungs exist only where the operator carried the
 //! pairing, and they are climbed only when the direct address did not answer
 //! — a LAN, a stable client and loopback never pay for the machinery.
+//!
+//! **The third rung is a call, never a bare re-punch** (yog REMOTE §13.3,
+//! ruling bl-278f): a held connection's pings are the only thing keeping a
+//! NAT mapping alive, so once the line has dropped the engine's side holds
+//! none, and a punch no call asked the engine to answer is one-sided. The
+//! re-call skips the presence read and nothing else; one it cannot land
+//! clears the cache, and the full rendezvous under it reads presence afresh.
 //!
 //! **What comes back says which kind of connection it is**, because the
 //! channel holds a punched one and not a dialled one: a punch costs seconds
@@ -63,7 +70,7 @@ pub(super) fn climb(
             missed.sentence
         }
     };
-    if let Some(tcp) = roving.repunch() {
+    if let Some(tcp) = roving.recall() {
         return Ok((tcp, true));
     }
     match roving.rendezvous() {

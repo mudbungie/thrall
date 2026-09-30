@@ -150,38 +150,49 @@ fn a_hangup_is_said_as_the_held_line_silent_past_it() {
     );
 }
 
-/// A held line the engine closed is said dropped, and the re-punch at the
-/// cache that follows says itself without the commons.
+/// **A re-call nobody answers falls to the full rendezvous** (ruling yog
+/// bl-278f): the engine that closed the held line is gone, so the re-call
+/// at its cached endpoints expires, the cache is cleared, and the same climb
+/// reads presence afresh — which names the engine now listening.
 #[test]
-fn a_held_line_the_engine_closed_is_said_and_the_re_punch_too() {
+fn a_re_call_nobody_answers_is_said_and_presence_is_read_again() {
     let scratch = Scratch::new();
     let held = roving_entry(scratch.path(), "127.0.0.1:1");
-    let engine = Punched::start(
-        scratch.path(),
-        vec![
-            Turn::Answer(vec![advertised()]),
-            Turn::Vanish,
-            Turn::Answer(vec![advertised()]),
-        ],
-    );
-    let (node, tuning) = commons(vec![presence(engine.port(), 1)]);
+    let gone = Punched::start(scratch.path(), vec![Turn::Answer(vec![advertised()])]);
+    let (_node, tuning) = commons(vec![presence(gone.port(), 1)]);
     let mut channel = Channel::open(&held).expect("opened");
     channel.tune(READ_TIMEOUT, tuning);
     let (notices, sink) = Notices::new();
     channel.speak_to(&sink);
     assert!(channel.ask(&json!({"op": "advertise"})).is_ok());
-    drop(node);
-    assert!(channel.ask(&json!({"op": "invocations"})).is_err());
+    // The script is spent: the engine closes the line and its punch port.
+    assert!(channel.ask(&json!({"op": "advertise"})).is_err());
+    let back = Punched::start(scratch.path(), vec![Turn::Answer(vec![advertised()])]);
+    let (_node, tuning) = commons(vec![presence(back.port(), 2)]);
+    channel.tune(READ_TIMEOUT, tuning);
     assert!(channel.ask(&json!({"op": "advertise"})).is_ok());
     let heard = notices.heard();
-    let tail: Vec<String> = heard.iter().skip(6).cloned().collect();
+    let mut tail: Vec<String> = heard.iter().skip(6).cloned().collect();
+    let written = |l: &str, head: &str| l.starts_with(head) && l.ends_with(", 1 ack(s)");
+    let recall = tail.get(1).cloned().unwrap_or_default();
+    let call = tail.get(5).cloned().unwrap_or_default();
+    assert!(
+        written(&recall, "rendezvous: re-call from cached presence — nonce "),
+        "{heard:?}"
+    );
+    assert!(written(&call, "rendezvous: call nonce "), "{heard:?}");
+    tail.retain(|l| *l != recall && *l != call);
     assert_eq!(
-        tail,
-        [
+        folded(tail),
+        folded(vec![
             "rendezvous: held line dropped — the receive failed (closed by the far end)".to_owned(),
-            "rendezvous: re-punch at 1 cached endpoint(s) (1 v4) — window 800ms".to_owned(),
+            "rendezvous: punch for call nonce 1 at 1 endpoint(s) (1 v4) — window 800ms".to_owned(),
+            "rendezvous: punch expired after 800ms with no stream".to_owned(),
+            "rendezvous: presence read — seq 2, 1 endpoint(s) (1 v4)".to_owned(),
+            "rendezvous: punch for call nonce 1 at 1 endpoint(s) (1 v4) — window 800ms".to_owned(),
+            "rendezvous: punch landed (1 v4)".to_owned(),
             say::held_kept(),
-        ],
+        ]),
         "{heard:?}"
     );
 }

@@ -137,22 +137,21 @@ pub(crate) fn call_unwritten(nonce: u64) -> String {
     format!("{P} call nonce {nonce} not written — {WALK}")
 }
 
-/// A punch starting: for a call's nonce, or a re-punch at the cache.
-pub(crate) fn punch_started(
-    nonce: Option<u64>,
-    targets: &[SocketAddr],
-    window: Duration,
-) -> String {
-    let at = nonce.map_or_else(
-        || format!("re-punch at {}", counted(targets, "cached endpoint")),
-        |n| {
-            format!(
-                "punch for call nonce {n} at {}",
-                counted(targets, "endpoint")
-            )
-        },
-    );
-    format!("{P} {at} — window {window:?}")
+/// A re-call (the ladder's third rung): a call written from the cached
+/// presence, with no presence read before it.
+pub(crate) fn recalled(nonce: u64, endpoints: &[SocketAddr], acks: usize) -> String {
+    format!(
+        "{P} re-call from cached presence — nonce {nonce}, {}, {acks} ack(s)",
+        counted(endpoints, "endpoint")
+    )
+}
+
+/// A punch starting, for a call's nonce — every punch has a call behind it.
+pub(crate) fn punch_started(nonce: u64, targets: &[SocketAddr], window: Duration) -> String {
+    format!(
+        "{P} punch for call nonce {nonce} at {} — window {window:?}",
+        counted(targets, "endpoint")
+    )
 }
 
 pub(crate) fn landed(peer: Option<SocketAddr>) -> String {

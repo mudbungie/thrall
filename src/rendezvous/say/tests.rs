@@ -28,8 +28,8 @@ fn every_line_is_the_house_shape_and_names_no_address() {
         presence_unread(SEALED),
         call_written(7, 10, &endpoints(), 2),
         call_unwritten(7),
-        punch_started(Some(7), &endpoints(), window),
-        punch_started(None, &endpoints(), window),
+        recalled(7, &endpoints(), 2),
+        punch_started(7, &endpoints(), window),
         landed(endpoints().first().copied()),
         landed(None),
         expired(window),
@@ -48,9 +48,19 @@ fn every_line_is_the_house_shape_and_names_no_address() {
         "rendezvous: call nonce 7 written — seq 10, 3 endpoint(s) (1 v6, 2 v4), 2 ack(s)"
     );
     assert_eq!(
-        punch_started(None, &endpoints(), window),
-        "rendezvous: re-punch at 3 cached endpoint(s) (1 v6, 2 v4) — window 35s"
+        recalled(7, &endpoints(), 2),
+        "rendezvous: re-call from cached presence — nonce 7, 3 endpoint(s) (1 v6, 2 v4), 2 ack(s)"
     );
+    assert_eq!(
+        punch_started(7, &endpoints(), window),
+        "rendezvous: punch for call nonce 7 at 3 endpoint(s) (1 v6, 2 v4) — window 35s"
+    );
+    for line in &lines {
+        assert!(
+            !line.contains("re-punch"),
+            "{line}: no re-punch line remains"
+        );
+    }
     assert_eq!(
         direct_refused(&ips, true),
         "rendezvous: direct rung timed out — 3 address(es) tried (1 v6, 2 v4)"

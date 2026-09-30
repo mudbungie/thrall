@@ -748,11 +748,13 @@ under. Four consequences, and each is deliberate:
 **And since bl-0a8b every dial is the whole ladder** (§3.11). A redial does
 not know which rung the last connection came from and does not need to: the
 live held connection is gone by definition, the direct address is tried under
-a bound, the endpoints the run cached are re-punched with no DHT round trip,
-and only then is the commons asked again. That is what yog bl-0247 meant by
-the redial becoming load-bearing — a foot behind a cellular NAT that flaps is
-answered by a punch window, not a poll period, and a foot that does not come
-back has no roving value at all.
+a bound, a fresh call is written from the presence the run cached — one DHT
+walk and a punch window, no presence read — and only then is presence read
+again. That is what yog bl-0247 meant by the redial becoming load-bearing — a
+foot behind a cellular NAT that flaps is answered by a call and a punch
+window, not a poll period, and a foot that does not come back has no roving
+value at all. The wait between climbs is unchanged: the ladder is inside one
+dial and `run::redial::next` is between them.
 
 **Where the loop sits is the whole of why it is safe** (`run::redial`, between
 `Entry::open` and `run::hold`). `fan` already owns the per-channel lifetime, so
@@ -950,7 +952,9 @@ foot publishes no presence, but its sealed call is an endpoint list too, and
 yog REMOTE §13.2 rules that such a list carry the observed endpoint — behind
 a carrier or tethered NAT the route-local addresses are private and the
 observed one is the only one the engine can punch to (§13.8). So the call
-appends each observed ADDRESS not already listed, at the punch port: the
+appends each observed ADDRESS not already listed, at the punch port — voted
+by the call's own write walk (`Dht::holders`, since bl-536d), which a re-call
+runs with no presence read before it and which is therefore always fresh: the
 observed port is the DHT socket's UDP mapping, not the punch port's TCP one,
 so only the address is taken and port preservation is trusted (a carrier
 that rewrites the port is the case this does not reach, §13.8). The sealed
@@ -973,14 +977,33 @@ the order that costs least, and stops at the first that answers:
    NAT that drops the SYN costs a rung and not the kernel's minutes. An entry
    without rendezvous material has this rung alone, and it is today's dial
    byte for byte.
-3. **A re-punch at the RAM-cached endpoints** — the engine endpoints the last
-   presence named, punched with no DHT round trip. RAM for the run, never
-   disk (REMOTE §13.4's runtime half of §8's `:0` discipline).
+3. **A re-call from the cached presence** (thrall bl-536d; yog REMOTE §13.3,
+   ruling bl-278f) — a fresh call written to the engine endpoints of the last
+   call that landed, and punched: one DHT walk rather than two, because the
+   presence read is skipped and nothing else is. The cache is those
+   endpoints alone, beside the rising `seq` basis and the punch port bound
+   once; it is RAM for the run, never disk (REMOTE §13.4's runtime half of
+   §8's `:0` discipline). **A re-call that does not land clears it**, so the
+   next rung reads presence afresh — the presence it came from is then the
+   suspect — and a call nobody answered never fills it.
 4. **The full rendezvous** (`rendezvous::call`) — `get` the engine's presence
-   under `(rendezvous.pub, presence salt)` and open it; `put` a sealed call —
-   an 8-byte nonce, then this box's route-local addresses and the presence
-   read's observed address (above) at its punch port —
-   signed under the inbox keypair with a rising `seq`; then punch.
+   under `(rendezvous.pub, presence salt)` and open it; then the call both
+   lower rungs share (`rendezvous::call::write`): walk to the inbox's
+   write-token holders, `put` a sealed call — an 8-byte nonce, then this
+   box's route-local addresses and the address that walk observed (above)
+   at its punch port — signed under the inbox keypair with a rising `seq`;
+   then punch.
+
+**Why the third rung is a call and never a bare re-punch.** It was a re-punch
+at the cached endpoints with no DHT round trip, on REMOTE §13.3's premise that
+a NAT mapping outlives the punch window. For TCP on a home NAT it does not:
+measured on yog bl-65dc, a client re-punched from exactly the port its landed
+call named, its SYNs left for the whole window, and none reached the engine's
+kernel — the engine's NAT held no mapping once the served stream had ended,
+and the engine sends no SYN outside a call's window, so the re-punch was
+one-sided. The held connection's twenty-five-second pings are the only thing
+that keeps a mapping alive, so **a dropped line is always a re-call**: the
+engine must be asked, through its inbox, to punch back.
 
 **The punch** (`rendezvous::punch`; REMOTE §13.3): bind one port with the two
 reuse options, listen on it per family, connect from it toward every engine
@@ -1029,7 +1052,7 @@ stderr, under the channel's own name — one line apiece:
     rendezvous: call nonce <n> written — seq <s>, <k> endpoint(s) (1 v6, 1 v4), <a> ack(s)
     rendezvous: call nonce <n> not written — the DHT walk failed (reason withheld: it names nodes)
     rendezvous: punch for call nonce <n> at <k> endpoint(s) (1 v4) — window 35s
-    rendezvous: re-punch at <k> cached endpoint(s) (1 v4) — window 35s
+    rendezvous: re-call from cached presence — nonce <n>, <k> endpoint(s) (1 v6, 1 v4), <a> ack(s)
     rendezvous: punch landed (1 v4)
     rendezvous: punch expired after 35s with no stream
     rendezvous: held line kept — the punched connection carries the next ask
@@ -1072,7 +1095,7 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/main.rs` | The process entry and nothing else: argv in, stream selected by the code, exit. The single `tarpaulin.toml` exclusion. |
 | `src/channel.rs` | **The channel** (bl-a4a5): one wire to one engine. There is an `ask` and there is nothing else — the shape of the file is the dial-in invariant. A dialled connection is one per ask, held only while waiting; a punched one is held across asks (§3.11, bl-0a8b), its pings discarded and its silence bounded. Knows nothing about being dialled again. |
 | `src/channel/failure.rs` | Why a channel could not carry a gesture, in the two classes that differ in what to do next — the wire, and version skew (split from `channel.rs` by bl-0a8b at the pre-split band). |
-| `src/channel/ladder.rs` | **The dial ladder** (§3.11): the direct address under a bound, the re-punch at cached endpoints, the full rendezvous — in that order, stopping at the first that answers, and saying whether what answered was punched. An entry without rendezvous material has a one-rung ladder. |
+| `src/channel/ladder.rs` | **The dial ladder** (§3.11): the direct address under a bound, the re-call from cached presence, the full rendezvous — in that order, stopping at the first that answers, and saying whether what answered was punched. An entry without rendezvous material has a one-rung ladder. |
 | `src/channel/speak.rs` | The channel's half of §3.11's lines (bl-3958): the sink the loop hands down (`speak_to`), and the held line lost and the ping discarded — the two things only the channel sees. Split from `channel.rs` at the pre-split band. |
 | `src/channel/frame.rs` | The framing: a big-endian `u32` length, then that many bytes of JSON; a zero-length frame terminates an answer (REMOTE §3). |
 | `src/channel/hello.rs` | The version preface, and this end's half of it — state the major and the edition beside it (REMOTE §3.2), confirm, refuse fail-closed naming both versions. The engine's edition comes back from the confirmation, defaulted at the floor when it states none. The number itself is in no Rust file: the repo-root `PROTOCOL` file states it and `build.rs` compiles it into the constant this module re-exports (bl-c618), because the release gates that read it are other repositories fetching one path out of a tree they do not build. A foot never *admits*, because a foot is never dialled. It also draws §3.8's one distinction REMOTE does not: a preface that arrived and states a version this end cannot speak is skew, one that never arrived is the wire. |
@@ -1101,7 +1124,8 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/rendezvous/item.rs` | The two sealed items: the presence this end opens and the call it seals — `nonce ‖ ciphertext ‖ tag`, the fixed-width endpoint list. Tested against bytes the engine sealed. |
 | `src/rendezvous/punch.rs` | The TCP simultaneous open from one port: the listeners, the connectors, v6 first, the first stream kept. The one socket a foot listens on (§2). |
 | `src/rendezvous/say.rs` | **What the ladder says** (§3.11, bl-3958): every line a roving channel says as it climbs, built here and nowhere else so none can carry an address, and the speaker that says a repeated outcome once. |
-| `src/rendezvous/call.rs` | The act — presence, call, punch — and the RAM cache the third rung re-punches at; every duration a `Tuning` field a test can shorten. |
+| `src/rendezvous/call.rs` | The act — presence, call, punch — the third rung's re-call, and the RAM cache it re-calls from; every duration a `Tuning` field a test can shorten. |
+| `src/rendezvous/call/write.rs` | Writing a call, the act both lower rungs share: walk to the inbox's token holders, seal a call naming where that walk saw this box, store it, punch — and refill the cache when the punch lands (bl-536d). |
 | `src/dht.rs` | **The DHT client** (REMOTE §13.2, §13.7 ruling 2): a pure client of the mainline DHT, never a node; the root holds `Config`, the client and its observed-address vote, and re-exports the shape the rendezvous consumes. Mirrored from yog's `src/dht`. |
 | `src/dht/bencode.rs` | Bencode: one enum, a canonical encoder, a strict bounded decoder. |
 | `src/dht/krpc.rs` | KRPC, the client's half: the query shape, the reply (with its BEP 42 `ip` claim) and error read back, compact nodes and addresses. |
@@ -1109,7 +1133,7 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/dht/lookup.rs` | The iterative walk: the door (re-asked only at the addresses that answered, yog bl-f519), the frontier loop and its end, bounded by per-query deadlines and a query cap (bl-921e). |
 | `src/dht/frontier.rs` | A walk's state — every node heard of, asked, replied, and the door addresses that answered — and the frontier read off it against the flight. |
 | `src/dht/flight.rs` | The sliding window: one query sent with its own deadline, and the wait for the flight's next event. |
-| `src/dht/items.rs` | `get` and `put` over the walk; a `put` whose walk found no token holder is its own error and sends nothing (yog bl-f519). |
+| `src/dht/items.rs` | `get`, and a write as `holders` (the walk, run before the value exists so its observed address can go into it) then `store` (the flight); a walk that found no token holder is its own error and sends nothing (yog bl-f519). |
 | `src/dht/transport.rs` | The datagram seam: one trait, and the std UDP socket that fills it. |
 | `src/spawn.rs` | **The spawn boundary.** Every child process is built AND forked here — nowhere else builds a `Command`, and nowhere else spends one. It decides three things a spawn site could forget: the git-environment scrub, the **process group** the child is born leading (bl-a78e, §3.5), and the fork lock the suite needs. **Founded by bl-a4a5**, before it had a production tenant, which is the point of the row: a boundary rule that arrives after the first spawn site is a rule that has to be argued with. |
 | `src/sys.rs` | **The confined `unsafe` file**, and it holds two things, both raw process effects `std` does not wrap. Signalling a process GROUP, which `std` has no spelling for at all (`Child::kill` is `SIGKILL` to one process, and there is no `Child::terminate`); the sign guard did not move when the group arrived (§3.5) — the negation is this file's, the callers pass a positive id. And putting a pipe into non-blocking mode (bl-6c14), which `std` spells for sockets and for nothing else — a `ChildStdout` has no `set_nonblocking`, and borrowing the socket one by wrapping the descriptor in a `UnixStream` would read the pipe with `recv(2)`, which a pipe refuses. Both are declared rather than depended on: `kill(2)` and `fcntl(2)` are in the libc `std` already links, so neither costs a crate, a build script or a lockfile line. |

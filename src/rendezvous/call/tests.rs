@@ -1,11 +1,12 @@
 //! The act against a fake commons and a loopback punch port: every way it
-//! refuses, the call it writes, and the cache the third rung re-punches.
+//! refuses, the call it writes, and the cache the third rung re-calls from.
 
+use super::write::{listed, nonce, unix_now};
 use super::*;
 use crate::dht::tests::fake::Mood;
 use crate::rendezvous::item::Call;
-use crate::rendezvous::punch::Punch;
 use crate::test_support::roving::{commons, commons_as, engine, pairing, presence, tuned};
+use std::net::IpAddr;
 
 pub(super) fn roving(tuning: Tuning) -> Roving {
     Roving::new(pairing(), tuning)
@@ -140,39 +141,6 @@ fn a_put_the_commons_refuses_is_the_acts_refusal() {
     );
 }
 
-/// The whole act lands on a listening punch port, and the endpoints it read
-/// are then the cache the third rung punches without the commons.
-#[test]
-fn a_rendezvous_lands_and_its_endpoints_are_re_punched_without_the_commons() {
-    let far = Punch::bind(0).expect("bind");
-    let port = far.port();
-    let served = std::thread::spawn(move || {
-        let first = far.punch(vec![], Duration::from_secs(5)).is_some();
-        let second = far.punch(vec![], Duration::from_secs(5)).is_some();
-        (first, second)
-    });
-    let (node, tuning) = commons(vec![presence(port, 1)]);
-    let mut r = roving(tuning);
-    assert!(r.repunch().is_none(), "nothing cached yet");
-    let stream = r.rendezvous().expect("landed");
-    assert_eq!(stream.peer_addr().expect("peer").port(), port);
-    drop(stream);
-    drop(node);
-    let again = r.repunch().expect("re-punched at the cache");
-    assert_eq!(again.peer_addr().expect("peer").port(), port);
-    drop(again);
-    assert_eq!(served.join().expect("served"), (true, true));
-}
-
-#[test]
-fn a_re_punch_nobody_answers_is_none() {
-    let (_node, tuning) = commons(vec![presence(dead_port(), 1)]);
-    let mut r = roving(tuning);
-    r.rendezvous().expect_err("nobody there");
-    assert!(r.cached.is_some());
-    assert!(r.repunch().is_none());
-}
-
 #[test]
 fn a_nonce_is_fresh_and_the_clock_rises() {
     assert_ne!(nonce().expect("a"), nonce().expect("b"));
@@ -227,5 +195,7 @@ fn the_filed_call_carries_the_observed_address_when_the_commons_named_one() {
     }
 }
 
+/// The third rung: the re-call, and the cache it reads and clears.
+mod recall;
 /// What the act says, arm by arm, into a captured sink.
 mod said;

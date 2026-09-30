@@ -3,6 +3,7 @@
 //! DHT's own reasons withheld.
 
 use super::super::*;
+use super::recall::answering;
 use super::{dead_port, roving};
 use crate::dht::tests::fake::Mood;
 use crate::rendezvous::say::{self, Say};
@@ -86,21 +87,35 @@ fn a_call_the_commons_refuses_is_said_unwritten() {
     );
 }
 
-/// A punch nobody answers is said started and expired; the re-punch at the
-/// cache says itself, and its expiry — the same outcome again — once.
+/// A re-call says itself — no presence line before it — then its punch
+/// under its own nonce, and a punch nobody answers is said expired.
 #[test]
-fn a_punch_nobody_answers_is_said_expired_once() {
-    let (_node, tuning) = commons(vec![presence(dead_port(), 1)]);
+fn a_re_call_is_said_with_no_presence_read_before_it() {
+    let (port, served) = answering(1);
+    let (_node, tuning) = commons(vec![presence(port, 1)]);
     let (mut r, notices) = heard(tuning);
-    r.rendezvous().expect_err("nobody there");
-    assert!(r.repunch().is_none());
+    drop(r.rendezvous().expect("landed"));
+    served.join().expect("served");
+    assert!(r.recall().is_none());
     let said = notices.heard();
-    let tail: Vec<String> = said.iter().skip(3).cloned().collect();
+    let recall = said.get(4).cloned().unwrap_or_default();
+    let nonce = recall
+        .strip_prefix("rendezvous: re-call from cached presence — nonce ")
+        .and_then(|rest| rest.split(',').next())
+        .unwrap_or_default();
+    assert!(
+        !nonce.is_empty() && recall.ends_with(", 1 ack(s)"),
+        "{said:?}"
+    );
     assert_eq!(
-        tail,
+        said.iter().skip(3).cloned().collect::<Vec<String>>(),
         [
-            "rendezvous: punch expired after 800ms with no stream",
-            "rendezvous: re-punch at 1 cached endpoint(s) (1 v4) — window 800ms",
+            "rendezvous: punch landed (1 v4)".to_owned(),
+            recall.clone(),
+            format!(
+                "rendezvous: punch for call nonce {nonce} at 1 endpoint(s) (1 v4) — window 800ms"
+            ),
+            "rendezvous: punch expired after 800ms with no stream".to_owned(),
         ],
         "{said:?}"
     );
