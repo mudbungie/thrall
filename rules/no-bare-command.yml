@@ -20,7 +20,7 @@
 #     spawned while one is set forks its own `git` against the WRONG
 #     repository. Learned upstream the expensive way: a pre-commit hook runs
 #     the suite, the suite spawns a child, the child commits into the repo
-#     being committed. `scripts/pre-commit` scrubs at the hook; the boundary is
+#     being committed. The gate (`bl-gate`) scrubs at the hook; the boundary is
 #     where a spawn from anywhere else gets the same treatment.
 #   - THE DEADLINES AND THE CAPTURE. A foot answers with what came back, once,
 #     transcoded once (bl-4cda). A spawn that bypassed the boundary would

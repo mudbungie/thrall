@@ -24,14 +24,23 @@ third answer.
 
 `make check` is the complete gate: `fmt-check → lint → coverage`, where `lint`
 is `line-cap → deploy-selftest → protocol-gate → leak-scan → clippy -D warnings
-→ rules-audit → cargo deny check`. The pre-commit hook (`scripts/pre-commit`)
-does not run them on this machine: it leak-scans locally, then asks
-`bl-speculate check` for a verified verdict on the staged tree and otherwise
-has the noodlezoo builder run `make check` and sign one (`bl-remote-gate`,
-~/ops/noodlezoo/docs/builder.md). `.github/workflows/ci.yml` readies a runner
-and runs `make ci`; nobody restates a step the Makefile defines. Run
-`make install-hooks` once per clone — it seats `pre-commit` **and**
-`commit-msg`.
+→ rules-audit → cargo deny check`. The pre-commit hook (`.githooks/pre-commit`)
+does not run them on this machine — this laptop does not compile in a gate
+(ops bl-1f80, `~/ops/remote-builds.md` "Phase 2"). It refuses direct commits to
+`main`, then `exec`s `bl-gate` (userconf; the one copy of the gate body for
+every repo here), which leak-scans locally, exports `BALLS_TOOLCHAIN`
+(`rustc -V`, the `rust-toolchain.toml` pin on both sides), asks
+`bl-speculate check` for a verified verdict on the staged tree, and otherwise
+has the noodlezoo builder run `make check` and sign one (`bl-remote-gate`;
+runbook `~/ops/noodlezoo/docs/builder.md`): exit 0 is a pass, 1 means the
+builder failed the tree (`ssh builder cat /tank/build/out/<sha>/log`), 75 means
+no verdict — nothing recorded, commit refused, never `cargo test` instead.
+`cargo tarpaulin` and `cargo llvm-cov` are shimmed on this laptop and refuse
+to run; to see tests or coverage before committing, `bl-remote-run <target>`
+runs any make target on the builder and streams the log.
+`.github/workflows/ci.yml` readies a runner and runs `make ci`; nobody restates
+a step the Makefile defines. Run `make install-hooks` once per clone — it seats
+`pre-commit` **and** `commit-msg`.
 
 CI runs on every pull request, and on `main` as the workflow `release-plz.yml`
 CALLS inside its own run — which is where a release is gated (bl-bbb3, and that

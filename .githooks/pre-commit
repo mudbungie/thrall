@@ -1,15 +1,7 @@
 #!/usr/bin/env bash
-# thrall pre-commit hook. Two jobs, split deliberately:
-#
-#   1. The COMMIT-CONTEXT guard, which only a hook can do: no direct commits to
-#      mainline. Squash-merges from task delivery are permitted, detected by
-#      the presence of MERGE_MSG or SQUASH_MSG.
-#   2. The BUILD GATE — delegated whole to scripts/pre-commit, where it is
-#      content-addressable and can be run by anything that has no commit
-#      context at all (a speculative builder, a CI job). Nothing but the guard
-#      may live here, or those callers silently run a different gate.
-#
-# Seat it with `make install-hooks`. Bypass is intentionally not supported.
+# The gate is bl-gate (userconf; ops bl-1f80); see AGENTS.md "The gate". Only
+# the REF check lives here: no direct commits to mainline, squash-merges from
+# `bl close` permitted (MERGE_MSG/SQUASH_MSG). Seat with `make install-hooks`.
 
 set -euo pipefail
 
@@ -26,4 +18,4 @@ case "$branch" in
     ;;
 esac
 
-exec "$(git rev-parse --show-toplevel)/scripts/pre-commit"
+exec bl-gate "$@"
