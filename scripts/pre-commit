@@ -1,58 +1,42 @@
 #!/usr/bin/env bash
-# thrall gate — the complete build gate, factored out of .githooks/pre-commit
-# so it is content-addressable: a verdict cache keyed on (tree, gate) can
-# fingerprint the gate as the content of THIS file and the Makefile, plus
-# `rustc -V`. Change any of them and every stored verdict silently stops
-# matching, which is exactly the invalidation a gate upgrade must cause.
+# The pre-commit gate (bl-e66f; ops bl-9e5b, ~/ops/remote-builds.md "Repo gate").
 #
-# Steps, cheap first, one make-target home each so the hook and a hand-run
-# `make check` cannot drift:
-#   1. make fmt-check
-#   2. make lint      — line-cap, leak-scan, clippy -D warnings, rules-audit,
-#                       cargo-deny
-#   3. make coverage  — tarpaulin --fail-under 100
+# This laptop does not compile. The gate's targets are `make check`
+# (AGENTS.md "The gate"); the noodlezoo builder runs them on the staged tree
+# and signs a bl-speculate verdict; bl-remote-gate (userconf) brings it home.
+# Three steps, no fourth:
+#   1. leak-scan here — cheap, and the one thing that must never leave the box
+#      unscanned;
+#   2. `bl-speculate check` — a verified verdict for this exact tree under
+#      this toolchain already passed: done;
+#   3. `bl-remote-gate` — its exit is the gate's exit (0 pass, 1 the builder
+#      failed the tree, 75 no verdict: nothing recorded, commit refused).
+# There is no local build path. If the builder is unreachable, the answer is
+# 75, not `cargo test` — see ~/ops/noodlezoo/docs/builder.md.
 #
-# THE DISCLOSURE SCAN AND A FUTURE VERDICT CACHE (bl-e878). `leak-scan` is
-# inside `lint` because `lint` is the whole static gate, and there is nothing
-# here for it to run ahead of: thrall consults no cache. The moment one is
-# added, that stops being true and this file must change with it — the scan
-# lifts OUT of the cached region and runs before the lookup, every time, never
-# skipped. Two reasons, and neither is speed. A stored verdict is a claim about
-# a tree, and it can be imported from another machine; every other step
-# re-derives a build, while this one decides whether something leaves the
-# building. And a cache fingerprint over this file plus the Makefile cannot see
-# `scripts/leak-rules.sh`, so an edited rule table would not invalidate a
-# single stored verdict. Not being cacheable dissolves that; widening the
-# fingerprint only postpones it.
-#
-# The commit MESSAGE is in no tree and no pre-commit step can reach it —
-# `.githooks/commit-msg` runs the same scanner over it.
-#
-# Bypass is intentionally not supported. If something is broken, fix it.
+# BALLS_TOOLCHAIN is the gate half of every verdict key (balls ≥ 0.5.13):
+# exported once here, inherited by both tools. The builder's rustc is the
+# rust-toolchain.toml pin, so the string is byte-identical on both sides.
 
 set -euo pipefail
-
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
-
-# When git invokes a hook it exports GIT_DIR, GIT_INDEX_FILE and friends. Those
-# OUTRANK `-C <repo>` and `current_dir`, so they leak into every git subprocess
-# the gate spawns and silently retarget it at THIS repo — a test that `git
-# init`s a tempdir included. Scrub, so the tools run as from a clean shell.
+# Hook env (GIT_INDEX_FILE et al.) would point the tools at a temporary index.
+# shellcheck disable=SC2046
 unset $(git rev-parse --local-env-vars)
 
-if ! command -v cargo >/dev/null 2>&1; then
-  echo "error: cargo not installed; cannot run the gate." >&2
-  exit 1
+for tool in cargo bl-speculate bl-remote-gate; do
+  command -v "$tool" >/dev/null 2>&1 || { echo "error: $tool not installed; cannot run the gate." >&2; exit 1; }
+done
+export BALLS_TOOLCHAIN="$(rustc -V)"
+
+echo "gate: leak-scan (make leak-scan)..." >&2
+make leak-scan >&2
+
+if bl-speculate check; then
+  echo "gate: verdict cache hit — this exact tree already passed this exact gate." >&2
+  exit 0
 fi
-
-echo "gate: fmt (make fmt-check)..." >&2
-make fmt-check >&2
-
-echo "gate: lint (make lint)..." >&2
-make lint >&2
-
-echo "gate: coverage (make coverage)..." >&2
-make coverage >&2
-
-echo "gate: OK." >&2
+echo "gate: no verdict yet — building on the noodlezoo builder (bl-remote-gate)..." >&2
+bl-remote-gate
+echo "gate: OK (remote verdict verified and imported)." >&2

@@ -24,9 +24,12 @@ third answer.
 
 `make check` is the complete gate: `fmt-check → lint → coverage`, where `lint`
 is `line-cap → deploy-selftest → protocol-gate → leak-scan → clippy -D warnings
-→ rules-audit → cargo deny check`. The pre-commit hook runs the same targets via `scripts/pre-commit`, and
-so does `.github/workflows/ci.yml`, which readies a runner and then runs
-`make ci`; none of the three restates a step the Makefile defines. Run
+→ rules-audit → cargo deny check`. The pre-commit hook (`scripts/pre-commit`)
+does not run them on this machine: it leak-scans locally, then asks
+`bl-speculate check` for a verified verdict on the staged tree and otherwise
+has the noodlezoo builder run `make check` and sign one (`bl-remote-gate`,
+~/ops/noodlezoo/docs/builder.md). `.github/workflows/ci.yml` readies a runner
+and runs `make ci`; nobody restates a step the Makefile defines. Run
 `make install-hooks` once per clone — it seats `pre-commit` **and**
 `commit-msg`.
 
