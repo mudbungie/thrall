@@ -1,7 +1,8 @@
 +++
 title = "Collapse the pre-commit gate to exec bl-gate (rollout phase 2; ops bl-3166)"
 created = 1790736019
-updated = 1790736019
+updated = 1790736020
+claimant = "Junketing-collapse1"
 priority = 2
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
 +++
