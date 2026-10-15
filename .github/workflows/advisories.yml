@@ -1,0 +1,126 @@
+name: Advisories
+
+# THE DAY'S QUESTION, ASKED DAILY — AND ANSWERED, NOT RELAYED.
+#
+# A RustSec advisory is a fact about the day, not about any tree. While
+# `cargo deny check advisories` sat inside `make check`, every tree in every
+# Rust repository on the maintainer's box went red the hour one published
+# (RUSTSEC-2026-0285 on 2026-09-17, RUSTSEC-2026-0349 on 2026-10-14), each
+# time with nothing in the refused commit to blame and the same lockfile bump
+# as the only answer, performed by hand, once per repository. So the gate no
+# longer asks the question (`make deny` is bans, licences and sources — the
+# facts about the tree), and this workflow does, once a day and on a dispatch:
+#
+#   1. `make advisories`. Clean: done, nothing written anywhere.
+#   2. `make mend-advisories`: every advised crate moved with `cargo update
+#      -p` (the names read off cargo-deny's own JSON diagnostics, never its
+#      prose), then the question asked again. An advisory with no fixed
+#      version leaves it failing, which fails this run — the ONE case that is
+#      a hand's, and the run says so rather than guessing.
+#   3. The lockfile committed on a branch, and `ci.yml` dispatched on that
+#      branch. That workflow is the one definition of green (`make ci` is
+#      `make check`), and this file restates no step of it: the mend is proved
+#      by the same gate every other change is proved by, on a runner.
+#   4. On a pass, `main` fast-forwarded to the branch; the branch deleted
+#      either way (the run's log is the record, the branch was only its seat).
+#   5. The release re-judged. A push by the default `GITHUB_TOKEN` triggers no
+#      workflow (GitHub, verbatim: "with the exception of `workflow_dispatch`
+#      and `repository_dispatch`, other GITHUB_TOKEN triggered events do not
+#      create workflow runs"), so `release-plz.yml` is dispatched by hand —
+#      exactly as `merge-release-pr` does after its own merge. Where the
+#      repository holds `RELEASE_PLZ_TOKEN` the push is made with it instead,
+#      the push triggers the chain itself, and no dispatch is sent: one
+#      condition, read off the secret's presence, and the same file serves a
+#      repository with the token and one without.
+#
+# WHAT A FAILED RUN MEANS. The fast-forward refuses when `main` moved while
+# the gate ran; the next day's run begins again from the new `main`, so the
+# refusal costs a day and no hand. A red `ci.yml` on the branch means the
+# bump broke something real, and that IS a hand's — the lockfile move that
+# cannot pass the gate is a change somebody must read. Both leave `main`
+# untouched: nothing lands here that the gate did not pass.
+#
+# Every action is pinned to a full commit SHA with its tag in the trailing
+# comment (`release-plz.yml`'s discipline): this job writes to `main`.
+
+on:
+  schedule:
+    - cron: "23 5 * * *"
+  workflow_dispatch:
+
+# No ambient scopes; the one job states what it writes.
+permissions: {}
+
+jobs:
+  mend:
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'mudbungie'
+    permissions:
+      # The branch, its commit and the fast-forward of main.
+      contents: write
+      # Dispatching ci.yml and release-plz.yml.
+      actions: write
+    env:
+      # Present: pushes trigger workflows and no dispatch is needed. Absent:
+      # the default token pushes and release-plz.yml is dispatched (5).
+      PAT: ${{ secrets.RELEASE_PLZ_TOKEN }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          token: ${{ secrets.RELEASE_PLZ_TOKEN || github.token }}
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable branch @ 2026-08-05
+        with:
+          # The SHA pin erases the ref name this action reads the toolchain
+          # from, so name it; rust-toolchain.toml still pins the build version.
+          toolchain: stable
+      - name: Cache cargo-deny 0.20.2
+        id: deny-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cargo/bin/cargo-deny
+          key: cargo-deny-0.20.2-${{ runner.os }}
+      - name: Install cargo-deny 0.20.2
+        if: steps.deny-cache.outputs.cache-hit != 'true'
+        run: cargo install cargo-deny --version 0.20.2 --locked
+      - name: The day's question
+        id: ask
+        run: |
+          if make advisories; then
+            echo "clean=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Mend the lockfile
+        if: steps.ask.outputs.clean != 'true'
+        run: make mend-advisories
+      - name: Land it through the gate
+        if: steps.ask.outputs.clean != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- Cargo.lock; then
+            echo "advised, and no crate moved: an advisory with no fixed version is a hand's" >&2
+            exit 1
+          fi
+          moved=$(git diff -- Cargo.lock | sed -nE 's/^[ +]name = "(.*)"/\1/p' | sort -u | paste -sd, -)
+          branch="advisories/$(date -u +%Y%m%d-%H%M)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -qm "the lockfile moves past the day's advisories: $moved" -- Cargo.lock
+          git push -u origin "$branch"
+          # The branch was only the run's seat: gone whichever way this ends.
+          trap 'git push origin --delete "$branch" || true' EXIT
+          gh workflow run ci.yml --ref "$branch"
+          # A dispatch answers before its run exists; find the run by its branch.
+          run=""
+          for _ in $(seq 1 30); do
+            run=$(gh run list --workflow ci.yml --branch "$branch" --event workflow_dispatch --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+            [ -n "$run" ] && break
+            sleep 5
+          done
+          [ -n "$run" ] || { echo "ci.yml never started on $branch" >&2; exit 1; }
+          gh run watch "$run" --exit-status
+          git push origin "$branch:main"
+          if [ -z "$PAT" ]; then
+            gh workflow run release-plz.yml --ref main
+          fi

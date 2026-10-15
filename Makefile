@@ -1,5 +1,5 @@
 .PHONY: all build release test coverage lint fmt fmt-check check ci \
-        line-cap leak-scan protocol-gate rules-audit deny install-hooks install uninstall \
+        line-cap leak-scan protocol-gate rules-audit deny advisories mend-advisories install-hooks install uninstall \
         image image-scan mac-artifact clean \
         deploy deploy-local deploy-status deploy-selftest
 
@@ -196,8 +196,29 @@ rules-audit:
 
 # Supply-chain audit (cargo-deny 0.20.2 — see deny.toml): licenses, advisories,
 # the TLS-stack bans, and registry-only sources.
+# The advisories are deliberately NOT in `deny` (ops bl-fb2c): an advisory is
+# a fact about the day, not the tree, and a gate that judged trees by it
+# failed every tree the hour one published (RUSTSEC-2026-0285, -0349). They
+# are `mend-advisories`, run daily by `.github/workflows/advisories.yml`.
 deny:
-	cargo deny check
+	cargo deny check bans licenses sources
+
+# The advisory check alone: the day's question, asked of this lockfile.
+advisories:
+	cargo deny check advisories
+
+# Move the lockfile past every advisory it carries, then ask again. The crate
+# names come off cargo-deny's own JSON diagnostics (one line per diagnostic,
+# the advised crate at the root of each graph) rather than off its prose, so a
+# reworded sentence cannot silently mend nothing; `cargo update -p` moves one
+# crate within its semver range and nothing else. The re-check is the proof:
+# an advisory with no fixed version leaves it failing, which is the one case
+# that is a hand's, and the workflow says so by failing.
+mend-advisories:
+	cargo deny --format json check advisories 2>&1 \
+	  | jq -r 'select(.type=="diagnostic" and .fields.severity=="error") | .fields.graphs[]?.Krate.name' \
+	  | sort -u | xargs -r -n1 cargo update -p
+	cargo deny check advisories
 
 fmt:
 	cargo fmt

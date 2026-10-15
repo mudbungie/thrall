@@ -24,7 +24,7 @@ third answer.
 
 `make check` is the complete gate: `fmt-check → lint → coverage`, where `lint`
 is `line-cap → deploy-selftest → protocol-gate → leak-scan → clippy -D warnings
-→ rules-audit → cargo deny check`. The pre-commit hook (`.githooks/pre-commit`)
+→ rules-audit → cargo deny check bans licenses sources`. The pre-commit hook (`.githooks/pre-commit`)
 does not run them on this machine — this laptop does not compile in a gate
 (ops bl-1f80, `~/ops/remote-builds.md` "Phase 2"). It refuses direct commits to
 `main`, then `exec`s `bl-gate` (userconf; the one copy of the gate body for
@@ -41,6 +41,14 @@ runs any make target on the builder and streams the log.
 `.github/workflows/ci.yml` readies a runner and runs `make ci`; nobody restates
 a step the Makefile defines. Run `make install-hooks` once per clone — it seats
 `pre-commit` **and** `commit-msg`.
+
+**Advisories are not in the gate** (ops bl-fb2c; lernie bl-9c29 holds the
+full reasoning). A RustSec advisory is a fact about the day, not the tree,
+so `make deny` judges bans, licences and sources, and
+`.github/workflows/advisories.yml` asks the day's question daily: on a
+finding it runs `make mend-advisories`, proves the lockfile move with
+`ci.yml` on a branch, fast-forwards `main` and re-judges the release. A
+gate failure on `deny` is about the tree, never about the calendar.
 
 CI runs on every pull request, and on `main` as the workflow `release-plz.yml`
 CALLS inside its own run — which is where a release is gated (bl-bbb3, and that

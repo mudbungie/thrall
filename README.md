@@ -346,7 +346,9 @@ make image     # the OCI image (podman or docker), tagged from the crate version
 ```
 
 `make lint` is `line-cap`, then `leak-scan`, then `cargo clippy --all-targets
--- -D warnings`, then `rules-audit`, then `cargo deny check`.
+-- -D warnings`, then `rules-audit`, then `cargo deny check bans licenses sources`
+(advisories are the daily `advisories.yml` workflow's, which mends the
+lockfile itself).
 
 Every tool is pinned, or the gate is not reproducible: rustc 1.95.0
 (`rust-toolchain.toml`), ast-grep 0.44.1 (`sgconfig.yml`), cargo-deny 0.20.2
