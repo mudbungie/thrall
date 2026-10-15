@@ -36,7 +36,8 @@ TARPAULIN_PIN := 0.35.2
 # The 100% coverage floor. The pin is checked before the run rather than
 # after: a 0.35.4+ tarpaulin silently drops inline `#[cfg(test)] mod tests`
 # files from the coverable denominator, so an unpinned run reports a weaker
-# floor as a pass. See tarpaulin.toml.
+# floor as a pass. See tarpaulin.toml, which also sets the engine: a
+# command-line `--engine` is ignored whenever that file exists (bl-9580).
 coverage:
 	@have=$$(cargo tarpaulin --version 2>/dev/null | awk '{print $$NF}'); \
 	if [ "$$have" != "$(TARPAULIN_PIN)" ]; then \
@@ -44,7 +45,7 @@ coverage:
 	  echo "  cargo install cargo-tarpaulin --version $(TARPAULIN_PIN) --locked" >&2; \
 	  exit 1; \
 	fi
-	cargo tarpaulin --fail-under 100 --skip-clean --engine llvm --out Stdout
+	cargo tarpaulin --fail-under 100 --skip-clean --out Stdout
 
 # The complete static gate: the line cap + clippy (which reads Cargo.toml
 # [lints]) + the ast-grep rules audit + the supply-chain audit. Every tool is

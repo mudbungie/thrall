@@ -15,7 +15,19 @@
 # a convenience, and the reason belongs here beside it.
 #
 # `ignore-panics` excludes branches that only fire on programmer-error panics.
+#
+# `engine = "Llvm"` is the one engine setting, and it lives here because 0.35.2
+# ignores `--engine` on the command line whenever this file exists: the merge
+# never copies it, so the Makefile's former `--engine llvm` ran ptrace (the
+# Linux default) silently, every run until bl-9580. ptrace attributes lines by
+# stepping breakpoints across threads, so which lines it credits depends on
+# thread timing — the 4-core GitHub runner read `src/dht.rs:167` as uncovered
+# while the 40-core builder read the same tree at 100%, and `main` sat red for a
+# day with no release able to cut. llvm reads the instrumented profile, which
+# is deterministic, and also counts untaken branches ptrace never saw: a
+# stricter floor, not a weaker one, and the same floor on every core count.
 [default]
+engine = "Llvm"
 exclude-files = ["src/main.rs"]
 ignore-panics = true
 timeout = "300s"

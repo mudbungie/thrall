@@ -65,6 +65,8 @@ fn the_embed_sweep_sees_and_resolves_a_planted_embed() {
     )
     .expect("the plant is written");
     std::fs::write(nested.join("plain.rs"), "const X: u8 = 1;\n").expect("a plain file");
+    // A file that is not text cannot name an embed, and is passed over.
+    std::fs::write(nested.join("blob.bin"), [0xff, 0xfe, 0x00]).expect("a binary file");
     assert_eq!(
         embeds_under(scratch.path(), scratch.path()),
         BTreeSet::from([(

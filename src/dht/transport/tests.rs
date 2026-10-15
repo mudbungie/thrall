@@ -24,6 +24,14 @@ fn a_wait_that_elapses_is_none_even_at_zero() {
     assert_eq!(a.recv(Duration::ZERO).unwrap(), None);
 }
 
+/// The socket failing is not the wait running out: no loopback socket fails
+/// on demand, so the classifier is asked directly.
+#[test]
+fn a_socket_that_fails_is_not_an_elapsed_wait() {
+    assert!(elapsed(&io::Error::from(io::ErrorKind::WouldBlock)));
+    assert!(!elapsed(&io::Error::from(io::ErrorKind::ConnectionRefused)));
+}
+
 #[test]
 fn a_family_this_socket_cannot_reach_refuses_the_send() {
     let a = loopback();

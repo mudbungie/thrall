@@ -160,3 +160,14 @@ fn a_path_the_frames_shape_does_not_admit_changes_nothing() {
         assert_eq!(reword(&frame(QUEUED[1]), path, UNHEARD), None, "{path}");
     }
 }
+
+/// **And the projector runs out of frame the same two ways**: a stamp on the
+/// frame itself names no key to delete, and a key step into a string finds no
+/// object to delete from. Both leave the frame as it was — the signature is a
+/// fixture here because no path the ledger really stamps has either shape.
+#[test]
+fn a_stamp_the_frames_shape_does_not_admit_deletes_nothing() {
+    const AFTER_THE_FLOOR: [(&str, u32); 2] = [(":object", 19), ("/kind/deeper:string", 19)];
+    let original = frame(QUEUED[1]);
+    assert_eq!(project(&original, &AFTER_THE_FLOOR, FLOOR), original);
+}
