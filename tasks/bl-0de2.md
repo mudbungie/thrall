@@ -2,6 +2,7 @@
 title = "advisories.yml's land step is rejected 'fetch first' on every mend: the checkout is shallow, so main's tip is not in the runner's object store and git refuses the fast-forward client-side — fetch the full history, and say in the log when a push is refused because main moved"
 created = 1792035392
 updated = 1792035392
+claimant = "Surveying"
 priority = 1
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
 +++
