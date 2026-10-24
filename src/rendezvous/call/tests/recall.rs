@@ -68,7 +68,7 @@ fn a_re_call_nobody_answers_clears_the_cache() {
     let mut r = roving(tuning);
     drop(r.rendezvous().expect("landed"));
     assert_eq!(served.join().expect("served"), 1);
-    assert!(r.recall().is_none(), "the engine answered no second punch");
+    assert!(r.recall().is_none(), "the server answered no second punch");
     assert!(r.cached.is_none());
     assert_eq!(calls(&node).len(), 1, "the re-call was written");
     assert!(r.recall().is_none(), "and nothing is left to re-call from");

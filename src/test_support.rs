@@ -32,12 +32,12 @@ use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
-/// The stand-in for the far end of the wire.
-pub(crate) mod engine;
 /// The operator's out-of-channel act, performed by the suite.
 pub(crate) mod mint;
 /// The rendezvous material and the commons, stood in for.
 pub(crate) mod roving;
+/// The stand-in for the far end of the wire.
+pub(crate) mod server;
 
 /// The binary-wide fork lock. See [`crate::spawn::output`] for the ETXTBSY
 /// race it closes and why the discipline belongs at the fork rather than at the
@@ -85,7 +85,7 @@ impl Notices {
 /// One notice, kept.
 ///
 /// The line is owned before the lock is taken rather than inside the `push`,
-/// which is the shape [`engine`]'s recorder already uses: a temporary built
+/// which is the shape [`server`]'s recorder already uses: a temporary built
 /// inside the locked call earns a drop region llvm-cov reports uncovered on
 /// however many times the line runs.
 fn record(said: &Arc<Mutex<Vec<String>>>, line: &str) {

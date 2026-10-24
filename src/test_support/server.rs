@@ -1,4 +1,4 @@
-//! **The stand-in engine**: the far end of the wire, so the suite can test a
+//! **The stand-in server**: the far end of the wire, so the suite can test a
 //! channel against something that speaks the protocol rather than against a
 //! mock of thrall's own beliefs about it.
 //!
@@ -10,30 +10,30 @@
 //!
 //! **It is scripted, one answer per connection**, because a foot dials per ask
 //! and holds a connection only while it is waiting. So a test says what the
-//! engine answers the first dial, the second, and so on.
+//! server answers the first dial, the second, and so on.
 //!
-//! **An entry may also be an engine that goes AWAY on that dial** — the `None`
-//! of [`Engine::flapping`], which reads the foot's frames and then drops the
+//! **An entry may also be a server that goes AWAY on that dial** — the `None`
+//! of [`Server::flapping`], which reads the foot's frames and then drops the
 //! stream where it stands, with no answer and no TLS `close_notify`. That is
 //! the failure a roaming box actually hits, and it is the one a script of
-//! answers cannot produce: every answer ends in a terminator, which is an
-//! engine finishing rather than an engine disappearing. It is what lets the
+//! answers cannot produce: every answer ends in a terminator, which is a
+//! server finishing rather than a server disappearing. It is what lets the
 //! redial (`run::redial`) be driven over a real wire — drop, dial again, and
 //! be answered on the next connection.
 //!
-//! **It states the FLOOR as its edition** (REMOTE §3.2). An engine speaking
+//! **It states the FLOOR as its edition** (REMOTE §3.2). A server speaking
 //! this major is at the floor or above it by definition, so the floor is the
 //! least a real one can say and the ordinary case a foot meets. What a foot
 //! does with a higher one, and with none at all, is
 //! `channel::hello::tests`' — a value this end reads, not a value it needs a
 //! listener to produce.
 //!
-//! **It states the engine's protocol number, not this crate's** (bl-e0f0).
+//! **It states the server's protocol number, not this crate's** (bl-e0f0).
 //! Every fixture here dials at [`crate::corpus::PROTOCOL`], a literal copied
 //! from yog's repo-root `PROTOCOL` file. While it wrote its preface from
 //! `channel::hello::PROTOCOL` the two ends of every test were one constant
 //! wearing two names, so they agreed at any value — and the pin sat five
-//! versions behind a live engine, unable to open a single real channel, with
+//! versions behind a live server, unable to open a single real channel, with
 //! the whole suite green. A stand-in built out of the thing it stands in for
 //! cannot fail the one way that matters.
 //!
@@ -67,30 +67,30 @@ const FRAMES_IN: usize = 2;
 /// It answers no address of its own: the address it bound is written into the
 /// scratch directory where [`material`](crate::channel::material) reads it, so
 /// a test opens a channel exactly the way an operator-provisioned box does.
-pub(crate) struct Engine {
+pub(crate) struct Server {
     seen: Arc<Mutex<Vec<Value>>>,
 }
 
-impl Engine {
+impl Server {
     /// Bind loopback, write the bound address into `dir` where
     /// [`material`](crate::channel::material) reads it, and serve one
     /// connection per entry in `script` — answering the n-th dial with the
     /// n-th entry's frames, then the terminator.
     ///
-    /// `protocol` is what the engine states as its version, so a test can make
+    /// `protocol` is what the server states as its version, so a test can make
     /// the two ends disagree without a second code path.
     pub(crate) fn start(dir: &Path, protocol: u32, script: Vec<Vec<Value>>) -> Self {
         Self::scripted(dir, protocol, script.into_iter().map(Some).collect())
     }
 
-    /// An engine that states its version, takes what the foot says — and then
+    /// A server that states its version, takes what the foot says — and then
     /// **goes away mid-conversation**, with no answer and no TLS
     /// `close_notify`. One connection, and then the port is gone too.
     pub(crate) fn vanishes(dir: &Path) -> Self {
         Self::scripted(dir, crate::corpus::PROTOCOL, vec![None])
     }
 
-    /// **An engine that drops some dials and answers others**: `None` is the
+    /// **A server that drops some dials and answers others**: `None` is the
     /// connection it disappears on, `Some(frames)` the connection it answers.
     /// A foot dials per ask, so this is how a test writes a wire that flaps
     /// under a conversation and comes back.
@@ -133,7 +133,7 @@ fn bound(dir: &Path) -> (TcpListener, Arc<Mutex<Vec<Value>>>) {
 
 /// One connection: state a version, record the two frames the foot writes —
 /// its own preface and its request — then answer and terminate. `None` is the
-/// engine that goes away instead: nothing written, and the stream dropped where
+/// server that goes away instead: nothing written, and the stream dropped where
 /// it stands.
 ///
 /// Every write ignores its error. A test that makes thrall refuse mid-exchange
@@ -169,7 +169,7 @@ fn serve(
     let _ = frame::write_end(&mut tls);
 }
 
-/// The engine's end of the mTLS: present the engine leaf, and require a client
+/// The server's end of the mTLS: present the server leaf, and require a client
 /// certificate the operator CA issued. Requiring one is the point — a stand-in
 /// that accepted an anonymous connection would prove nothing about the channel
 /// thrall actually opens.
@@ -181,18 +181,18 @@ pub(super) fn server_config(dir: &Path) -> Arc<ServerConfig> {
             .build()
             .expect("a client verifier");
     let chain: Vec<CertificateDer<'static>> =
-        CertificateDer::pem_file_iter(dir.join(format!("{}.pem", super::mint::ENGINE)))
-            .expect("the engine chain")
+        CertificateDer::pem_file_iter(dir.join(format!("{}.pem", super::mint::SERVER)))
+            .expect("the server chain")
             .collect::<Result<_, _>>()
-            .expect("the engine chain");
-    let key = PrivateKeyDer::from_pem_file(dir.join(format!("{}.key", super::mint::ENGINE)))
-        .expect("the engine key");
+            .expect("the server chain");
+    let key = PrivateKeyDer::from_pem_file(dir.join(format!("{}.key", super::mint::SERVER)))
+        .expect("the server key");
     Arc::new(
         ServerConfig::builder_with_provider(provider)
             .with_safe_default_protocol_versions()
             .expect("tls versions")
             .with_client_cert_verifier(verifier)
             .with_single_cert(chain, key)
-            .expect("the engine identity"),
+            .expect("the server identity"),
     )
 }

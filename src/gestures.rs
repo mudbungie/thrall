@@ -9,7 +9,7 @@
 //! foot is invoked; it never invokes.**
 //!
 //! So the enumeration is the enforcement thrall can keep. The real enforcement
-//! is the engine's — it is the party that can be trusted to hold it — but a
+//! is the server's — it is the party that can be trusted to hold it — but a
 //! foot with no spelling for a fourth verb cannot send one by accident, and
 //! adding one here would be a visible act rather than a slip.
 //!
@@ -51,15 +51,15 @@ pub fn complete(invocation: &str, capture: &Capture) -> Value {
             "capture": capture_value(capture) })
 }
 
-/// What an engine can answer a foot. Three kinds, because there are three
+/// What a server can answer a foot. Three kinds, because there are three
 /// gestures — plus the refusal every gesture can earn.
 ///
-/// A refusal is not an error *here*: the engine spoke, and what it said is that
+/// A refusal is not an error *here*: the server spoke, and what it said is that
 /// it will not do the thing. Whether that ends the loop is the loop's decision
 /// (see [`run`](crate::run)), not the decoder's.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Reply {
-    /// The advertisement landed, and **whether the engine wrote it** (REMOTE
+    /// The advertisement landed, and **whether the server wrote it** (REMOTE
     /// §5.1, PROTOCOL 8): `false` when it found the stored set identical and
     /// compared, `true` when the document changed.
     ///
@@ -69,7 +69,7 @@ pub enum Reply {
     /// receipt in the pre-8 shape refuses here rather than decoding to a
     /// comforting `false`.
     Advertised { wrote: bool },
-    /// This machine's work, which is ordinarily empty: the engine holds the
+    /// This machine's work, which is ordinarily empty: the server holds the
     /// read for its own bound and then answers with what it has.
     Invocations(Vec<Invocation>),
     /// One invocation's standing after the call — the handle, and the capture
@@ -91,7 +91,7 @@ pub enum Reply {
 ///
 /// **A kind this foot has no use for is an error and not a shrug.** The three
 /// above are the only answers the three gestures can earn; anything else means
-/// the engine answered a question nobody here asked, and continuing on it would
+/// the server answered a question nobody here asked, and continuing on it would
 /// be guessing.
 pub fn decode(v: &Value) -> Result<Result<Reply, String>, String> {
     let o = v.as_object().ok_or("reply: not a JSON object")?;

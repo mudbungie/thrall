@@ -16,8 +16,8 @@
 //!
 //! **The third rung is a call, never a bare re-punch** (yog REMOTE §13.3,
 //! ruling bl-278f): a held connection's pings are the only thing keeping a
-//! NAT mapping alive, so once the line has dropped the engine's side holds
-//! none, and a punch no call asked the engine to answer is one-sided. The
+//! NAT mapping alive, so once the line has dropped the server's side holds
+//! none, and a punch no call asked the server to answer is one-sided. The
 //! re-call skips the presence read and nothing else; one it cannot land
 //! clears the cache, and the full rendezvous under it reads presence afresh.
 //!
@@ -48,7 +48,7 @@ struct Missed {
     timed_out: bool,
 }
 
-/// A connection to the engine and whether it was punched. Only a roving
+/// A connection to the server and whether it was punched. Only a roving
 /// entry's ladder says its rungs (`rendezvous::say`): a one-rung ladder's
 /// only outcome already reaches the operator as the channel's sentence.
 pub(super) fn climb(

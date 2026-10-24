@@ -2,7 +2,7 @@
 //! ruling 1).
 //!
 //! A `complete` that fails on the WIRE leaves this foot standing with a capture
-//! nobody else has: the tool ran here, the engine's slot still holds the lease
+//! nobody else has: the tool ran here, the server's slot still holds the lease
 //! it handed out, and the driver is waiting. Dropping it — which is what this
 //! crate did until this file existed — lets that lease re-run the tool on the
 //! next dial, so the box pays for the work twice and the asker waits for the
@@ -11,7 +11,7 @@
 //! **So it is carried out with the ending and posted first on the next dial**,
 //! after the advertisement and BEFORE that channel's first follow-class read.
 //! The order is the whole mechanism: the read is what releases the lease
-//! (REMOTE §5.3), so a capture posted ahead of it lands on a slot the engine is
+//! (REMOTE §5.3), so a capture posted ahead of it lands on a slot the server is
 //! still holding with no capture of its own.
 //!
 //! **This is not the id ledger bl-9261 refused, and that refusal still
@@ -24,7 +24,7 @@
 //! interval had no name; posting rather than waiting gives it one, and that is
 //! the whole of what is narrowed.
 //!
-//! **A refusal of the re-post is dropped and the channel reads on.** An engine
+//! **A refusal of the re-post is dropped and the channel reads on.** A server
 //! that refuses it has swept the slot, restarted, or already handed the driver
 //! an answer — all ordinary — and a foot that ended its channel over a capture
 //! nobody was waiting for would be turning the ordinary case into the terminal
@@ -39,9 +39,9 @@ use super::hold::{Ending, Failed, tell};
 
 /// **Post one capture back**, at the moment it is computed.
 ///
-/// **The receipt is read rather than discarded.** An engine that refused the
+/// **The receipt is read rather than discarded.** A server that refused the
 /// completion — an expired handle, a slot addressed to another machine — is
-/// saying that this foot and that engine disagree about what is in flight, and
+/// saying that this foot and that server disagree about what is in flight, and
 /// a foot that kept answering into that would be posting captures nobody is
 /// waiting for.
 pub(super) fn answer(
@@ -54,12 +54,12 @@ pub(super) fn answer(
 
 /// **A capture the wire swallowed**, and the handle it answers.
 ///
-/// The id is the engine's own, quoted back exactly as an ordinary completion
+/// The id is the server's own, quoted back exactly as an ordinary completion
 /// quotes it — this is the same gesture on the same lane, sent one channel
 /// late, and not a second spelling of anything.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Held {
-    /// The engine's handle on the invocation this box ran.
+    /// The server's handle on the invocation this box ran.
     pub(crate) id: String,
     /// What running it produced: computed once, and posted once.
     pub(crate) capture: Capture,
@@ -77,7 +77,7 @@ impl Held {
     /// **Post it, ahead of the read that would release the lease.**
     ///
     /// `None` is the channel reading on, and it is the answer to three of the
-    /// four outcomes: the capture landed, the engine refused it, or the engine
+    /// four outcomes: the capture landed, the server refused it, or the server
     /// answered something no foot gesture can earn. All three are the far end
     /// having spoken, and once it has spoken this capture has no further claim
     /// on anything — it is dropped here and never becomes an [`Ending::Over`].
@@ -103,7 +103,7 @@ impl Held {
     /// An ending that will be dialled again carries it; an `Over` drops it,
     /// and that is REMOTE §5.6's fourth consequence falling out of the matrix
     /// rather than a second decision. The two endings that stop a channel at a
-    /// completion are the engine refusing it and the engine answering
+    /// completion are the server refusing it and the server answering
     /// something no gesture can earn, and both say the two ends disagree about
     /// what is in flight — so re-posting it would ask the same question and
     /// get the same answer.

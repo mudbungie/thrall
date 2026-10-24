@@ -22,12 +22,12 @@
 # than a `cargo install && systemctl restart` line.
 #
 # **What a restart destroys is an invocation mid-flight**, and the damage is not
-# symmetrical with the engine's. A killed turn on the engine costs the spend
+# symmetrical with the server's. A killed turn on the server costs the spend
 # that bought it; a killed invocation here costs a command that already ran
 # HALF. Its side effects on this box stand, the capture never comes back, and
-# the engine learns only that its foot went away. Nothing settles that the way
+# the server learns only that its foot went away. Nothing settles that the way
 # litany settles an unanswered tool window, because the act was not a message.
-# So the deferral here is if anything more load-bearing than the engine's.
+# So the deferral here is if anything more load-bearing than the server's.
 #
 # **The idle read is the unit's own cgroup, and for a NATIVE unit that is
 # honest.** thrall runs every tool as a child process (`src/spawn.rs`), and its
@@ -37,7 +37,7 @@
 # fact is already there to read, and thrall's whole wire surface is three acts
 # by design (README), none of which is "are you busy".
 #
-# The objection that retired this predicate on yog's engine does not reach here.
+# The objection that retired this predicate on the yog server does not reach here.
 # There it was read off a CONTAINER unit's cgroup, which holds `docker run` — a
 # client process — so the count answered about the wrong program. A native unit's
 # cgroup holds the program.
@@ -74,7 +74,7 @@ die() { say "$*" >&2; exit 1; }
 # ONE RULE: the foot should be running the newest live version, unless an
 # invocation is executing or the operator stopped it. Every case below falls out
 # of that sentence. It is a pure function of four facts so the branches that
-# matter can be tested without a box, a release or an engine (`--self-test`).
+# matter can be tested without a box, a release or a server (`--self-test`).
 # Prints exactly one of `current`, `defer`, `restart`.
 #
 # WHY `failed` IS ITS OWN ARM. A unit that could not start has no invocation to
@@ -222,7 +222,7 @@ pid=$(systemctl --user show -P MainPID "$UNIT" 2>/dev/null || echo 0)
 # is a second writer — a new inode at no new published version — and under the
 # inode read the next tick restarted the foot onto it, killing whatever
 # invocation was executing at the moment the box looked idle enough to act. yog
-# met exactly that on a live engine (its bl-6b27). This file's rule is *the foot
+# met exactly that on a live server (its bl-6b27). This file's rule is *the foot
 # should be running the newest live version*, and after step 1 the installed
 # binary IS that version, so comparing versions asks the rule itself.
 pending=unknown

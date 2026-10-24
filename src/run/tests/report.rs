@@ -7,7 +7,7 @@
 //! `serve`'s.
 
 use super::super::fan;
-use super::{echo, engine_at, flapping_at, refusal, set};
+use super::{echo, flapping_at, refusal, server_at, set};
 use crate::channel::entries;
 use crate::run::{Notice, Pause};
 use crate::test_support::{Notices, Scratch};
@@ -52,7 +52,7 @@ fn a_terminal_sentence_is_said_while_a_sibling_is_still_serving() {
         &scratch.join("north"),
         vec![None, Some(refusal("north stopped"))],
     );
-    let _south = engine_at(&scratch.join("south"), vec![refusal("south stopped")]);
+    let _south = server_at(&scratch.join("south"), vec![refusal("south stopped")]);
     let (notices, into) = Notices::new();
     let (release, awaited) = std::sync::mpsc::sync_channel(1);
     let sink: Notice = Arc::new(move |line: &str| watch(&into, &release, line));

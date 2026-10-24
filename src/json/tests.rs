@@ -30,7 +30,7 @@ fn a_mistyped_string_field_refuses_rather_than_stringifying_it() {
 /// **A required boolean has three answers and only one of them is a value.**
 /// Absent refuses rather than reading false, because the fields wearing this
 /// shape are readings off the far end (`wrote`), and a reading defaulted to
-/// false is the reassuring answer invented for an engine that said nothing.
+/// false is the reassuring answer invented for a server that said nothing.
 #[test]
 fn a_required_boolean_refuses_absence_rather_than_reading_false() {
     let o = object(json!({"wrote": true}));

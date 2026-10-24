@@ -1,5 +1,5 @@
 //! **The conformance replay** (yog's `docs/REMOTE.md` §3.2): one vendored
-//! record, replayed at every edition an engine can be at, and read under a word
+//! record, replayed at every edition a server can be at, and read under a word
 //! no build has heard of.
 //!
 //! §3.2 replaced the bump for the additive class, and what a consumer owes in
@@ -11,11 +11,11 @@
 //! of the frames there are:
 //!
 //! - **[`project`]** deletes from a frame every key stamped above an edition,
-//!   which is exactly the frame an engine of that edition would have written.
+//!   which is exactly the frame a server of that edition would have written.
 //!   The stamps are the history, so one record replays to any point of it and
 //!   no archive of old fixtures is kept (or goes stale).
 //! - **[`reword`]** replaces one string with a token no build has heard of,
-//!   which is exactly the frame an engine that coined a word would send. Free
+//!   which is exactly the frame a server that coined a word would send. Free
 //!   text passes trivially; a vocabulary passes only through its catch-all.
 //!
 //! **What the replay can prove today, and what it cannot.** Every path this
@@ -43,18 +43,18 @@ pub(crate) const REPLIES: [(&str, &[&str]); 4] = [
     ("reply/refusal", &[REFUSAL]),
 ];
 
-/// **The editions an engine of this major can be at**: the floor, up to the
+/// **The editions a server of this major can be at**: the floor, up to the
 /// newest this build has vendored. Never empty — the floor is always in it,
 /// because §3.2 defines the floor as the edition the major was cut at and no
-/// engine speaking this major is below it.
+/// server speaking this major is below it.
 ///
-/// Below the floor is not an older engine, it is another major, and the preface
+/// Below the floor is not an older server, it is another major, and the preface
 /// refuses that by equality before a frame is decoded.
 pub(crate) fn editions() -> Vec<u32> {
     (FLOOR..=FLOOR.max(ledger::edition())).collect()
 }
 
-/// **One frame as an engine of `edition` would have written it**: every key
+/// **One frame as a server of `edition` would have written it**: every key
 /// stamped above that edition deleted, wherever the path occurs.
 pub(crate) fn project(frame: &Value, signature: &[(&'static str, u32)], edition: u32) -> Value {
     let mut projected = frame.clone();

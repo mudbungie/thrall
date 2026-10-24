@@ -1,4 +1,4 @@
-//! **The channel**: thrall's end of one wire to one engine (yog's
+//! **The channel**: thrall's end of one wire to one server (yog's
 //! `docs/REMOTE.md` §3, §5.4, §13.4; DESIGN §3.1, §3.11).
 //!
 //! **A foot dials and is never dialled.** Every leg is a reply to something
@@ -10,7 +10,7 @@
 //! milliseconds.** A foot's life is one follow-class read (`invocations`,
 //! bl-a2ea) whose answer takes as long as it takes, and a dialled connection is
 //! held for exactly that. Between asks, and for the whole time it is executing
-//! something, it is *absent* — which is why the engine does not treat presence
+//! something, it is *absent* — which is why the server does not treat presence
 //! as the routing predicate (REMOTE §5's amendment: the mailbox queue is).
 //!
 //! **A punched connection is held across asks** (REMOTE §13.4), because it
@@ -18,7 +18,7 @@
 //! criterion for a held connection is met in its own terms. What is held is
 //! exactly what was punched: the ladder ([`ladder`]) says which kind of
 //! connection it climbed to, a dialled one is spent with its ask, and a punched
-//! one is kept for the next. The engine pings a held connection through its
+//! one is kept for the next. The server pings a held connection through its
 //! silence and the ping is discarded wherever a reply is read; two minutes of
 //! nothing is the hangup, and it ends the conversation like any other wire
 //! failure — which is to say it is dialled again.
@@ -28,8 +28,8 @@
 //! `run::redial`'s: a dropped wire is taken up again after a wait, through the
 //! same ladder, and a foot that cannot be a foot at all still exits.
 //!
-//! **The engine's name comes from the address and from nowhere else.** A dotted
-//! quad or a bracketed v6 literal is verified as an IP address — the engine's
+//! **The server's name comes from the address and from nowhere else.** A dotted
+//! quad or a bracketed v6 literal is verified as an IP address — the server's
 //! leaf must carry the matching `IP:` subject alternative name — and anything
 //! else is a DNS name. Whichever rung answered, that is the name the inner
 //! mTLS verifies (REMOTE §13.3): there is nothing to configure and nothing
@@ -69,13 +69,13 @@ use material::Material;
 
 /// How long one read may wait before the channel is judged gone.
 ///
-/// It is a bound on the **transport**, not on the wait: the engine parks a
+/// It is a bound on the **transport**, not on the wait: the server parks a
 /// follow-class read for its mailbox's own hold and then answers — with no work
 /// if there was none — so a foot waiting for hours is a *sequence* of answered
 /// reads, never one read held for hours. This has to sit comfortably above that
-/// hold, because a read timeout below it would turn the engine's ordinary empty
+/// hold, because a read timeout below it would turn the server's ordinary empty
 /// answer into a dead channel. **On a held connection it is the hangup** the
-/// engine states from its end too (REMOTE §13.4): the engine pings every
+/// server states from its end too (REMOTE §13.4): the server pings every
 /// twenty-five seconds of silence, so a live connection never reaches it, and
 /// one that does is gone. It is a socket bound and not a clock, because rustls
 /// has no clean resume from a half-read record — a timeout is "the connection
@@ -101,13 +101,13 @@ pub struct Channel {
 
 impl Channel {
     /// Open the channel from provisioned material. **Nothing is dialled here**:
-    /// a channel is a fact about what this box may say, not about whether an
-    /// engine happens to be up — and nothing is bound either, the punch port
+    /// a channel is a fact about what this box may say, not about whether a
+    /// server happens to be up — and nothing is bound either, the punch port
     /// being taken on the first rendezvous.
     ///
     /// The grade is read first, because a leaf that is not a foot's is a
     /// refusal about *this box's configuration* and has nothing to do with any
-    /// engine — it must not arrive as a connection failure.
+    /// server — it must not arrive as a connection failure.
     pub fn open(m: &Material) -> Result<Self, String> {
         let client = leaf::foot(&m.chain)?;
         Ok(Self {
@@ -150,7 +150,7 @@ impl Channel {
     /// *"the streaming form is not a second form"*.
     ///
     /// **The `Err` is [`Failure`]**, which is two classes and not a taxonomy: a
-    /// socket that never opened, an engine that went away and an unreadable
+    /// socket that never opened, a server that went away and an unreadable
     /// answer are one fact to the loop above — this channel is gone, and here
     /// is the sentence — while a version the two ends do not share is the one
     /// fact that is about the two *binaries* and survives every dial.
@@ -177,7 +177,7 @@ impl Channel {
     }
 
     /// Every frame of one answer, in order, up to the terminator — and never
-    /// a ping, which the engine writes into a held connection's silence
+    /// a ping, which the server writes into a held connection's silence
     /// (REMOTE §13.4) and which is never the start of a reply stream.
     fn answer(&mut self, tls: &mut Tls, punched: bool) -> Result<Vec<Value>, Failure> {
         let mut stream = Vec::new();
@@ -194,7 +194,7 @@ impl Channel {
     ///
     /// The sentence IS the product on this path: what a supervisor's log or an
     /// operator's terminal carries is the whole of what they get — and what
-    /// they need from it is which engine went away and whether anything is
+    /// they need from it is which server went away and whether anything is
     /// going to happen next. A library's own diagnosis answers neither: it
     /// names no address, and "peer closed connection without sending TLS
     /// close_notify" is a fact about TLS rather than about what to do. **It
@@ -207,7 +207,7 @@ impl Channel {
     /// beside it: the act, the address, then what happened.
     fn failed(&self, leg: &str, e: &std::io::Error) -> String {
         format!(
-            "{leg} {}: the channel to the engine failed. What the {leg} \
+            "{leg} {}: the channel to the server failed. What the {leg} \
              reported: {e}",
             self.address
         )
@@ -215,13 +215,13 @@ impl Channel {
 
     /// Climb the ladder to a connection, handshake and send. The TLS handshake
     /// happens inside the first write, and the one frame read here is the
-    /// engine's version preface — so what this hands back is a stream with a
+    /// server's version preface — so what this hands back is a stream with a
     /// request on it and no *answer* yet read, and whether it was punched.
     ///
     /// **Both ends state a version before either reads** (REMOTE §3), and the
     /// request goes out in the same breath as this end's preface — so
-    /// confirming the engine's costs no round trip, and a mismatch refuses
-    /// before a frame of the answer is decoded. **The engine's EDITION comes
+    /// confirming the server's costs no round trip, and a mismatch refuses
+    /// before a frame of the answer is decoded. **The server's EDITION comes
     /// back from that confirmation and is dropped here** (REMOTE §3.2): a foot
     /// reads no post-floor field, so nothing above consults it yet.
     fn dial(&mut self, request: &Value) -> Result<(Tls, bool), Failure> {
@@ -240,13 +240,13 @@ impl Channel {
     }
 }
 
-/// The engine's keepalive on a held connection: `{"ping":true}` and nothing
+/// The server's keepalive on a held connection: `{"ping":true}` and nothing
 /// else (yog `wire::server::peer`).
 fn is_ping(frame: &Value) -> bool {
     frame.get("ping").and_then(Value::as_bool) == Some(true)
 }
 
-/// The name to verify the engine's certificate against, read off the address.
+/// The name to verify the server's certificate against, read off the address.
 fn server_name(address: &str) -> Result<ServerName<'static>, String> {
     let host = address.rsplit_once(':').map_or(address, |(head, _)| head);
     let host = host.trim_start_matches('[').trim_end_matches(']');

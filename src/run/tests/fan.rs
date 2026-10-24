@@ -3,7 +3,7 @@
 
 use super::super::fan;
 use super::boom;
-use super::{advertised, aside, echo, engine_at, receipt, refusal, restored, row, set, work};
+use super::{advertised, aside, echo, receipt, refusal, restored, row, server_at, set, work};
 use crate::channel::entries;
 use crate::test_support::{Notices, Scratch, unwaited};
 
@@ -13,7 +13,7 @@ use crate::test_support::{Notices, Scratch, unwaited};
 #[test]
 fn every_entry_is_served_and_each_answers_under_its_own_name() {
     let scratch = Scratch::new();
-    let _one = engine_at(
+    let _one = server_at(
         &scratch.join("north"),
         vec![
             advertised(),
@@ -21,7 +21,7 @@ fn every_entry_is_served_and_each_answers_under_its_own_name() {
             refusal("north stopped"),
         ],
     );
-    let _two = engine_at(&scratch.join("south"), vec![refusal("south stopped")]);
+    let _two = server_at(&scratch.join("south"), vec![refusal("south stopped")]);
     // A third entry that was made and never provisioned: its refusal is its
     // own, and it does not cost the other two.
     std::fs::create_dir_all(scratch.join("empty")).expect("mkdir");
@@ -59,7 +59,7 @@ fn a_box_with_no_entry_has_nothing_to_report() {
 }
 
 /// **A notice carries the name of the channel that raised it**, the same
-/// prefix that channel's ending sentence carries. A box holding two engines
+/// prefix that channel's ending sentence carries. A box holding two servers
 /// that is told it was disarmed, and not by which one, has been told nothing it
 /// can act on — the two channels have different identities and different
 /// operators.
@@ -67,7 +67,7 @@ fn a_box_with_no_entry_has_nothing_to_report() {
 fn a_notice_names_the_channel_that_raised_it() {
     let (notices, sink) = Notices::new();
     let scratch = Scratch::new();
-    let _one = engine_at(
+    let _one = server_at(
         &scratch.join("north"),
         vec![
             advertised(),
@@ -78,7 +78,7 @@ fn a_notice_names_the_channel_that_raised_it() {
             refusal("north stopped"),
         ],
     );
-    let _two = engine_at(&scratch.join("south"), vec![refusal("south stopped")]);
+    let _two = server_at(&scratch.join("south"), vec![refusal("south stopped")]);
     let said = fan(
         entries::read_dir(scratch.path()),
         set(),
@@ -107,17 +107,17 @@ fn a_notice_names_the_channel_that_raised_it() {
     );
 }
 
-/// **One engine's conversation does not take the others down.** An executor
+/// **One server's conversation does not take the others down.** An executor
 /// that dies is named as its own outcome, under the channel it killed, and the
 /// channel beside it still answers.
 #[test]
 fn a_channel_that_dies_is_named_and_does_not_take_the_others_with_it() {
     let scratch = Scratch::new();
-    let _one = engine_at(
+    let _one = server_at(
         &scratch.join("north"),
         vec![advertised(), work(vec![row("i-1", "Bash")])],
     );
-    let _two = engine_at(&scratch.join("south"), vec![refusal("south stopped")]);
+    let _two = server_at(&scratch.join("south"), vec![refusal("south stopped")]);
     let said = fan(
         entries::read_dir(scratch.path()),
         set(),

@@ -2,19 +2,19 @@
 //! and everything both ends derive from it.
 //!
 //! Two files beside `ca.pem`, both hex, both carried here by the operator's
-//! hand exactly as the anchors are (REMOTE §1.4): the engine's ed25519
+//! hand exactly as the anchors are (REMOTE §1.4): the server's ed25519
 //! **public** key, which presence is filed under, and the **pairing salt**
 //! the two ends share. **A foot holds no keypair of its own.** The inbox is
 //! signed under a keypair *derived* from the salt — `inbox key` below is an
 //! ed25519 seed — so a client needs nothing minted to write it and the
-//! engine holds no client key to poll it; that is what makes the material two
+//! server holds no client key to poll it; that is what makes the material two
 //! files rather than three.
 //!
 //! **One salt, four derivations, all HKDF-SHA256** with the salt `yog
 //! rendezvous` and one info label each, 32 bytes out: the DHT salts the two
 //! items are filed under, the AEAD key both are sealed with, and the inbox
-//! seed. The labels are the engine's (`src/wire/rendezvous/material.rs`), and
-//! `pairing::tests` holds the bytes the engine's own code derives from a
+//! seed. The labels are the server's (`src/wire/rendezvous/material.rs`), and
+//! `pairing::tests` holds the bytes the server's own code derives from a
 //! known salt, so a label that drifted by one character is a red test here
 //! rather than a call nobody answers.
 
@@ -22,15 +22,15 @@ use crate::dht::Keypair;
 use ring::hkdf::{HKDF_SHA256, Salt};
 use std::path::Path;
 
-/// The engine's rendezvous public key, hex — where presence lives.
+/// The server's rendezvous public key, hex — where presence lives.
 pub(crate) const KEY: &str = "rendezvous.pub";
-/// The pairing salt, hex — the secret this box and the engine share.
+/// The pairing salt, hex — the secret this box and the server share.
 pub(crate) const SALT: &str = "pairing.salt";
 
 /// What the two files hold, decoded.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Pairing {
-    /// The engine's public key.
+    /// The server's public key.
     pub(crate) key: [u8; 32],
     pub(crate) salt: [u8; 32],
 }
@@ -41,7 +41,7 @@ impl Pairing {
         Keypair::from_seed(self.derive(b"inbox key"))
     }
 
-    /// The DHT salt the engine's presence is filed under.
+    /// The DHT salt the server's presence is filed under.
     pub(crate) fn presence_salt(&self) -> Vec<u8> {
         self.derive(b"presence salt").to_vec()
     }

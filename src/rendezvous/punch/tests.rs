@@ -10,11 +10,11 @@ fn loopback(port: u16) -> SocketAddr {
 
 #[test]
 fn a_punch_lands_on_the_peers_listener_and_carries_bytes() {
-    let engine = Punch::bind(0).expect("bind");
+    let server = Punch::bind(0).expect("bind");
     let client = Punch::bind(0).expect("bind");
-    let target = loopback(engine.port());
-    let served = std::thread::spawn(move || {
-        let mut stream = engine
+    let target = loopback(server.port());
+    let accepted = std::thread::spawn(move || {
+        let mut stream = server
             .punch(vec![], Duration::from_secs(5))
             .expect("accepted");
         let mut byte = [0u8; 1];
@@ -30,7 +30,7 @@ fn a_punch_lands_on_the_peers_listener_and_carries_bytes() {
         "the SYN left from the fixed port"
     );
     stream.write_all(b"x").expect("write");
-    assert_eq!(served.join().expect("served"), b'x');
+    assert_eq!(accepted.join().expect("served"), b'x');
 }
 
 #[test]
@@ -77,12 +77,12 @@ fn v6_is_punched_first() {
 
 #[test]
 fn a_v6_loopback_punch_lands_where_the_box_has_v6() {
-    let engine = Punch::bind(0).expect("bind");
-    let target: SocketAddr = format!("[::1]:{}", engine.port()).parse().expect("v6");
-    let has_v6 = engine.listeners.len() == 2;
+    let server = Punch::bind(0).expect("bind");
+    let target: SocketAddr = format!("[::1]:{}", server.port()).parse().expect("v6");
+    let has_v6 = server.listeners.len() == 2;
     let client = Punch::bind(0).expect("bind");
-    let served =
-        std::thread::spawn(move || engine.punch(vec![], Duration::from_millis(600)).is_some());
+    let accepted =
+        std::thread::spawn(move || server.punch(vec![], Duration::from_millis(600)).is_some());
     let landed = client
         .punch(vec![target], Duration::from_millis(500))
         .is_some();
@@ -90,7 +90,7 @@ fn a_v6_loopback_punch_lands_where_the_box_has_v6() {
         landed, has_v6,
         "a v6 SYN lands exactly where a v6 listener is"
     );
-    assert_eq!(served.join().expect("served"), has_v6);
+    assert_eq!(accepted.join().expect("served"), has_v6);
 }
 
 #[test]

@@ -1,8 +1,8 @@
-//! The loop, against an engine that really speaks the protocol: what goes out,
+//! The loop, against a server that really speaks the protocol: what goes out,
 //! in what order, and what stops it.
 //!
 //! Split on the seam the code is: [`channel`] is one conversation with one
-//! engine, [`ending`] is what that conversation's failure means for the
+//! server, [`ending`] is what that conversation's failure means for the
 //! channel's lifetime, [`skew`] is the one ending that means it at every leg,
 //! [`redial`] is that lifetime, and [`fan`] is every channel a box holds,
 //! served at once. The fixtures they share live here.
@@ -12,7 +12,7 @@ use crate::channel::material::read_dir;
 use crate::config::Local;
 use crate::invocation::{Capture, Invocation};
 use crate::run::hold::Ending;
-use crate::test_support::engine::Engine;
+use crate::test_support::server::Server;
 use crate::test_support::{Scratch, aside, mint};
 use crate::tools::Tool;
 use serde_json::{Value, json};
@@ -33,7 +33,7 @@ fn set() -> Vec<Local> {
     }]
 }
 
-/// The stand-in executor: it answers with what it was handed, so the engine's
+/// The stand-in executor: it answers with what it was handed, so the server's
 /// record of the completion is the evidence that both arguments arrived.
 fn echo(set: &[Local], invocation: &Invocation) -> Capture {
     Capture {
@@ -49,13 +49,13 @@ fn boom(_: &[Local], _: &Invocation) -> Capture {
     panic!("an executor that died");
 }
 
-/// The ordinary receipt: the engine compared and found the set in force
+/// The ordinary receipt: the server compared and found the set in force
 /// identical, so it wrote nothing (REMOTE §5.1's `wrote`, PROTOCOL 8).
 fn advertised() -> Value {
     json!({"ok": true, "kind": "advertised", "wrote": false})
 }
 
-/// The receipt that says the engine CHANGED the document. On a re-assertion
+/// The receipt that says the server CHANGED the document. On a re-assertion
 /// that is this box learning it was disarmed while a tool ran.
 fn restored() -> Value {
     json!({"ok": true, "kind": "advertised", "wrote": true})
@@ -78,22 +78,22 @@ fn refusal(said: &str) -> Value {
     json!({"ok": false, "error": said})
 }
 
-/// Provision `dir` and stand an engine at the far end, answering the n-th dial
+/// Provision `dir` and stand a server at the far end, answering the n-th dial
 /// with the n-th entry of `script` — one frame each.
-fn engine_at(dir: &Path, script: Vec<Value>) -> Engine {
+fn server_at(dir: &Path, script: Vec<Value>) -> Server {
     mint::material(dir);
-    Engine::start(
+    Server::start(
         dir,
         crate::corpus::PROTOCOL,
         script.into_iter().map(|v| vec![v]).collect(),
     )
 }
 
-/// The same, where a `None` is the dial the engine **goes away on** instead of
+/// The same, where a `None` is the dial the server **goes away on** instead of
 /// answering — a wire that flaps under a conversation and comes back.
-fn flapping_at(dir: &Path, script: Vec<Option<Value>>) -> Engine {
+fn flapping_at(dir: &Path, script: Vec<Option<Value>>) -> Server {
     mint::material(dir);
-    Engine::flapping(
+    Server::flapping(
         dir,
         script.into_iter().map(|v| v.map(|v| vec![v])).collect(),
     )
@@ -111,38 +111,38 @@ fn said(ending: Ending) -> String {
     }
 }
 
-/// The entry standing at `dir`, where an engine has been provisioned — the
+/// The entry standing at `dir`, where a server has been provisioned — the
 /// same fact a channel is opened from, wearing the name a box files it under.
 fn entry_at(dir: &Path) -> crate::channel::entries::Entry {
     crate::channel::entries::Entry {
-        leaf: "engine".to_owned(),
+        leaf: "server".to_owned(),
         channel: Ok(read_dir(dir).expect("readable").expect("provisioned")),
     }
 }
 
-/// A box with one channel, and the engine standing at it.
-fn wired(script: Vec<Value>) -> (Scratch, Engine, Channel) {
+/// A box with one channel, and the server standing at it.
+fn wired(script: Vec<Value>) -> (Scratch, Server, Channel) {
     let scratch = Scratch::new();
-    let engine = engine_at(scratch.path(), script);
+    let server = server_at(scratch.path(), script);
     let held = read_dir(scratch.path())
         .expect("readable")
         .expect("provisioned");
     let channel = Channel::open(&held).expect("opened");
-    (scratch, engine, channel)
+    (scratch, server, channel)
 }
 
-/// Every `op` the engine was handed, in order.
-fn ops(engine: &Engine) -> Vec<String> {
-    engine
+/// Every `op` the server was handed, in order.
+fn ops(server: &Server) -> Vec<String> {
+    server
         .heard()
         .iter()
         .filter_map(|v| v.get("op")?.as_str().map(str::to_owned))
         .collect()
 }
 
-/// The n-th gesture frame the engine was handed.
-fn gesture(engine: &Engine, n: usize) -> Value {
-    engine
+/// The n-th gesture frame the server was handed.
+fn gesture(server: &Server, n: usize) -> Value {
+    server
         .heard()
         .into_iter()
         .filter(|v| v.get("op").is_some())
@@ -150,7 +150,7 @@ fn gesture(engine: &Engine, n: usize) -> Value {
         .expect("a gesture")
 }
 
-/// One conversation with one engine.
+/// One conversation with one server.
 mod channel;
 /// What a channel says while it is still serving.
 mod disarm;

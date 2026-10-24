@@ -3,27 +3,28 @@
 **The foot.** A tool-execution client for a yog server.
 
 A thrall runs on a machine, holds an operator-issued certificate for it, and
-dials in to an engine somewhere else. Its entire wire surface is three acts:
+dials in to a server somewhere else. Its entire wire surface is three acts:
 
 1. **advertise** — present what this box offers: for each tool, a name, a
    description, and a JSON Schema for its input.
-2. **wait** — hold open one read on its own mailbox until the engine hands it
+2. **wait** — hold open one read on its own mailbox until the server hands it
    an invocation.
 3. **post the capture** — run the thing, and answer with what came back.
 
 That is the whole of it. A thrall asks nothing and acts on nothing. It cannot
 start a conversation, read a transcript, spawn an agent, or address any part of
 the server other than its own queue. It never listens on a port — the punch port an entry behind a NAT binds for
-its own simultaneous open is the one stated exception (`docs/DESIGN.md` §2); **the engine
+its own simultaneous open is the one stated exception (`docs/DESIGN.md` §2); **the server
 never speaks first**.
 
 ## Why it is a separate program
 
-thrall is one of four components that meet only at the wire — the server, the
-seat, the engine, and the foot. Execution was severed from the server so that
-the machine holding the conversations is not the machine running the commands,
-and so that adding execution to an installation is an explicit act rather than
-a property of having installed anything.
+thrall is one of four components — the server (yog), the seat (lernie), the
+foot (this), and litany, the agent loop yog runs as a subprocess per verb. The
+first three meet only at the wire; litany is not on it. Execution was severed
+from the server so that the box holding the conversations is not the box
+running the commands, and so that adding execution to an installation is an
+explicit act rather than a property of having installed anything.
 
 A server with no enrolled thrall is a valid, and the default, installation. It
 is structurally incapable of executing anything until a foot is enrolled — even
@@ -49,12 +50,12 @@ Two honesty clauses ride with that, and neither is decoration:
 ## Status
 
 **A working foot.** `thrall run` serves every channel this box is provisioned
-for: it dials each engine over mTLS with the protocol version stated by both
+for: it dials each server over mTLS with the protocol version stated by both
 ends before either reads, refuses to open at all on a certificate that is not
 foot-grade, presents what the operator's tool document enables, waits on its
 mailbox, runs what comes back and posts the capture. It presents its set again
 at the end of every hand-off, and **says so on stderr when that presentation
-actually changed anything**: the engine's receipt distinguishes a comparison
+actually changed anything**: the server's receipt distinguishes a comparison
 from a write, so a write there means something replaced this box's advertised
 set while a tool was running. It restores it and carries on — the notice is the
 part a person needs. It does not return while a
@@ -62,17 +63,17 @@ channel is up.
 
 **A channel that drops is dialled again.** A laptop that sleeps, changes
 network or crosses a relay switch loses TCP, and until this landed that
-engine's tools were silently gone for the life of the process — a live-looking
+server's tools were silently gone for the life of the process — a live-looking
 foot offering nothing, because supervision restarts a *process* and a dropped
 channel does not kill one. So each channel takes itself up again, with a wait
 that starts at a second, doubles, and stops at a minute, so a box in airplane
 mode settles to a slow cadence rather than burning a core. Two refusals are
-told apart and never collapsed: the engine declining this box's *read* is its
+told apart and never collapsed: the server declining this box's *read* is its
 own predecessor's connection still dying, which frees within one hold's width
-and is waited past; the engine declining what this box *offers* is another
+and is waited past; the server declining what this box *offers* is another
 connection serving under its name, and that ends the channel. **And a protocol
 version the two ends do not share is neither of those**: it is a fact about the
-two binaries rather than this engine's reading of this box, the wire admits no
+two binaries rather than this server's reading of this box, the wire admits no
 negotiation, and the refusal names the only remedy there is — upgrade the older
 component. So it ends the channel where it stands, with one sentence and no
 wait, instead of a line a minute into the operator's journal for the life of a
@@ -107,22 +108,22 @@ same gated workflow. Publication authenticates to the registry by a trusted
 publisher — a short-lived token minted per run for one workflow file in one
 repository — so this repository stores no registry credential at all.
 
-**A protocol bump waits for the engine** (bl-635b). yog mints the wire protocol
+**A protocol bump waits for the server** (bl-635b). yog mints the wire protocol
 version and this crate *vendors* a copy of the number in a repo-root
 `PROTOCOL` file — one line, compiled into the constant by `build.rs` (bl-c618),
 at the one address a module split cannot move, which is what both gates read;
 the wire is fail-closed on a mismatch and does not negotiate (yog
 `docs/REMOTE.md` §3). So
 `merge-release-pr` also **holds a release whose `PROTOCOL` exceeds the newest
-published yog's** — thrall 0.0.15 shipped 16 while the newest published engine
+published yog's** — thrall 0.0.15 shipped 16 while the newest published server
 spoke 15, which composes with nothing exactly as the mirror-image defect did.
-Strictly greater, not different: a thrall *behind* the engine is that mirror
+Strictly greater, not different: a thrall *behind* the server is that mirror
 image, and its release is the fix. Between the two gates — yog holds a bump
 until the consumers' mains carry it, each consumer holds a release until yog
 has published it — the ordering a bump requires is: **the consumers' mains
 first, then yog publishes, then the consumers publish.** The decision is
 `scripts/protocol-gate.sh`, proved both ways by `make protocol-gate`. A hold
-clears when the engine publishes, which is an event this repository never sees,
+clears when the server publishes, which is an event this repository never sees,
 so `merge-release-pr` runs on a `workflow_dispatch` of Release-plz as well as
 on a push (bl-f3a5): that dispatch is the door for re-judging a held release,
 and without it the release waited for an unrelated landing on `main`.
@@ -154,8 +155,8 @@ shared library, no state directory thrall creates for itself — beyond whatever
 the operator's own `tools.json` entries spawn. So the whole install is a binary
 plus the two files the operator writes by hand: *The tool document* below, and
 one channel directory under `<data root>/wire/workspaces/` holding the
-certificate an engine's operator issued — and, for an engine that cannot be
-dialled, the rendezvous pairing (*Reaching an engine behind a NAT*, below).
+certificate a server's operator issued — and, for a server that cannot be
+dialled, the rendezvous pairing (*Reaching a server behind a NAT*, below).
 
 The other route is **the image** (below), for a box that takes images rather
 than toolchains. Either way, *Deployment* at the end of this file is how a foot
@@ -165,27 +166,27 @@ releases — and it installs by exactly the command above, on the box, on a time
 `make install` is the contributor's route and not this one: it builds the
 working tree and puts that binary on this machine.
 
-## Reaching an engine behind a NAT
+## Reaching a server behind a NAT
 
 A channel directory holds four files — `ca.pem`, `client.pem`, `client.key`
-and `address` — and dials the address. An engine behind a residential NAT with
+and `address` — and dials the address. A server behind a residential NAT with
 no port-forward cannot be dialled (yog `docs/REMOTE.md` §13), so its operator
 carries two more files into the same directory, exactly as they carry the
 certificate:
 
 | File | Holds |
 |---|---|
-| `rendezvous.pub` | the engine's rendezvous public key, 32 bytes, hex |
+| `rendezvous.pub` | the server's rendezvous public key, 32 bytes, hex |
 | `pairing.salt` | the pairing salt the two ends share, 32 bytes, hex |
 
 Both or neither. With them, a dial that the address does not answer falls
-through: the foot reads the engine's presence off the BitTorrent mainline DHT,
-writes a sealed call into the engine's inbox there, and both ends punch a TCP
+through: the foot reads the server's presence off the BitTorrent mainline DHT,
+writes a sealed call into the server's inbox there, and both ends punch a TCP
 connection toward each other. The connection is then **held** between asks
-rather than dialled per ask, the engine's keepalive pings are discarded, two
+rather than dialled per ask, the server's keepalive pings are discarded, two
 minutes of silence hangs it up, and a hang-up is dialled again through the same
 ladder — held connection, direct address, a re-call from the cached presence
-(a fresh call, no presence read), the full rendezvous. `address` stays required: it is the name the engine's
+(a fresh call, no presence read), the full rendezvous. `address` stays required: it is the name the server's
 certificate is verified against, whichever way the connection was made. A
 channel without the two files never touches the DHT and never binds a port.
 `docs/DESIGN.md` §3.11 is the design; the protocol is REMOTE §13.
@@ -298,7 +299,7 @@ process publishes a catalog of tools and a client calls them), and
 `thrall mcp <tool> -- <server argv>` is an ordinary tool command whose program
 happens to be this binary: it spawns the server for the one call, performs the
 handshake, makes the call, renders the result to standard output and tears the
-server down. The document gains no key, the engine learns no verb, and
+server down. The document gains no key, yog learns no verb, and
 deleting the entry deletes the capability like any other.
 
 Write those entries by running the server once, at your own hand:
@@ -312,7 +313,7 @@ It prints one complete entry per tool in the catalog, on standard output, and
 which is the allowlist. What the server says about each tool's reach
 (`readOnlyHint`, `destructiveHint`, `openWorldHint`) goes to standard error
 instead: those are hints from a program you installed but did not write, so
-they inform the policy row on the engine side and are never advertised.
+they inform the policy row on yog's side and are never advertised.
 
 Two things about the `fetch` entry above are worth reading rather than
 skimming. Its `description` and `input_schema` are the **server's own words**,
@@ -671,9 +672,9 @@ A foot is a long-running program on somebody's box, and until bl-6c98 there was
 no recipe for making it one: `make install` put a binary on the box and that
 was the whole story, so a foot was whatever somebody last started in a terminal.
 It stopped at the next logout, never came back from a crash, and never picked up
-a release. Observed on a live box: a data root provisioned by hand, an engine on
+a release. Observed on a live box: a data root provisioned by hand, a server on
 the far end of one of its channels holding a foot certificate issued for it, and
-no thrall process running at all — an engine with no live foot, with nothing
+no thrall process running at all — a server with no live foot, with nothing
 anywhere saying so.
 
     make deploy-local             # seat THIS box: unit, reconciler, timer, first pass
@@ -690,12 +691,12 @@ this tree to change.
 
 **The remote form is the door for the box class that most needs a foot.** Until
 bl-605f a foot could be deployed only by a human logged in to the machine that
-would run it, which is exactly backwards: the always-on server is awake when a
+would run it, which is exactly backwards: the always-on box is awake when a
 laptop is not, and it is the only box that can act on ITSELF. A deployment whose
-engine ran there while its only foot certificate was issued for somebody's
+server ran there while its only foot certificate was issued for somebody's
 laptop could execute nothing most of the time and could never look at its own
 box — and **neither end could say so**, because a foot that is not running is
-indistinguishable from a foot that has not spoken lately (§3.7) and the engine
+indistinguishable from a foot that has not spoken lately (§3.7) and the server
 may not probe (§3.1). The local form stays the door for the box running no sshd,
 which cannot ssh to itself.
 
@@ -751,10 +752,10 @@ stopped it*:
 - **anything unreadable** — defer. A fact we could not read is never grounds for
   killing work we cannot see.
 
-A killed invocation is worse than a killed turn on the engine, and that is why
+A killed invocation is worse than a killed turn on the server, and that is why
 the deferral is here rather than left to luck: the command already ran half, its
 side effects on this box stand, the capture never comes back, and nothing
-settles that the way the engine's litany settles an unanswered tool window —
+settles that the way litany settles an unanswered tool window —
 because the act was not a message.
 
 **A yank is the rollback lever.** Yanked versions are filtered in the reconciler
@@ -773,7 +774,7 @@ publishes. A box in that state has a seated timer and no foot, and the deploy
 says so. The units stay armed, because that is what makes it self-healing: the
 box adopts the fix by itself on the next tick after the release.
 
-A dial that has simply not landed yet — an engine that is down, a listener not
+A dial that has simply not landed yet — a server that is down, a listener not
 yet up, a name that has not resolved — is the opposite case and is reported as a
 **notice**: it is transient by construction, §3.8's backoff is what it is for,
 and the units are right where they should be. It earned its own arm the first

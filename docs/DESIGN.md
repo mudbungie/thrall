@@ -55,7 +55,7 @@ REMOTE §2's nouns, unchanged and not re-minted here:
 | **client** | A machine holding an operator-issued certificate. One certificate = one client identity, its leaf name. A client is a fact about a machine, not a person. |
 | **tool host** | A client advertising tools into the workspaces it is registered in. |
 | **registration** | The durable fact that client C participates in workspace W, on the server that hosts W. The server's half. |
-| **entry** | A workspace held from the box that participates in it: the channel facts that reach it — the host engine's anchors, this box's leaf and key for it, the host's address, the name the workspace bears here. The client's half. Possession, where registration is permission. |
+| **entry** | A workspace held from the box that participates in it: the channel facts that reach it — the host server's anchors, this box's leaf and key for it, the host's address, the name the workspace bears here. The client's half. Possession, where registration is permission. |
 
 A thrall is a client that is a tool host and **only** a tool host. Its whole
 life is one loop:
@@ -77,11 +77,11 @@ to add and would dissolve the reason thrall exists.
   (§3.11, bl-0a8b): an entry carrying rendezvous material binds a **punch
   port** — bound once per run, on the first rendezvous, never on open — and a
   TCP simultaneous open needs a listener on the port the SYNs leave from. It
-  accepts only inside a window this foot opened by calling the engine; a SYN
+  accepts only inside a window this foot opened by calling the server; a SYN
   arriving outside one sits in the backlog for the next window or dies in a
   handshake the redial already answers. Nothing is served from it, nothing is
   announced on it, and an entry without the material binds nothing.
-- **It never speaks first, and neither does the engine to it.** Every leg of
+- **It never speaks first, and neither does the server to it.** Every leg of
   the path is a reply to something the foot asked for (REMOTE §3, §5).
 - **It never asks and never acts.** No query about a conversation, no gesture
   that changes one. Its certificate is foot-grade and would be refused.
@@ -89,7 +89,7 @@ to add and would dissolve the reason thrall exists.
   entry per workspace and a config saying what this box offers, and that is the
   whole of its durable state.
 - **It never restarts its own process.** A foot that cannot be a foot at all —
-  no tool document, no channel, a leaf that is not foot-grade, an engine
+  no tool document, no channel, a leaf that is not foot-grade, a server
   refusing the set this box offers — is an exit naming the failure. Restart
   policy belongs to the supervision the operator's machine already has, and
   inventing one here would be thrall deciding how a box it does not administer
@@ -103,7 +103,7 @@ to add and would dissolve the reason thrall exists.
   **Which makes the sentence the product, and it is written for the operator**
   (bl-52ba). A supervisor's log, or a terminal, is the whole of what an operator
   gets on this path, so every refusal here names the address that failed — the
-  same shape the connect refusals already had, held for the one an engine going
+  same shape the connect refusals already had, held for the one a server going
   away actually produces. **What this box will do next is said too, and since
   bl-916d it is said by the redial rather than by the channel**: a file that
   dials per ask and holds nothing cannot know whether anything is going to
@@ -122,8 +122,8 @@ to add and would dissolve the reason thrall exists.
   makes a busy foot *absent* at the far end — and why presence is not the
   routing predicate there. **Per channel** is the whole of the qualification and
   it is not a loosening: a box holding two entries is two trust relationships
-  with two engines, and queueing one behind the other would make this foot
-  absent from one of them for reasons that engine's operator cannot see. Each
+  with two servers, and queueing one behind the other would make this foot
+  absent from one of them for reasons that server's operator cannot see. Each
   channel is a thread with its own connection, its own identity and its own
   serial loop; they share no state (`run::fan`).
 
@@ -132,19 +132,19 @@ to add and would dissolve the reason thrall exists.
 Each of these is REMOTE's, not thrall's. thrall's obligation is to be
 implementable only in the way that honours them.
 
-### 3.1 Dial-in only — the engine never speaks first
+### 3.1 Dial-in only — the server never speaks first
 
 REMOTE §5's invocation path, verbatim in its own words:
 
 > the agent's tool call hits lernie's tool seam → server-side adjudication
 > (`yog tool-control`, unchanged, fails closed) → the driver queues the
-> invocation in that client's engine-side mailbox → the tool host, waiting on
+> invocation in that client's server-side mailbox → the tool host, waiting on
 > its follow-class read, is handed it → the client executes locally → the
 > client posts the capture back as an ordinary act → the driver's poll collects
-> it. **Nothing in that path is the engine speaking first.**
+> it. **Nothing in that path is the server speaking first.**
 
 The consequence for thrall: the mailbox read is a *read the foot issues*. The
-engine parks it and answers when there is work. There is no inbound direction
+server parks it and answers when there is work. There is no inbound direction
 to secure, because there is no inbound direction.
 
 ### 3.2 Foot-grade certificate
@@ -162,7 +162,7 @@ Enforcement is the server's — it is the party that can be trusted to enforce
 it. thrall's obligations are the two it can keep: carry a leaf of that grade,
 and refuse to be configured with anything else.
 
-**As built (bl-a4a5), thrall fails closed where the engine fails open, and the
+**As built (bl-a4a5), thrall fails closed where the server fails open, and the
 asymmetry is deliberate.** yog reads a subject with no `OU=foot` as operator
 grade — *default-operator*, so a certificate minted before the grade existed
 keeps working. `channel::leaf::foot` refuses that same certificate, and refuses
@@ -259,10 +259,10 @@ amended by yog bl-77be; thrall bl-36f7). An entry carrying
 `"subject_cwd": true` states that this box will execute that tool at a working
 directory the *invocation* names — the conversation's own resolved cwd, which
 REMOTE §5 calls the subject's location. It is part of the ADVERTISED element
-(the engine routes the lane on it), so the projection carries it; absent reads
+(the server routes the lane on it), so the projection carries it; absent reads
 false, and a mistyped value refuses the file at the read, like every other
 field here. The consent is meaningful only on a box that actually holds the
-engine's worktrees — REMOTE §5.4's co-located thrall, the normal install — and
+server's worktrees — REMOTE §5.4's co-located thrall, the normal install — and
 severable in the way this whole document is: deleting the key deletes the
 capability.
 
@@ -350,7 +350,7 @@ and then drained the pipes bounded nothing — the drain waited on a stranger it
 never started, the invocation earned no capture, and the serial loop behind it
 waited too, which is the hang §1's whole leg exists to exclude. Nothing
 recovered it, and §3.8's redial would not have: the wedge was inside the
-hand-off, where the channel is neither failing nor waiting on an engine — a
+hand-off, where the channel is neither failing nor waiting on a server — a
 thread stuck in an executor never reaches an ending for anything to act on.
 
 The half that had to give is the *waiting*, not the reading:
@@ -435,16 +435,16 @@ published artifact for anything late to check.
 
 Separately installed ends make version skew possible for the first time. The
 handshake carries a protocol version, and a mismatch **refuses fail-closed,
-naming both versions**. A foot and an engine that disagree about the wire must
+naming both versions**. A foot and a server that disagree about the wire must
 not discover it one field at a time. Every word of that is unchanged; what
 changed is what a disagreement *is*.
 
 **`PROTOCOL` is a major-compatibility number** (yog `docs/REMOTE.md` §3.2, the
 authority — this section states only the foot's half). It moves on a break: a
 field removed or re-typed, a meaning changed under a spelling still in use, a
-field the engine newly requires on a request. **The pin is 19**, the last bump
+field the server newly requires on a request. **The pin is 19**, the last bump
 of the old kind and the first of the new. Every *addition* — a field, a word, an
-op, a reply kind — ships unbumped and is stamped an **edition** in the engine's
+op, a reply kind — ships unbumped and is stamped an **edition** in the server's
 shape ledger, which this crate vendors (`src/corpus/ledger/shapes.rs`) as it
 vendors the frames.
 
@@ -454,32 +454,32 @@ bl-44b4 at 15, bl-272d at 16, bl-dc8a at 17), five of them inside three sessions
 — and *sixteen of the eighteen bumps were invisible to this crate by
 construction*. A foot's surface is small, so it was usually a version behind on
 shapes it does not read, and always unable to dial while it was: bl-272d was
-filed off a `thrall.service` sitting `failed` on two boxes, and 16 was never an
-engine anyone could have met (yog published 15, then 17). Four of the five bumps
+filed off a `thrall.service` sitting `failed` on two boxes, and 16 was never a
+server anyone could have met (yog published 15, then 17). Four of the five bumps
 in that week carried nothing but additions. Under the edition discipline none of
 the four moves the number, so none of them takes a foot off the wire.
 
 **The stamps, the floor, and what this foot states.** `shapes.json` stamps every
 field PATH with the edition it appeared at and records a **floor** — the edition
 the major was cut at, 18. A path at or below the floor is present on every
-engine of this major and a reader may require it; a path above it is optional to
+server of this major and a reader may require it; a path above it is optional to
 read, and its reader owes it a default that is *the fact before the field
 existed*. **Every path a foot decodes is at or under the floor** — its newest
 stamp is 8 — so every reader here still requires its fields, and
 `corpus::ledger::tests` is what says so out loud rather than leaving it a
 coincidence. The preface now carries `edition` beside `protocol`: this build
 states **8**, which is what it can READ rather than when it was built, and a
-peer that states none is read as the floor. The engine's edition is decoded and
+peer that states none is read as the floor. The server's edition is decoded and
 dropped at `Channel::dial` — a foot reads no post-floor field, so there is
 nothing to grey and no absence to explain.
 
 **The by-hand re-vendor comparison is a replay now.** Every re-vendor up to 18
-was paid for by reading the engine's frames against this crate's, shape by shape
+was paid for by reading the server's frames against this crate's, shape by shape
 — at 18 that was thirteen frames and seven stamps compared by eye.
 `src/corpus/replay.rs` is that reading mechanised, and it asks two questions no
 eye asked:
 
-- **Projection.** For every reply shape and every edition an engine of this
+- **Projection.** For every reply shape and every edition a server of this
   major can be at, delete every key stamped above it and decode: nothing
   refuses. The stamps are the history, so one record replays to any point of it
   and no archive of old fixtures is kept or goes stale.
@@ -498,22 +498,22 @@ key a default.
 
 **What no fixture on this side can catch, and it is unchanged.** A fixture
 cannot see the far end, so the corpus defends a bad re-vendor and never a moved
-engine; only a real dial meets that. **And pinning FORWARD is still not the way
+server; only a real dial meets that. **And pinning FORWARD is still not the way
 out** (bl-dc5f): the preface is compared for EQUALITY, so a foot ahead of the
-engine is refused in the same sentence as a foot behind it. What the edition
+server is refused in the same sentence as a foot behind it. What the edition
 discipline buys is that the window in which both ends carry one number is now
-wide by default instead of narrow by accident — an engine an edition on is an
-engine this foot still dials. When the number does move, it moves in the order
+wide by default instead of narrow by accident — a server an edition on is a
+server this foot still dials. When the number does move, it moves in the order
 REMOTE §3 writes down: *the consumers' mains carry it first, then yog publishes,
 then the consumers publish.*
 
-**And the number is the engine's, so the suite states it as the engine's.**
+**And the number is the server's, so the suite states it as the server's.**
 `src/corpus.rs` (§4) holds the protocol number, the ledger and the frames of
 every shape a foot speaks as literal text copied from yog, and the stand-in
-engine dials at that. It has to: while the stand-in wrote its preface from
+server dials at that. It has to: while the stand-in wrote its preface from
 `channel::hello::PROTOCOL`, both ends of every test were one constant wearing
 two names, agreeing at any value — so the pin sat five versions behind a live
-engine, unable to open one real channel, with the whole suite green (bl-e0f0). A
+server, unable to open one real channel, with the whole suite green (bl-e0f0). A
 fixture built out of the thing it stands in for cannot fail the one way that
 matters. Vendoring the corpus as `.rs` rather than as yog's `.json` files is
 `Cargo.toml`'s doing: JSON would have to be ruled into the `include` allowlist to
@@ -528,7 +528,7 @@ bearing this box's certificate may replace it, and the box that is running has
 nothing in the protocol that would tell it (there is no version on the set, no
 generation, and no receipt on the read that names which set is in force).
 
-The engine closed the half it can see (yog bl-1462, REMOTE §5.1): a second
+The server closed the half it can see (yog bl-1462, REMOTE §5.1): a second
 concurrent follow-class read under one identity is refused, and an
 advertisement that would **change** the set in force is refused while that
 client holds a parked read. That covers the whole of an idle foot's life,
@@ -536,19 +536,19 @@ because an idle foot is parked.
 
 It cannot cover the window this foot opens itself. §3.1's dial-in shape means
 one connection per ask, held only while waiting — so while a tool runs, this
-box holds no parked read, the engine cannot tell it apart from a machine that
+box holds no parked read, the server cannot tell it apart from a machine that
 has gone away, and a set replaced in that window would stand until the process
 was restarted, with every later invocation refused for a tool that plainly
 exists.
 
 **So the set is asserted again at the end of every hand-off** (bl-2d78). The
 window is bounded by one tool's runtime instead of by the process lifetime, and
-an idle foot pays nothing: no hand-off ends, so nothing is said. The engine
+an idle foot pays nothing: no hand-off ends, so nothing is said. The server
 writes only when the set differs, so the ordinary re-assertion is a comparison
 and no write.
 
 **And since PROTOCOL 8 it buys knowing too** (yog bl-66d4, consumed in
-bl-e0f0). `advertised` carries `wrote`: false when the engine compared, true
+bl-e0f0). `advertised` carries `wrote`: false when the server compared, true
 when it changed the document. So a re-assertion that WROTE is this box learning
 it was disarmed while it was absent — the set it presented was not the set in
 force — and the foot **says so** instead of healing in silence, which was the
@@ -557,12 +557,12 @@ whole of what bl-2d78 could not close from this end.
 Three properties of that reading, and each is a decision:
 
 - **A `true` on the FIRST presentation of a channel says nothing.** Every fresh
-  channel presents into whatever the engine happens to hold, and the ordinary
+  channel presents into whatever the server happens to hold, and the ordinary
   first presentation writes. Only a presentation made after a hand-off this
   foot just performed can tell a rival from a beginning.
 - **It does not end the channel.** The set is back and the tools work; a foot
   that exited here would hand the box to the rival by leaving. Compare the
-  *refused* re-assertion, which does end it — there the engine is telling this
+  *refused* re-assertion, which does end it — there the server is telling this
   foot that another connection is serving under its name right now, and this
   one is not the machine in force. Two readings of one hazard, two answers.
 - **It goes to a sink, not to the return.** This sentence has to be said with
@@ -574,7 +574,7 @@ Three properties of that reading, and each is a decision:
   **Since bl-e834 every sentence goes here**, endings included: a channel's
   return value is read at a join, and a join waits on the siblings (§3.9).
 
-The foot cannot tell a rival from an engine that lost what it was holding, so
+The foot cannot tell a rival from a server that lost what it was holding, so
 the sentence names both readings rather than guessing one.
 
 ### 3.8 The redial, and what does not cross one (bl-916d)
@@ -588,29 +588,29 @@ The old ruling's premise was sound and its conclusion did not follow.
 **Supervision restarts a process, and this failure does not kill one.** REMOTE
 §1's canonical box sleeps, changes network and crosses a relay switch; TCP
 drops; the channel's conversation ends with its sentence; and the foot process
-stays healthy, serving whatever other engines it holds. A multi-entry box loses
+stays healthy, serving whatever other servers it holds. A multi-entry box loses
 one channel of several and there is no exit code for a supervisor to see. From
-that moment the engine believes this box is gone — presence is connection RAM,
+that moment the server believes this box is gone — presence is connection RAM,
 correctly — and the box believes it is serving. The operator's symptom is tools
 that silently stopped being offered by a live-looking process.
 
 **The trigger is an ending, and there are two kinds** (`run::hold`). The
 classification is structural — *who* failed, at *which* leg — and never
-textual, because a foot that decided its own lifetime by reading the engine's
+textual, because a foot that decided its own lifetime by reading the server's
 prose would be a foot the far end could rewrite by rewording.
 
 | What ended it | Leg | Answer |
 |---|---|---|
 | The wire | any | dial again |
-| The engine refused | the `invocations` read | dial again, past one hold's width |
-| The engine refused | `advertise`, `complete` | over |
+| The server refused | the `invocations` read | dial again, past one hold's width |
+| The server refused | `advertise`, `complete` | over |
 | An answer no foot gesture can earn | any | over |
 | The two ends speak different versions | any | over |
 | This box's own material | before any dial | over |
 
 **The two refusals are two animals and must never be collapsed.** A refused
 READ is REMOTE §5.1's one-reader guard, and after a drop it names *this very
-machine*: the predecessor's read does not leave until the engine tries to
+machine*: the predecessor's read does not leave until the server tries to
 answer it, so a redial inside that window is refused by a connection that is
 already dying. REMOTE §5.1 states the bound as a contract — *"Its life is the
 hold and not the connection's ... `Mailbox::take` drops the claim on the way
@@ -619,14 +619,14 @@ frees the slot within one hold's width — thirty seconds"* — so the answer is
 wait past that width and ask again. A foot that took the sentence as final
 would make the first network blip permanent, which is the failure the reversal
 exists to end. A refused ADVERTISEMENT is the opposite reading and keeps
-bl-2d78's answer: the engine declines a set that would replace a *serving*
+bl-2d78's answer: the server declines a set that would replace a *serving*
 machine's own, so a refusal there is another connection holding this machine's
 read with a different set in force. Dialling again would hand it the box by
 pretending otherwise.
 
 **A version the two ends do not share is a fourth party, and it is over
 wherever it is met** (bl-5d62). The three rows above are the wire, which has no
-opinion of either binary, and two readings of what *this engine* thinks of *this
+opinion of either binary, and two readings of what *this server* thinks of *this
 box*. A protocol mismatch is neither: it is a fact about the two binaries, and
 REMOTE §3 states it as one — *"There is no negotiation ... an operator who
 installs both ends can upgrade the older one"* — so the sentence carries its own
@@ -641,10 +641,10 @@ the failure and not by the leg.
 **A preface that ARRIVED is told apart from one that never did, and that split
 is this end's alone.** REMOTE §3 collapses them — *"A peer that states no
 version is refused exactly as a peer of the wrong one"* — and is right to, on
-the *engine's* side: it cannot serve either, and three sentences for one outcome
+the *server's* side: it cannot serve either, and three sentences for one outcome
 is three sentences. A foot is deciding a different question. A frame it read and
 could not agree with is the peer's deliberate act and will be the same act next
-time. A preface that never came is an engine restarting under this dial, a
+time. A preface that never came is a server restarting under this dial, a
 socket dying, a box waking up — the wire, and the wire is dialled again. The
 sentence stays one sentence either way; only what this foot does next differs,
 and collapsing them here would exit the process on the very blip the reversal
@@ -659,24 +659,24 @@ refusal **floors** at thirty-two seconds — one hold's width and two seconds of
 margin — while the series advances underneath it, so a refusal that is a
 genuine rival rather than a predecessor backs off like anything else instead of
 polling at one fixed cadence forever. And a channel that **served** — that had
-a read answered, which is the engine having parked this foot for its own hold —
+a read answered, which is the server having parked this foot for its own hold —
 returns the series to its floor: without that, a laptop sleeping nightly would
 creep to the cap and stay there for the life of the process, which is the delay
 this whole loop exists to shorten. A hammering loop cannot manufacture that
-evidence without the engine handing out work, and a foot already dials as fast
-as an engine answers reads.
+evidence without the server handing out work, and a foot already dials as fast
+as a server answers reads.
 
-**The loop imposes no deadline of its own, and must not.** The engine side has
-no socket timeouts (yog bl-1421, filed and unbuilt), so a dead peer can wedge an
-engine thread for a long time and the first dial after a flap may be answered
-slowly — by an engine still working out that the previous connection is gone.
+**The loop imposes no deadline of its own, and must not.** The server side has
+no socket timeouts (yog bl-1421, filed and unbuilt), so a dead peer can wedge a
+server thread for a long time and the first dial after a flap may be answered
+slowly — by a server still working out that the previous connection is gone.
 The only deadline in the path is the transport one the channel already had
 (`channel::READ_TIMEOUT`, two minutes), which sits comfortably above the
-engine's thirty-second hold and is a bound on the *socket* rather than on the
-wait; and if it does fire it is the wire, which is retryable, so a slow engine
+server's thirty-second hold and is a bound on the *socket* rather than on the
+wait; and if it does fire it is the wire, which is retryable, so a slow server
 costs this box one more dial rather than the channel. **Nothing here depends on
 bl-1421 landing**, and the predecessor floor is the other half of that: a foot
-that hammered an engine which has not yet noticed the dead peer would pile dials
+that hammered a server which has not yet noticed the dead peer would pile dials
 into exactly the party that is busy — where the refusal it earns is answered
 immediately and parks nothing, but the handshake is spent for a sentence whose
 expiry is already known.
@@ -684,8 +684,8 @@ expiry is already known.
 **Nothing crosses a redial, and that is the decision rather than an omission.**
 A redial makes a NEW channel. Presence re-forms as it does for any fresh
 connection, the advertisement rides the connection already, registration is
-durable engine-side, and an invocation in flight when the wire died is the
-engine's mailbox lease (REMOTE §5.3's at-least-once leg) rather than this loop's
+durable server-side, and an invocation in flight when the wire died is the
+server's mailbox lease (REMOTE §5.3's at-least-once leg) rather than this loop's
 — so the same invocation is handed over again under the id it was first handed
 under. Four consequences, and each is deliberate:
 
@@ -697,7 +697,7 @@ under. Four consequences, and each is deliberate:
   offer to hosts generally, not an instruction to this one. **A foot declines
   it**, for two reasons and the second is the stronger. A remembered set of ids
   is memory that has to survive the gap the whole of this section refuses; and
-  suppressing the second run without answering it would leave the engine
+  suppressing the second run without answering it would leave the server
   holding a slot with no capture, which is precisely bl-9261's silence — an
   invocation nobody ran and nobody was told about — reintroduced by the client.
   So the honest answer to a redelivery is to run it: the duplicate is the price
@@ -711,12 +711,12 @@ under. Four consequences, and each is deliberate:
   contradicted: it is not held and waited on, it is **posted as the first act
   of the next dial** — after the advertisement and before that channel's first
   follow-class read, because the read is what releases the lease (REMOTE §5.3),
-  so a capture posted ahead of it lands on a slot the engine still holds with no
+  so a capture posted ahead of it lands on a slot the server still holds with no
   capture and the driver collects a result this box computed once. The interval
   is named by that act: until the next channel's first gesture is answered,
   landed or refused. A refusal of the re-post is dropped and the channel reads
-  on — the engine has swept, restarted, or already answered the driver, and none
-  of those is terminal — and a completion the ENGINE refused carries nothing at
+  on — the server has swept, restarted, or already answered the driver, and none
+  of those is terminal — and a completion the SERVER refused carries nothing at
   all, because a refusal says the two ends disagree about what is in flight.
   **This is one capture, on the loop's own stack, and it is not a ledger**
   (`run::held`): no id set, no comparison, no suppression, and nothing that
@@ -725,10 +725,10 @@ under. Four consequences, and each is deliberate:
 
 - **The disarming is not remembered.** §3.7's notice fires on a re-assertion
   that WROTE, and is silent on a channel's FIRST presentation because every
-  fresh channel presents into whatever the engine happens to hold. A redial's
+  fresh channel presents into whatever the server happens to hold. A redial's
   presentation is a first presentation, so it stays silent — and a foot that
   remembered having been disarmed and read the next one as a rival would cry
-  rival on the most ordinary redial there is: the engine restarted, or this
+  rival on the most ordinary redial there is: the server restarted, or this
   box's own dying predecessor wrote last. That is the noise that gets the real
   notice ignored. **The healing crosses a redial and the knowing does not**, and
   the healing is the half that matters: the re-presentation restores the set on
@@ -771,12 +771,12 @@ threads at a join, in filing order.** So a sentence that is only returned is a
 sentence held until every earlier-filed sibling has stopped — which for a
 healthy sibling is never. On a one-entry box the process exits at the first
 death and nothing is lost; on a multi-entry box the operator's symptom is a
-live-looking process serving one engine and silently not serving another.
+live-looking process serving one server and silently not serving another.
 
 That is a report that does not ship, and §2 makes the sentence the whole
 product: thrall's channel does not reconnect *the process*, so a supervisor's
 log is all an operator gets. It also blunts the two refusals yog bl-1462 added,
-which are the engine telling this box that something else is presenting its
+which are the server telling this box that something else is presenting its
 certificate — the loudest thing the far end can say, arriving at a process that
 will not repeat it.
 
@@ -818,14 +818,14 @@ picked up a release.
 
 **The consequence is invisible from both ends, which is what makes it a design
 problem rather than an operational one.** §3.7 rules that a working foot is
-*absent* from the engine's view — the advertised set is stored per identity and
-a foot that is up is simply a set that is present. An engine whose foot is not
+*absent* from the server's view — the advertised set is stored per identity and
+a foot that is up is simply a set that is present. A server whose foot is not
 running sees an identity that advertised once and has not since; it has no probe
 to send, because §3.1 forbids it speaking first. So the box holds a certificate,
 holds a tool document, holds a channel directory, and executes nothing, and
 neither end has a place to say so.
 
-`scripts/deploy/` is the answer, and it is the same shape yog's native engine and
+`scripts/deploy/` is the answer, and it is the same shape yog's own server unit and
 lernie's seat carry: a user unit with `Restart=always` and a StartLimit, plus an
 hourly reconciler that installs the newest live crates.io version and restarts
 the unit only when this box is not executing anything. README's "Deployment"
@@ -840,7 +840,7 @@ operational:
   wire whose whole point is that a foot asks nothing and answers only its own
   mailbox. The fact is already there to read, on the box, by the box.
 - **A killed invocation does not settle, and the deferral is sized for that.**
-  The engine's equivalent restart costs the spend that bought a turn; the
+  The server's equivalent restart costs the spend that bought a turn; the
   conversation survives because litany settles the unanswered tool window. Here
   the act was not a message. A command that ran half leaves its side effects on
   this box, the capture never arrives, and §3.9's channel report has nothing to
@@ -849,7 +849,7 @@ operational:
 - **Version skew is closed by the schedule, not by a shim.** §3.6 makes a
   protocol mismatch a fail-closed refusal naming both versions, and §3.8 makes
   that refusal end the channel. That is only tolerable because both ends reach
-  the newest release on their own: an engine box reconciles from its registry
+  the newest release on their own: the server's box reconciles from its registry
   and this box reconciles from the index, so a skew closes itself within the
   hour with nobody logging in to either machine. Before bl-6c98 the foot half of
   that sentence was not true, and §3.6's ruling rested on a schedule that did
@@ -857,9 +857,9 @@ operational:
 - **The seating must reach a box nobody is logged in to** (bl-605f). bl-6c98's
   recipe seated the box it was run on and had no other form, so a foot could be
   deployed only by a human at that machine's own keyboard — which is backwards
-  for the box class the paragraphs above are about. The always-on server is
+  for the box class the paragraphs above are about. The always-on box is
   awake when a laptop is not, and it is the only box that can execute anything
-  ON ITSELF; a deployment whose engine ran there while the only foot certificate
+  ON ITSELF; a deployment whose server ran there while the only foot certificate
   it held was issued for a laptop could act on nothing most of the time and on
   its own machine never, with neither end able to say so. So `seat.sh` carries
   ONE payload over two carriers — `put` and `run` are the whole of what a HOST
@@ -871,14 +871,14 @@ operational:
 
 ### 3.11 The punched wire — rendezvous, the ladder, held connections (bl-0a8b; yog bl-0247, REMOTE §13)
 
-REMOTE §13 puts the engine behind a NAT that drops every unsolicited SYN, with
+REMOTE §13 puts the server behind a NAT that drops every unsolicited SYN, with
 no port-forward and no rented anchor: discovery rides the BitTorrent mainline
-DHT and the data path is a TCP simultaneous open. The engine's end landed as
+DHT and the data path is a TCP simultaneous open. The server's end landed as
 yog bl-4263; this section is the foot's, and it is REMOTE §13.2–§13.4 stated
 from this side. Nothing here is protocol thrall gets a vote on.
 
 **The material** (`channel::material`, `rendezvous::pairing`). An entry may
-carry two more files beside `ca.pem`: `rendezvous.pub`, the engine's ed25519
+carry two more files beside `ca.pem`: `rendezvous.pub`, the server's ed25519
 public key, and `pairing.salt`, 32 random bytes the two ends share — both hex,
 both carried by the operator's hand exactly as the anchors are (§3.3). Both or
 neither: half is the same refusal half a trust store earns, and neither is
@@ -887,8 +887,8 @@ keypair of its own.** Everything else both ends need is HKDF-SHA256 over the
 salt with the salt `yog rendezvous` and one label each — `presence salt` and
 `inbox salt` are the DHT salts the two items are filed under, `seal key` seals
 both, and `inbox key` is an ed25519 seed, so the inbox is signed under a
-keypair *derived from the salt* and the engine holds no client key to poll it.
-`address` stays required and is the engine NAME's one home: whichever rung
+keypair *derived from the salt* and the server holds no client key to poll it.
+`address` stays required and is the server NAME's one home: whichever rung
 answers, the inner mTLS verifies the host written there against the same
 `ca.pem` (REMOTE §13.3), so a punched stream is authenticated exactly as a
 dialled one and §4's identity model is untouched.
@@ -951,7 +951,7 @@ whose top count is tied or that no node spoke to; a dark walk clears it. A
 foot publishes no presence, but its sealed call is an endpoint list too, and
 yog REMOTE §13.2 rules that such a list carry the observed endpoint — behind
 a carrier or tethered NAT the route-local addresses are private and the
-observed one is the only one the engine can punch to (§13.8). So the call
+observed one is the only one the server can punch to (§13.8). So the call
 appends each observed ADDRESS not already listed, at the punch port — voted
 by the call's own write walk (`Dht::holders`, since bl-536d), which a re-call
 runs with no presence read before it and which is therefore always fresh: the
@@ -961,7 +961,7 @@ that rewrites the port is the case this does not reach, §13.8). The sealed
 byte format is unchanged — it was always a list.
 
 **Interoperation is asserted, not assumed.** `rendezvous::pairing::tests`,
-`rendezvous::item::tests` and `dht::mutable::tests` hold bytes the ENGINE's
+`rendezvous::item::tests` and `dht::mutable::tests` hold bytes the SERVER's
 own code produced from known inputs — the four derivations, a sealed presence
 and a sealed call, a signed item and its target — and this end must derive,
 open and sign to exactly those bytes. A label off by a character, a nonce in
@@ -978,7 +978,7 @@ the order that costs least, and stops at the first that answers:
    without rendezvous material has this rung alone, and it is today's dial
    byte for byte.
 3. **A re-call from the cached presence** (thrall bl-536d; yog REMOTE §13.3,
-   ruling bl-278f) — a fresh call written to the engine endpoints of the last
+   ruling bl-278f) — a fresh call written to the server endpoints of the last
    call that landed, and punched: one DHT walk rather than two, because the
    presence read is skipped and nothing else is. The cache is those
    endpoints alone, beside the rising `seq` basis and the punch port bound
@@ -986,7 +986,7 @@ the order that costs least, and stops at the first that answers:
    §8's `:0` discipline). **A re-call that does not land clears it**, so the
    next rung reads presence afresh — the presence it came from is then the
    suspect — and a call nobody answered never fills it.
-4. **The full rendezvous** (`rendezvous::call`) — `get` the engine's presence
+4. **The full rendezvous** (`rendezvous::call`) — `get` the server's presence
    under `(rendezvous.pub, presence salt)` and open it; then the call both
    lower rungs share (`rendezvous::call::write`): walk to the inbox's
    write-token holders, `put` a sealed call — an 8-byte nonce, then this
@@ -998,27 +998,27 @@ the order that costs least, and stops at the first that answers:
 at the cached endpoints with no DHT round trip, on REMOTE §13.3's premise that
 a NAT mapping outlives the punch window. For TCP on a home NAT it does not:
 measured on yog bl-65dc, a client re-punched from exactly the port its landed
-call named, its SYNs left for the whole window, and none reached the engine's
-kernel — the engine's NAT held no mapping once the served stream had ended,
-and the engine sends no SYN outside a call's window, so the re-punch was
+call named, its SYNs left for the whole window, and none reached the server's
+kernel — the server's NAT held no mapping once the served stream had ended,
+and the server sends no SYN outside a call's window, so the re-punch was
 one-sided. The held connection's twenty-five-second pings are the only thing
 that keeps a mapping alive, so **a dropped line is always a re-call**: the
-engine must be asked, through its inbox, to punch back.
+server must be asked, through its inbox, to punch back.
 
 **The punch** (`rendezvous::punch`; REMOTE §13.3): bind one port with the two
-reuse options, listen on it per family, connect from it toward every engine
+reuse options, listen on it per family, connect from it toward every server
 endpoint, v6 first, one SYN per two seconds. **The first stream that lands is
-the connection** — the engine serves every stream it obtains and lets the
+the connection** — the server serves every stream it obtains and lets the
 unspoken ones die in the handshake, so this end keeps the first and needs no
-negotiation over which. The window is thirty-five seconds: the engine reads
+negotiation over which. The window is thirty-five seconds: the server reads
 its inbox every fifteen and punches for twenty after a call, so a client that
-stopped at twenty would miss the engine's whole window when the poll came late. It
-still holds with the engine's read counted (bl-921e): the call is stored when
+stopped at twenty would miss the server's whole window when the poll came late. It
+still holds with the server's read counted (bl-921e): the call is stored when
 `put` returns and this window opens, a read that just missed it is followed
 within fifteen seconds by one that lands when its walk ends — bounded near
-`max_queries / α` deadlines, ~8 s, and measured ~7.5 s — so the engine punches
+`max_queries / α` deadlines, ~8 s, and measured ~7.5 s — so the server punches
 by ~24 s and the windows overlap by ~11 s. The lockstep walk's ~20 s `get`
-had put the engine's start at the window's very edge.
+had put the server's start at the window's very edge.
 A stated default, to be revisited on evidence (REMOTE §13.7 ruling 3).
 
 **What is held is what was punched.** A direct connection stays one per ask —
@@ -1026,8 +1026,8 @@ A stated default, to be revisited on evidence (REMOTE §13.7 ruling 3).
 milliseconds. A punched one cost a presence read, an inbox write and a punch
 window, which is §10's criterion for a held connection met in its own terms,
 so it is kept across asks: the preface is exchanged once, every later ask is
-one request frame, and the engine's serving loop takes them in turn. Two facts
-of the held wire are this end's to honour (REMOTE §13.4): the engine writes
+one request frame, and the server's serving loop takes them in turn. Two facts
+of the held wire are this end's to honour (REMOTE §13.4): the server writes
 `{"ping":true}` into twenty-five seconds of silence and **the ping is
 discarded wherever a reply stream is read** — it is never the start of one —
 and **two minutes of silence is the hangup**, which is the channel's existing
@@ -1038,7 +1038,7 @@ purpose: rustls has no clean resume from a half-read record, so a timeout is
 shortening the bound rather than by faking time. The hangup is the wire, and
 the wire is dialled again (§3.8).
 
-**What the ladder says** (`rendezvous::say`, bl-3958; the engine's half is
+**What the ladder says** (`rendezvous::say`, bl-3958; the server's half is
 yog bl-355c, REMOTE §13.4 "The operator's view of the loop"). A dial that
 fails silently is indistinguishable from one that never ran, so a roving
 entry's ladder says each step through the channel's §3.7 notice sink —
@@ -1076,8 +1076,8 @@ decides what that class is.
 
 **What a foot does not do.** It does not publish presence, poll anything or
 hold a thread for the commons: a foot touches the DHT only at the moment it
-wants a connection, on that channel's own thread. It does not keep the engine
-awake through a long tool — a hand-off past the engine's two minutes costs the
+wants a connection, on that channel's own thread. It does not keep the server
+awake through a long tool — a hand-off past the server's two minutes costs the
 held connection, and the capture rides the next dial exactly as REMOTE §5.6
 already provides (`run::held`). It carries no relay, because REMOTE §13.6
 parks one. And it does not choose the rung: the ladder is a fixed order, and
@@ -1093,13 +1093,13 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/lib.rs` | Crate root. Module declarations and the crate's own statement of what it is. |
 | `src/cli.rs` | The command line as a pure function: arguments in, a `Verdict` (exit code + text) out. No process state is touched, which is what lets `main.rs` be the one coverage exclusion without excluding a decision. |
 | `src/main.rs` | The process entry and nothing else: argv in, stream selected by the code, exit. The single `tarpaulin.toml` exclusion. |
-| `src/channel.rs` | **The channel** (bl-a4a5): one wire to one engine. There is an `ask` and there is nothing else — the shape of the file is the dial-in invariant. A dialled connection is one per ask, held only while waiting; a punched one is held across asks (§3.11, bl-0a8b), its pings discarded and its silence bounded. Knows nothing about being dialled again. |
+| `src/channel.rs` | **The channel** (bl-a4a5): one wire to one server. There is an `ask` and there is nothing else — the shape of the file is the dial-in invariant. A dialled connection is one per ask, held only while waiting; a punched one is held across asks (§3.11, bl-0a8b), its pings discarded and its silence bounded. Knows nothing about being dialled again. |
 | `src/channel/failure.rs` | Why a channel could not carry a gesture, in the two classes that differ in what to do next — the wire, and version skew (split from `channel.rs` by bl-0a8b at the pre-split band). |
 | `src/channel/ladder.rs` | **The dial ladder** (§3.11): the direct address under a bound, the re-call from cached presence, the full rendezvous — in that order, stopping at the first that answers, and saying whether what answered was punched. An entry without rendezvous material has a one-rung ladder. |
 | `src/channel/speak.rs` | The channel's half of §3.11's lines (bl-3958): the sink the loop hands down (`speak_to`), and the held line lost and the ping discarded — the two things only the channel sees. Split from `channel.rs` at the pre-split band. |
 | `src/channel/frame.rs` | The framing: a big-endian `u32` length, then that many bytes of JSON; a zero-length frame terminates an answer (REMOTE §3). |
-| `src/channel/hello.rs` | The version preface, and this end's half of it — state the major and the edition beside it (REMOTE §3.2), confirm, refuse fail-closed naming both versions. The engine's edition comes back from the confirmation, defaulted at the floor when it states none. The number itself is in no Rust file: the repo-root `PROTOCOL` file states it and `build.rs` compiles it into the constant this module re-exports (bl-c618), because the release gates that read it are other repositories fetching one path out of a tree they do not build. A foot never *admits*, because a foot is never dialled. It also draws §3.8's one distinction REMOTE does not: a preface that arrived and states a version this end cannot speak is skew, one that never arrived is the wire. |
-| `src/channel/hello/version.rs` | The three vendored numbers and nothing else (bl-6fcf): the major, the edition this build states, and the floor an absent one reads as. Split from the exchange because they are the ENGINE's facts copied, and a re-vendor rewrites this file alone. |
+| `src/channel/hello.rs` | The version preface, and this end's half of it — state the major and the edition beside it (REMOTE §3.2), confirm, refuse fail-closed naming both versions. The server's edition comes back from the confirmation, defaulted at the floor when it states none. The number itself is in no Rust file: the repo-root `PROTOCOL` file states it and `build.rs` compiles it into the constant this module re-exports (bl-c618), because the release gates that read it are other repositories fetching one path out of a tree they do not build. A foot never *admits*, because a foot is never dialled. It also draws §3.8's one distinction REMOTE does not: a preface that arrived and states a version this end cannot speak is skew, one that never arrived is the wire. |
+| `src/channel/hello/version.rs` | The three vendored numbers and nothing else (bl-6fcf): the major, the edition this build states, and the floor an absent one reads as. Split from the exchange because they are the SERVER's facts copied, and a re-vendor rewrites this file alone. |
 | `src/channel/tls.rs` | The rustls client configuration: the operator CA as anchors, this box's leaf as its identity, `ring` named rather than defaulted. |
 | `src/channel/leaf.rs` | The foot grade, read off this box's own certificate — a DER walk, because thrall links no certificate library. |
 | `src/channel/material.rs` | What the operator carried here, and the three answers a directory can give: nothing, half, or a channel — with the rendezvous pairing beside it where the operator carried one (§3.11). |
@@ -1109,10 +1109,10 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/json.rs` | The strict field reads every decoder here shares: a missing field, a mistyped one and a wrong-shaped one each refuse with the key an operator typed. |
 | `src/gestures.rs` | **The foot set** (bl-a2ea): `advertise`, `invocations`, `complete`, and the answers they can earn. The enumeration is the enforcement thrall can keep — there is no spelling here for a fourth verb. |
 | `src/invocation.rs` | What crosses the routing leg: the invocation a foot is handed and the capture it hands back, each in one strict spelling. |
-| `src/run.rs` | **The loop**, and the three seams that are parameters: what runs a command (`Handoff`), where a channel says something while it is still serving (`Notice`, §3.7) and where it waits between dials (`Pause`, §3.8). All three are effects no test can read back, so the one implementation of each is `src/main.rs`'s — which is what lets the whole conversation be tested against a real engine, a one-line executor and two recorders. This file itself is `fan`: every channel this box holds, one thread each — and `served`, which says a channel's terminal sentence in that channel's own thread rather than at the join (§3.9). |
+| `src/run.rs` | **The loop**, and the three seams that are parameters: what runs a command (`Handoff`), where a channel says something while it is still serving (`Notice`, §3.7) and where it waits between dials (`Pause`, §3.8). All three are effects no test can read back, so the one implementation of each is `src/main.rs`'s — which is what lets the whole conversation be tested against a real server, a one-line executor and two recorders. This file itself is `fan`: every channel this box holds, one thread each — and `served`, which says a channel's terminal sentence in that channel's own thread rather than at the join (§3.9). |
 | `src/run/hold.rs` | **One channel's conversation** (split from `run.rs` by bl-916d): present, wait, hand off, answer, present again. |
 | `src/run/hold/ending.rs` | **How a channel ended, and who ended it** (split from `hold.rs` by bl-5d62): the `Ending`, the party that failed, and the leg it failed at — the classification of §3.8's table, kept apart from the conversation that produces it because they are two questions. |
-| `src/run/held.rs` | **The capture going back** (bl-f9d2): the ordinary post at the moment it is computed, and the one this process is still holding when that post fails on the wire — carried out with the ending and posted first on the next dial, ahead of the read that releases the engine's lease (§3.8, REMOTE §5.6 ruling 1). |
+| `src/run/held.rs` | **The capture going back** (bl-f9d2): the ordinary post at the moment it is computed, and the one this process is still holding when that post fails on the wire — carried out with the ending and posted first on the next dial, ahead of the read that releases the server's lease (§3.8, REMOTE §5.6 ruling 1). |
 | `src/run/redial.rs` | **One channel's lifetime** (bl-916d): the endings worth another dial, the backoff that settles, and the sentence said in the meantime. It is a separate file because it is a separate question — what happened, against what to do about it — and because its whole decision is three numbers and one line of arithmetic, testable as values. |
 | `src/exec.rs` | **The executor's dispatch** (bl-4cda): which entry an invocation names, whose working directory it may run in (§3.4's `subject_cwd`), and the three facts that come back. Every outcome is a capture — a tool that ran, one that overran, a name this box does not carry, a command that would not start. |
 | `src/exec/child.rs` | One child, from the fork to the capture: the spawn, the poll that is also the drain, and the cascade that stops a tool which will not stop itself. Split from `exec.rs` when the drain moved into the poll (bl-6c14) — the seam is *deciding what to run* against *running it*. |
@@ -1120,8 +1120,8 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/serve.rs` | What `thrall run` does: read the document, read the channels, serve until they stop. There is no success exit, so none is spelled. |
 | `src/paths.rs` | The one data root, named by `$XDG_DATA_HOME` or `$HOME` and by nothing of thrall's own. Neither set is a refusal, never a relative guess. |
 | `src/rendezvous.rs` | **The client rendezvous** (§3.11, bl-0a8b): the root that names the four files below and the mainline bootstrap nodes, resolved at the moment of a call and never on open. |
-| `src/rendezvous/pairing.rs` | The two rendezvous files an entry carries — the engine's public key and the pairing salt — and the four HKDF derivations both ends compute from the salt. Tested against the engine's own bytes. |
-| `src/rendezvous/item.rs` | The two sealed items: the presence this end opens and the call it seals — `nonce ‖ ciphertext ‖ tag`, the fixed-width endpoint list. Tested against bytes the engine sealed. |
+| `src/rendezvous/pairing.rs` | The two rendezvous files an entry carries — the server's public key and the pairing salt — and the four HKDF derivations both ends compute from the salt. Tested against the server's own bytes. |
+| `src/rendezvous/item.rs` | The two sealed items: the presence this end opens and the call it seals — `nonce ‖ ciphertext ‖ tag`, the fixed-width endpoint list. Tested against bytes the server sealed. |
 | `src/rendezvous/punch.rs` | The TCP simultaneous open from one port: the listeners, the connectors, v6 first, the first stream kept. The one socket a foot listens on (§2). |
 | `src/rendezvous/say.rs` | **What the ladder says** (§3.11, bl-3958): every line a roving channel says as it climbs, built here and nowhere else so none can carry an address, and the speaker that says a repeated outcome once. |
 | `src/rendezvous/call.rs` | The act — presence, call, punch — the third rung's re-call, and the RAM cache it re-calls from; every duration a `Tuning` field a test can shorten. |
@@ -1138,13 +1138,13 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/spawn.rs` | **The spawn boundary.** Every child process is built AND forked here — nowhere else builds a `Command`, and nowhere else spends one. It decides three things a spawn site could forget: the git-environment scrub, the **process group** the child is born leading (bl-a78e, §3.5), and the fork lock the suite needs. **Founded by bl-a4a5**, before it had a production tenant, which is the point of the row: a boundary rule that arrives after the first spawn site is a rule that has to be argued with. |
 | `src/sys.rs` | **The confined `unsafe` file**, and it holds two things, both raw process effects `std` does not wrap. Signalling a process GROUP, which `std` has no spelling for at all (`Child::kill` is `SIGKILL` to one process, and there is no `Child::terminate`); the sign guard did not move when the group arrived (§3.5) — the negation is this file's, the callers pass a positive id. And putting a pipe into non-blocking mode (bl-6c14), which `std` spells for sockets and for nothing else — a `ChildStdout` has no `set_nonblocking`, and borrowing the socket one by wrapping the descriptor in a `UnixStream` would read the pipe with `recv(2)`, which a pipe refuses. Both are declared rather than depended on: `kill(2)` and `fcntl(2)` are in the libc `std` already links, so neither costs a crate, a build script or a lockfile line. |
 | `src/state.rs` | **The lock chokepoint.** Every `Mutex`/`RwLock` in the crate. Unbuilt, and it stayed that way: the only cross-thread hand-offs thrall has are a `JoinHandle`'s own answer (the pipes a child writes, the sentence a channel ends with), which need no lock. The suite's fork lock is **not** a tenant — a test's serialization lock is scaffolding, and the rule's own text sends it to `src/test_support.rs`. |
-| `src/corpus.rs` | `cfg(test)` only. **The engine's conformance corpus, vendored as literal text** (REMOTE §3, bl-e0f0): the protocol number and the frames of every shape a foot speaks, copied from yog rather than derived from anything here. `corpus/tests.rs` pays what §3 says a client owes them — decode every frame, and round-trip every request byte for byte. It is the crate's one statement of what the FAR end says, which is why the stand-in engine reads its version from here and not from the pin it is testing. |
-| `src/corpus/ledger.rs` | `cfg(test)` only. **The engine's shape ledger, vendored** (REMOTE §3.2, bl-6fcf, §3.6): the floor, the deprecation list, and the reads a replay walks a signature by. What a stamp is FOR lives here; what the stamps ARE is the file below. |
+| `src/corpus.rs` | `cfg(test)` only. **The server's conformance corpus, vendored as literal text** (REMOTE §3, bl-e0f0): the protocol number and the frames of every shape a foot speaks, copied from yog rather than derived from anything here. `corpus/tests.rs` pays what §3 says a client owes them — decode every frame, and round-trip every request byte for byte. It is the crate's one statement of what the FAR end says, which is why the stand-in server reads its version from here and not from the pin it is testing. |
+| `src/corpus/ledger.rs` | `cfg(test)` only. **The server's shape ledger, vendored** (REMOTE §3.2, bl-6fcf, §3.6): the floor, the deprecation list, and the reads a replay walks a signature by. What a stamp is FOR lives here; what the stamps ARE is the file below. |
 | `src/corpus/ledger/shapes.rs` | `cfg(test)` only. The seven shapes a foot speaks, every field path stamped with the edition it appeared at, copied key for key out of `corpus/shapes.json`. A file of data, so a re-vendor's diff is the whole file and reads as one. |
-| `src/corpus/replay.rs` | `cfg(test)` only. **The two replays a consumer owes** (REMOTE §3.2, §3.6): projection — one record replayed at every edition an engine can be at, with every key stamped above it deleted — and word mutation, a token no build has heard of in every string-typed path but `kind`. It replaces the by-hand frame-by-frame comparison every re-vendor up to 18 was paid for. |
-| `src/test_support.rs` | `cfg(test)` only. The scratch directory, the fork lock, the stand-in engine, the recording notice sink (§3.7 — a serving foot writes to stderr, and a test cannot read that back), and the certificate mint the suite performs on the operator's behalf. |
-| `src/test_support/engine/punched.rs` | `cfg(test)` only. The stand-in engine's punched end: a punch port that listens, and a whole script served over ONE held connection — an answer, a vanish, a silence — so the ladder, the ping discard and the hangup are driven over a real punched wire. |
-| `src/test_support/roving.rs` | `cfg(test)` only. The operator's rendezvous act performed by the suite — the two files, the engine's presence item signed as the engine signs it — and a fake commons on loopback UDP — a router door that answers only `find_node` and the node past it holding the items — with the tuning that walks it in milliseconds. |
+| `src/corpus/replay.rs` | `cfg(test)` only. **The two replays a consumer owes** (REMOTE §3.2, §3.6): projection — one record replayed at every edition a server can be at, with every key stamped above it deleted — and word mutation, a token no build has heard of in every string-typed path but `kind`. It replaces the by-hand frame-by-frame comparison every re-vendor up to 18 was paid for. |
+| `src/test_support.rs` | `cfg(test)` only. The scratch directory, the fork lock, the stand-in server, the recording notice sink (§3.7 — a serving foot writes to stderr, and a test cannot read that back), and the certificate mint the suite performs on the operator's behalf. |
+| `src/test_support/server/punched.rs` | `cfg(test)` only. The stand-in server's punched end: a punch port that listens, and a whole script served over ONE held connection — an answer, a vanish, a silence — so the ladder, the ping discard and the hangup are driven over a real punched wire. |
+| `src/test_support/roving.rs` | `cfg(test)` only. The operator's rendezvous act performed by the suite — the two files, the server's presence item signed as the server signs it — and a fake commons on loopback UDP — a router door that answers only `find_node` and the node past it holding the items — with the tuning that walks it in milliseconds. |
 | `src/dht/tests/fake.rs` | `cfg(test)` only. A fake DHT node on loopback UDP: scripted routing, a BEP 44 store that checks what a real node checks, and a mood for each way the commons misbehaves — the measured router, rotor and mute among them. It listens, which is why it is scaffolding; its datagrams are `fake/wire.rs`. |
 | `src/packaged_tests/embeds.rs` | `cfg(test)` only. **What the build reads, and whether it ships** (split from `packaged_tests.rs` by bl-bb7d): every compile-time embed under `src`, resolved against the file that names it and held to both halves of the policy — the class `is_ruled_in` admits and the path `cargo package --list` actually carries. It was a prohibition (*there are no embeds*) until the crate wanted one; a prohibition that has to be lifted the first time it binds was never the check. |
 | `src/packaged_tests.rs` | `cfg(test)` only. **The publication guard** (bl-d25a): what `cargo publish` would upload, read off the real `cargo package --list` and judged against the classes `Cargo.toml`'s `include` allowlist rules in — both directions, since a shape guard dies by matching nothing. It is in `src` rather than a `tests/` crate because it forks a child and the spawn boundary is `pub(crate)`; an integration crate could only reach a bare `Command::new`, which the confinement rules refuse. |
@@ -1159,7 +1159,7 @@ than an omission** (bl-a4a5). Upstream a client box also holds material
 directly under `wire/`, because that same directory is where a *server* keeps
 the address it binds. A foot never binds anything (§2), so that second meaning
 does not exist here and one shape covers every case: every channel is an entry
-at `wire/workspaces/<leaf>/`, and a box with one engine has one entry. The four
+at `wire/workspaces/<leaf>/`, and a box that dials one server has one entry. The four
 file names inside are REMOTE §8.2's, unchanged, so a pair the operator minted
 for a client box is filed the same way whichever program reads it — and the two
 optional rendezvous files beside them are REMOTE §13.2's (§3.11).
@@ -1190,7 +1190,7 @@ them from scratch.
 ### 5.1 The MCP bridge (bl-d5d6)
 
 **No longer deferred — ruled in §6** (bl-3b03). The two properties this stub
-named — the engine never learns MCP, the local config stays the gate — are
+named — yog never learns MCP, the local config stays the gate — are
 §6.1 and §6.3, and the four questions bl-d5d6 left open are answered at
 §6.3 (names), §6.4 (lifetime), §6.5 (content) and §6.8 (no passthrough).
 
@@ -1245,14 +1245,14 @@ REMOTE §5.1 advertisement, which is the whole reason the bridge is cheap.
 Three homes were weighed (usability round 1, TRIAGE ruling 8: *MCP before
 web; the bridge is the general path*):
 
-- **Engine-side** — a `litany-tool-mcp` binary yog ships beside its embedded
+- **Server-side** — a `litany-tool-mcp` binary yog ships beside its embedded
   litany, the framing of litany's `docs/DESIGN_MCP_BRIDGE.md`. **Dead on
   arrival in this suite**, and not on taste: yog's router is total and its
-  driver keeps no local executor (REMOTE §5, *the engine's driver keeps no
+  driver keeps no local executor (REMOTE §5, *the server's driver keeps no
   local executor*), so nothing beneath yog ever resolves a `litany-tool-<name>`
   binary — every tool call is adjudicated, queued to a foot's mailbox and
-  executed on that foot's box, and a granted name no foot advertises and the
-  engine does not implement is refused in band (REMOTE §5.4's ladder, rung 4).
+  executed on that foot's box, and a granted name no foot advertises and
+  yog does not implement is refused in band (REMOTE §5.4's ladder, rung 4).
   A bridge in that slot would be a binary nothing forks.
 - **Foot-side** — this section. It is also what REMOTE §5.4's own closing
   paragraph named, deferred, and what bl-d5d6 filed.
@@ -1269,13 +1269,13 @@ Four facts pick the foot, and each is a law this suite already has:
    box will run* is the foot. What rises is exactly the policy — which
    servers, which of their tools, what each reaches — and each of those has
    a home above: the tool document (this box's operator), the workspace
-   policy (the engine's operator, §6.6).
+   policy (yog's operator, §6.6).
 2. **Blast radius** (yog DESIGN §3.1; §16.2's *nothing ambient*): an MCP
    server's credential is a fact about a box, not about the world. The foot's
    document is out of world by construction (§3.4: *it describes this
    machine*), its local half never crosses the wire (REMOTE §5.2), and a
-   credential that sat beside the engine would be one every workspace on the
-   server could spend.
+   credential that sat beside yog would be one every workspace yog hosts
+   could spend.
 3. **Fleet reach**: the servers are where the resources are. A database
    server on box 2 runs on box 2; the foot on box 2 is the process that can
    spawn it, and REMOTE §5's subject-locality invariant — *a tool executes
@@ -1342,7 +1342,7 @@ one costs its schema in every prompt of every role that loads it.
   `config::read`, at the next `thrall run` (bl-d5d6's first question).
 - **Annotations are commentary, never advertised.** Servers hint at a tool's
   reach (`readOnlyHint`, `destructiveHint`, `openWorldHint`). Pin prints them
-  on stderr for the operator writing the engine-side policy row (§6.6) and
+  on stderr for the operator writing yog's policy row (§6.6) and
   puts none of them in the entry: REMOTE §5.1 admits nothing yog stores and
   cannot check, and a hint from an untrusted server is exactly that.
 - **Drift**: a server whose schema moved surfaces as its own in-band error on
@@ -1376,7 +1376,7 @@ exits 1. A capture is text because a tool result is a model's message (REMOTE
 
 ### 6.6 Adjudication: opaque, held, then a row the operator writes
 
-A pinned tool reaches the engine's control as `<client>_<tool>` with an input
+A pinned tool reaches yog's control as `<client>_<tool>` with an input
 shaped by the server's schema — no `command` field — so yog's routed lane
 classifies it **opaque** and the shipped table **holds** it (yog bl-72bd): the
 first call parks for the operator with the tool and its input in front of
@@ -1428,7 +1428,7 @@ leaves available — and that word is nearly always a launcher (`uvx`, `npx`,
 *the MCP server "uvx" ended before answering initialize* sends an operator to
 read the launcher's documentation for a server's fault. The name the operator
 typed costs nothing, carries no argv, and is the same word the document, the
-roster and the engine's hold sentence (§6.6) already spell. The one sentence
+roster and yog's hold sentence (§6.6) already spell. The one sentence
 that still names the program is the spawn failure, where it is the right
 answer: nothing has become a server yet, and what would not start is the file
 this box tried to execute. `thrall mcp pin` names the program too, having been
@@ -1443,15 +1443,15 @@ given no tool name to use.
 - **No HTTP/SSE transport** — §6.2, until a named deployment.
 - **No class on the wire** — §6.3, §6.6.
 - **No generic passthrough** — §6.6.
-- **No native fetch in thrall or in the engine** — §6.9.
+- **No native fetch in thrall or in yog** — §6.9.
 
 ### 6.9 The web tool is the first pinned server
 
 litany bl-4409 asked whether the suite's missing fetch is a native tool or the
 bridge's first server, and asked for the general path to be decided first so
 the specific one is not a second home. It is the first server. A fetch is a
-machine's act and the engine executes none (REMOTE §5.4: *nothing new goes
-into the engine that a thrall could advertise*); a fetch native to thrall
+machine's act and yog executes none (REMOTE §5.4: *nothing new goes
+into the server that a thrall could advertise*); a fetch native to thrall
 would be this crate carrying HTTP, HTML-to-markdown and pagination — code
 whose whole subject is the web's quirks, the trusted-computing-base argument
 litany made against an in-process bridge, applied here. The reference
@@ -1476,8 +1476,8 @@ transport: this one bootstraps a node helper on a box's first fetch, and its
 package-manager warnings arrived mid-conversation as prose. §6.2's transport
 therefore skips anything that is not the answer in flight, a line that is not
 JSON included — the general rule it already had, with the special case that
-sat inside it removed. `bash` reaching the web is already visible to the
-engine's control (`curl` and `wget` classify open-world in the shipped
+sat inside it removed. `bash` reaching the web is already visible to
+yog's control (`curl` and `wget` classify open-world in the shipped
 ruleset); what the pinned tool adds is a name in the roster and a row in the
 policy, which is what bl-4409 meant by *visible*.
 
@@ -1492,7 +1492,7 @@ Four, each one lane-day, tagged `usability-r2`:
 3. **yog bl-b65d** — the `rules:` row keyed on a routed tool's host-qualified
    name, and the hold sentence that names it (§6.6).
 4. **thrall bl-73db** — the round trip: `mcp-server-fetch` through a yog
-   engine, first call held, row written, page read; the wall time of one
+   server, first call held, row written, page read; the wall time of one
    fetch recorded against §6.4.
 
 The sibling amendments land beside this section: yog REMOTE §5.4's closing

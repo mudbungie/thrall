@@ -3,7 +3,7 @@
 //!
 //! **It is a local tool contract, unchanged**: the `tool_use.input` JSON on
 //! stdin, bytes on stdout, the exit code the verdict. So a foot's tool
-//! executable is the same kind of program the engine's own pool tools are, and
+//! executable is the same kind of program the server's own pool tools are, and
 //! the capture that comes back is the same three facts. `command` is an argv,
 //! spawned directly — no shell, and no interpolation of the invocation's input
 //! into it, because a shell would make the declared `input_schema` advisory and
@@ -25,7 +25,7 @@
 //! **Two deadlines, measuring different things** (REMOTE §5.3). This box's own
 //! bound terminates the child and answers with a sentence; the asking side's
 //! longer patience stands behind it for the case where this whole process went
-//! away. Neither is a knob: an engine that has not answered is down, and a tool
+//! away. Neither is a knob: a server that has not answered is down, and a tool
 //! that has not answered is working.
 //!
 //! **Containment honesty** (DESIGN §3.5): what thrall enforces locally is the

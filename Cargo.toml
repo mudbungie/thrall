@@ -104,7 +104,7 @@ include = [
 #     `anyhow`, is NOT approved: thrall's `main.rs` is a thin entry with no
 #     error-plumbing layer that would justify one.
 #   ring — NAMED DIRECTLY since bl-0a8b, on the argument yog bl-df31 made for
-#     the engine: it is the provider rustls above already links, so the manifest
+#     the server: it is the provider rustls above already links, so the manifest
 #     gained a line and the lockfile an edge — no crate, no licence, no
 #     advisory. The client rendezvous (yog REMOTE §13.2) signs BEP 44 items
 #     with ed25519, names a target by SHA-1, seals with ChaCha20-Poly1305 and
@@ -143,7 +143,7 @@ include = [
 # rustls' defaults select `aws-lc-rs`, whose sys crate builds C and breaks the
 # single-binary story; `ring` because it is the approved provider and the one
 # substitution that is not at a linking ball's discretion; `std` and `tls12`
-# because the channel is synchronous `std::net` and the engine's safe default
+# because the channel is synchronous `std::net` and the server's safe default
 # protocol versions include TLS 1.2. `deny.toml` bans `aws-lc-sys` outright, so
 # an edit that dropped the flag fails the gate rather than quietly re-acquiring
 # a C toolchain.

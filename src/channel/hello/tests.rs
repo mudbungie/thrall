@@ -30,24 +30,24 @@ fn this_end_states_the_major_and_its_edition_in_one_frame() {
     );
 }
 
-/// An engine speaking this version is admitted, and says nothing about it.
+/// A server speaking this version is admitted, and says nothing about it.
 ///
 /// It states the number the way the far end states it — `corpus::PROTOCOL`, a
 /// literal copied from yog — rather than the pin this file is about, so the two
 /// have different sources here as they do on the wire.
 #[test]
-fn an_engine_of_this_version_is_confirmed_and_answers_its_edition() {
+fn a_server_of_this_version_is_confirmed_and_answers_its_edition() {
     let wire = stated(&json!({ "protocol": crate::corpus::PROTOCOL, "edition": 21 }));
     assert_eq!(confirm(&mut wire.as_slice()), Ok(21));
 }
 
-/// **An engine that states no edition is read as the floor** (REMOTE §3.2),
+/// **A server that states no edition is read as the floor** (REMOTE §3.2),
 /// and so is one whose edition is not an edition: the fail-closed equality is
 /// the MAJOR's, and this key is no part of it. The floor credits the peer with
 /// the least it can be spelling, which is the direction that cannot invent a
 /// capability the far end does not have.
 #[test]
-fn an_engine_that_states_no_readable_edition_is_read_as_the_floor() {
+fn a_server_that_states_no_readable_edition_is_read_as_the_floor() {
     for preface in [
         json!({ "protocol": crate::corpus::PROTOCOL }),
         json!({ "protocol": crate::corpus::PROTOCOL, "edition": "eight" }),
@@ -88,7 +88,7 @@ fn a_mismatch_names_both_versions_and_the_remedy() {
         refusal.contains(&format!("version {PROTOCOL}")),
         "{refusal}"
     );
-    assert!(refusal.contains("engine speaks 99"), "{refusal}");
+    assert!(refusal.contains("server speaks 99"), "{refusal}");
     assert!(refusal.contains("upgrade the older component"), "{refusal}");
     assert!(
         !refusal.contains("negotiat") || refusal.contains("no negotiation"),
@@ -113,7 +113,7 @@ fn a_preface_that_arrived_and_states_nothing_is_skew() {
             panic!("a frame the peer wrote is not the wire");
         };
         assert!(
-            refusal.contains("the engine speaks no version"),
+            refusal.contains("the server speaks no version"),
             "{refusal}"
         );
     }
@@ -121,10 +121,10 @@ fn a_preface_that_arrived_and_states_nothing_is_skew() {
 
 /// **A preface that never arrived is the WIRE**, and that is the one place this
 /// end parts from REMOTE §3's own collapsing of the two cases (bl-5d62). The
-/// engine refuses a peer of the wrong version and a peer that hung up
+/// server refuses a peer of the wrong version and a peer that hung up
 /// mid-preface with one sentence, because it can serve neither. A foot is
 /// asking a different question — whether dialling again could help — and there
-/// they part: an engine restarting under a foot's dial says nothing at all, and
+/// they part: a server restarting under a foot's dial says nothing at all, and
 /// a foot that took that as final would exit on the blip that a redial exists
 /// for.
 #[test]
@@ -133,7 +133,7 @@ fn a_preface_that_never_arrived_is_the_wire() {
         panic!("a peer that hung up mid-preface is not a version this end cannot speak");
     };
     assert!(
-        refusal.contains("the engine speaks no version"),
+        refusal.contains("the server speaks no version"),
         "the sentence is the same sentence: {refusal}"
     );
 }

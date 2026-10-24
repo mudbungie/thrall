@@ -7,9 +7,9 @@ use super::super::{Channel, READ_TIMEOUT};
 use super::advertised;
 use super::ladder::roving_entry;
 use crate::rendezvous::say;
-use crate::test_support::engine::Engine;
-use crate::test_support::engine::punched::{Punched, Turn};
 use crate::test_support::roving::{commons, presence, tuned};
+use crate::test_support::server::Server;
+use crate::test_support::server::punched::{Punched, Turn};
 use crate::test_support::{Notices, Scratch, mint, roving};
 use serde_json::json;
 use std::time::Duration;
@@ -45,7 +45,7 @@ fn a_direct_rung_that_answers_is_said_once() {
     let scratch = Scratch::new();
     mint::material(scratch.path());
     roving::carried(scratch.path());
-    let _engine = Engine::start(
+    let _server = Server::start(
         scratch.path(),
         crate::corpus::PROTOCOL,
         vec![vec![advertised()], vec![advertised()]],
@@ -69,7 +69,7 @@ fn a_direct_rung_that_answers_is_said_once() {
 fn an_entry_that_does_not_rove_says_nothing() {
     let scratch = Scratch::new();
     mint::material(scratch.path());
-    let _engine = Engine::start(
+    let _server = Server::start(
         scratch.path(),
         crate::corpus::PROTOCOL,
         vec![vec![advertised()]],
@@ -93,7 +93,7 @@ fn the_rendezvous_says_every_step_and_the_held_line_its_first_ping() {
     let scratch = Scratch::new();
     let held = roving_entry(scratch.path(), "127.0.0.1:1");
     let pinged = vec![json!({"ping": true}), json!({"ping": true}), advertised()];
-    let engine = Punched::start(
+    let server = Punched::start(
         scratch.path(),
         vec![
             Turn::Answer(vec![advertised()]),
@@ -101,7 +101,7 @@ fn the_rendezvous_says_every_step_and_the_held_line_its_first_ping() {
             Turn::Answer(pinged),
         ],
     );
-    let (_node, tuning) = commons(vec![presence(engine.port(), 1)]);
+    let (_node, tuning) = commons(vec![presence(server.port(), 1)]);
     let mut channel = Channel::open(&held).expect("opened");
     channel.tune(READ_TIMEOUT, tuning);
     let (notices, sink) = Notices::new();
@@ -134,8 +134,8 @@ fn the_rendezvous_says_every_step_and_the_held_line_its_first_ping() {
 fn a_hangup_is_said_as_the_held_line_silent_past_it() {
     let scratch = Scratch::new();
     let held = roving_entry(scratch.path(), "127.0.0.1:1");
-    let engine = Punched::start(scratch.path(), vec![Turn::Silence]);
-    let (_node, tuning) = commons(vec![presence(engine.port(), 1)]);
+    let server = Punched::start(scratch.path(), vec![Turn::Silence]);
+    let (_node, tuning) = commons(vec![presence(server.port(), 1)]);
     let mut channel = Channel::open(&held).expect("opened");
     channel.tune(Duration::from_millis(300), tuning);
     let (notices, sink) = Notices::new();
@@ -151,9 +151,9 @@ fn a_hangup_is_said_as_the_held_line_silent_past_it() {
 }
 
 /// **A re-call nobody answers falls to the full rendezvous** (ruling yog
-/// bl-278f): the engine that closed the held line is gone, so the re-call
+/// bl-278f): the server that closed the held line is gone, so the re-call
 /// at its cached endpoints expires, the cache is cleared, and the same climb
-/// reads presence afresh — which names the engine now listening.
+/// reads presence afresh — which names the server now listening.
 #[test]
 fn a_re_call_nobody_answers_is_said_and_presence_is_read_again() {
     let scratch = Scratch::new();
@@ -165,7 +165,7 @@ fn a_re_call_nobody_answers_is_said_and_presence_is_read_again() {
     let (notices, sink) = Notices::new();
     channel.speak_to(&sink);
     assert!(channel.ask(&json!({"op": "advertise"})).is_ok());
-    // The script is spent: the engine closes the line and its punch port.
+    // The script is spent: the server closes the line and its punch port.
     assert!(channel.ask(&json!({"op": "advertise"})).is_err());
     let back = Punched::start(scratch.path(), vec![Turn::Answer(vec![advertised()])]);
     let (_node, tuning) = commons(vec![presence(back.port(), 2)]);

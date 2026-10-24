@@ -1,9 +1,9 @@
 //! **The mTLS half** (REMOTE §1.3, §4): the rustls configuration a foot dials
 //! with, built from the material the operator carried here.
 //!
-//! **Certificates are the entire authentication story.** The engine requires a
+//! **Certificates are the entire authentication story.** The server requires a
 //! client certificate that chains to the operator CA; this end requires the
-//! same of the engine and presents its own. There is no password, token or
+//! same of the server and presents its own. There is no password, token or
 //! account anywhere in the channel — so there is nothing in it to phish, rotate
 //! or leak, and a connection that cannot authenticate gets a **TLS refusal, not
 //! a reply**: the handshake fails inside rustls and no byte of the boundary is
@@ -27,7 +27,7 @@ use rustls::{ClientConfig, RootCertStore};
 
 use super::material::Material;
 
-/// The foot's end: verify the engine against the operator CA, and present this
+/// The foot's end: verify the server against the operator CA, and present this
 /// box's own leaf — the certificate that **is** this client's identity.
 pub fn client_config(m: &Material) -> Result<Arc<ClientConfig>, String> {
     let provider = Arc::new(rustls::crypto::ring::default_provider());

@@ -32,7 +32,7 @@ impl Dht {
     /// the pool and its `ip` claims vote, but it is not a node near the target
     /// and nothing it says is in the [`Outcome`]. So a walk whose learned
     /// nodes were all silent — measured one walk in five from the deployed
-    /// engine box, the one answering router naming a single node eight times —
+    /// server box, the one answering router naming a single node eight times —
     /// is the same `Err` as a silent bootstrap: a dark commons. Not an empty
     /// `Ok`, because an empty `Ok` already means *nodes near the target
     /// answered and held nothing*, and a caller seeding on it would be dark
@@ -56,7 +56,7 @@ impl Dht {
     /// The door is asked again whenever the frontier runs dry before K nodes
     /// past it have replied — none, the dark case, being the one measured —
     /// as long as it has ever named anyone; `max_queries` bounds it. The
-    /// door's queries hold no α slot. Measured from the deployed engine box
+    /// door's queries hold no α slot. Measured from the deployed server box
     /// (REMOTE §13.7 ruling 3), the one router that answers names a single
     /// random node eight times per query — often the same one several
     /// queries running — so its two seeds are both silent about one walk in
@@ -67,7 +67,7 @@ impl Dht {
     /// commons costs one deadline.
     ///
     /// A re-ask knocks only at the bootstrap addresses that answered (yog
-    /// bl-f519). Traced from the deployed engine box, three of the five
+    /// bl-f519). Traced from the deployed server box, three of the five
     /// addresses the roster resolves to were silent every time, so a walk
     /// that re-asked all five spent three queries in five of every door
     /// round on routers that never answer — in the walks that ended dark,

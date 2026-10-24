@@ -143,8 +143,8 @@ leak-scan:
 # the other direction). yog mints the wire protocol version and this crate
 # VENDORS a copy of the constant, so the skew is two-directional: yog must not
 # publish a bump ahead of its consumers, and this repository must not publish
-# one ahead of the engine. thrall 0.0.15 shipped PROTOCOL 16 while the newest
-# published yog spoke 15 — a foot ahead of every installable engine.
+# one ahead of the server. thrall 0.0.15 shipped PROTOCOL 16 while the newest
+# published yog spoke 15 — a foot ahead of every installable server.
 #
 # `.github/workflows/release-plz.yml`'s `merge-release-pr` job spends the
 # decision and CANNOT run locally, so the decision does not live there:
@@ -276,7 +276,7 @@ install-hooks:
 # `systemctl --user disable` away with no file here to change.
 #
 # The remote form is the door for the box class that most needs a foot — the
-# always-on server, awake when the laptop is not and the only box that can act
+# always-on box, awake when the laptop is not and the only box that can act
 # on itself — which could not be seated at all until bl-605f. The local form is
 # the door for the box that is running no sshd and cannot ssh to itself.
 #
@@ -289,7 +289,7 @@ install-hooks:
 #
 # `scripts/deploy/seat.sh` and `scripts/deploy/reconcile.sh` carry the reasoning,
 # including why the idle read is the unit's own cgroup here and the §8.5 boundary
-# on yog's engine.
+# on the yog server.
 deploy-local:
 	@scripts/deploy/seat.sh
 

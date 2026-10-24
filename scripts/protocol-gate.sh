@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # protocol-gate.sh — this foot does not publish a wire protocol version that no
-# published engine speaks (bl-635b; yog bl-bca2 is the other direction).
+# published server speaks (bl-635b; yog bl-bca2 is the other direction).
 #
 #   scripts/protocol-gate.sh file         the path every repo states it at
 #   scripts/protocol-gate.sh read FILE    the PROTOCOL integer that file states
@@ -16,9 +16,9 @@
 #   1. yog publishing a bump AHEAD of its consumers. Held at yog's release pull
 #      request until this repository's `main` — and lernie's, and
 #      yog-android's — carries the new number. That is yog bl-bca2.
-#   2. THIS repository publishing a bump ahead of the engine. thrall 0.0.15
+#   2. THIS repository publishing a bump ahead of the server. thrall 0.0.15
 #      published PROTOCOL 16 while the newest published yog, 0.0.49, spoke 15:
-#      a foot published ahead of every engine a user can install, composing
+#      a foot published ahead of every server a user can install, composing
 #      with nothing, by exactly the road the other direction took.
 #
 # THE ORDERING THE TWO GATES PRODUCE, and the one thing to remember when
@@ -27,7 +27,7 @@
 # second. Landing the constant on `main` is never held by either — it is what
 # gate 1 waits for.
 #
-# STRICTLY GREATER, NOT DIFFERENT. A thrall BEHIND the published engine is
+# STRICTLY GREATER, NOT DIFFERENT. A thrall BEHIND the published server is
 # direction 1's defect, and its release is the fix; holding it would hold the
 # remedy shut.
 #
@@ -42,16 +42,16 @@
 # Rust path is not a stable address for that: yog split `src/wire/hello.rs`
 # into `src/wire/hello/version.rs` and left the old path re-exporting, which a
 # build cannot notice and a regex reads as no declaration. This gate went on
-# fetching the old path, read the engine's number as ABSENT, and held — the
+# fetching the old path, read the server's number as ABSENT, and held — the
 # fail-closed answer, and the wrong one, because the input was readable at
-# another address. The next engine publish would have made that hold permanent
+# another address. The next server publish would have made that hold permanent
 # rather than clearing it. So the number now has one file-shaped home per
 # repository: a top-level `PROTOCOL` file, one line, the integer, compiled into
 # the constant by `build.rs`. There is NO Rust path in this file.
 
 set -euo pipefail
 
-# The path, at the root of this repository and of the engine's alike. One
+# The path, at the root of this repository and of the server's alike. One
 # constant for both reads, because one address is the whole point: a
 # per-repository path is a per-repository way to rot.
 FILE='PROTOCOL'
@@ -81,18 +81,18 @@ judge() {
     return 3
   fi
   if ! pub=$(protocol_of "$published"); then
-    # This repository's expectation, named as this repository's — the engine's
+    # This repository's expectation, named as this repository's — the server's
     # file is not the thing that failed. A yog release predating its own
     # PROTOCOL file states nothing at this path, and so does a fetch that never
     # answered.
-    echo "hold: the published engine states no PROTOCOL integer at its repo root, which is where this gate reads it"
+    echo "hold: the published server states no PROTOCOL integer at its repo root, which is where this gate reads it"
     return 3
   fi
   if [ "$cand" -gt "$pub" ]; then
-    echo "hold: this release speaks PROTOCOL $cand and the published engine speaks $pub"
+    echo "hold: this release speaks PROTOCOL $cand and the published server speaks $pub"
     return 3
   fi
-  echo "merge: PROTOCOL $cand, and the published engine speaks $pub"
+  echo "merge: PROTOCOL $cand, and the published server speaks $pub"
 }
 
 # --- the self-test ----------------------------------------------------------
@@ -133,27 +133,27 @@ self_test() {
   # tree that still keeps its number in a module states nothing.
   fixture "$d/decl" 'pub const PROTOCOL: u32 = 15;\n'
 
-  # The 2026-09-06 tree: this repo at 16, the published engine at 15.
-  expect 3 'hold: this release speaks PROTOCOL 16 and the published engine speaks 15' \
+  # The 2026-09-06 tree: this repo at 16, the published server at 15.
+  expect 3 'hold: this release speaks PROTOCOL 16 and the published server speaks 15' \
     "$d/n15" "$d/n16"
   # The same release once yog has published 16.
-  expect 0 'merge: PROTOCOL 16, and the published engine speaks 16' \
+  expect 0 'merge: PROTOCOL 16, and the published server speaks 16' \
     "$d/n16" "$d/n16"
   # Level, however each end terminates its file.
-  expect 0 'merge: PROTOCOL 15, and the published engine speaks 15' \
+  expect 0 'merge: PROTOCOL 15, and the published server speaks 15' \
     "$d/loose15" "$d/n15"
-  # BEHIND the engine is direction 1's defect and this release is its fix:
+  # BEHIND the server is direction 1's defect and this release is its fix:
   # strictly greater, so it publishes.
-  expect 0 'merge: PROTOCOL 15, and the published engine speaks 16' \
+  expect 0 'merge: PROTOCOL 15, and the published server speaks 16' \
     "$d/tight16" "$d/n15"
   # Fail closed on each unreadable input, and never merge on one. The `decl`
   # fixture is the defect this shape ended: the number in a Rust file is read
   # by nothing here.
   expect 3 "hold: this release's $d/decl states no PROTOCOL integer" \
     "$d/n15" "$d/decl"
-  expect 3 'hold: the published engine states no PROTOCOL integer at its repo root, which is where this gate reads it' \
+  expect 3 'hold: the published server states no PROTOCOL integer at its repo root, which is where this gate reads it' \
     "$d/decl" "$d/n16"
-  expect 3 'hold: the published engine states no PROTOCOL integer at its repo root, which is where this gate reads it' \
+  expect 3 'hold: the published server states no PROTOCOL integer at its repo root, which is where this gate reads it' \
     "$d/absent" "$d/n16"
 
   # This repository's own file, read as the workflow will read it: the gate is

@@ -6,9 +6,9 @@
 //! supervision restarts a *process*, and the failure this exists for does not
 //! kill one. REMOTE §1's canonical box sleeps, changes network and crosses a
 //! relay switch; TCP drops; the channel's conversation ends with its sentence;
-//! and the foot stays healthy, serving whatever other engines it holds. A
+//! and the foot stays healthy, serving whatever other servers it holds. A
 //! multi-entry box loses one channel of several and there is no exit code for a
-//! supervisor to see, while the engine believes this box is gone (presence is
+//! supervisor to see, while the server believes this box is gone (presence is
 //! connection RAM, correctly) and the box believes it is serving. **So a foot
 //! redials its own channels, and still exits when it cannot be a foot at all** —
 //! which is the part supervision was always the right owner of.
@@ -16,8 +16,8 @@
 //! **It is not a session resume and there is nothing to resume.** A redial
 //! makes a *new* channel: presence re-forms as it does for any fresh
 //! connection, the advertisement rides the connection already, registration is
-//! durable engine-side, and an invocation in flight when the wire died is the
-//! engine's mailbox lease rather than this loop's. DESIGN §3.8 states what
+//! durable server-side, and an invocation in flight when the wire died is the
+//! server's mailbox lease rather than this loop's. DESIGN §3.8 states what
 //! that costs and why it is the right price.
 //!
 //! **One thing crosses, and it is an act rather than a memory** (REMOTE §5.6
@@ -32,12 +32,12 @@
 //! conversation that produces the endings so that both are readable and the
 //! arithmetic is testable as values.
 //!
-//! **And it imposes no deadline of its own.** The engine has no socket timeouts
+//! **And it imposes no deadline of its own.** The server has no socket timeouts
 //! (yog bl-1421, filed and unbuilt), so the first dial after a flap may be
-//! answered slowly by an engine still working out that the previous connection
+//! answered slowly by a server still working out that the previous connection
 //! is gone. The only deadline in the path is the transport one the channel
-//! already had — a bound on the *socket*, sitting well above the engine's hold
-//! — and if it fires it is the wire, which is retryable. So a slow engine costs
+//! already had — a bound on the *socket*, sitting well above the server's hold
+//! — and if it fires it is the wire, which is retryable. So a slow server costs
 //! one more dial rather than the channel, and nothing here waits on bl-1421.
 
 use std::time::Duration;
@@ -77,8 +77,8 @@ pub(super) const PREDECESSOR: Duration = Duration::from_secs(32);
 /// The entry is opened once and not per dial — `opened` is that one act's
 /// answer, handed down by `run::served`: opening reads no file and dials
 /// nothing, it is a fact about this box's own material, so a failure there is
-/// this box's configuration and never an engine, and asking it again would ask
-/// the same question. Everything after it is the engine's, and that is the part
+/// this box's configuration and never a server, and asking it again would ask
+/// the same question. Everything after it is the server's, and that is the part
 /// that is asked again — **through the whole dial ladder each time** (DESIGN
 /// §3.11): a held connection that dropped, the direct address, a re-call
 /// from the presence the run has cached — one DHT walk, a call and a punch —
@@ -138,10 +138,10 @@ pub(crate) fn redial(
 ///   that is a genuine rival rather than a predecessor backs off to the cap
 ///   like anything else.
 /// - **A channel that served returns the series to its floor.** One answered
-///   read is the engine having parked this foot for its own hold, which is the
-///   evidence that this channel was real; a loop hammering a broken engine
-///   cannot produce it without that engine handing out work, and a foot already
-///   dials as fast as an engine answers reads. So the reset adds no cadence the
+///   read is the server having parked this foot for its own hold, which is the
+///   evidence that this channel was real; a loop hammering a broken server
+///   cannot produce it without that server handing out work, and a foot already
+///   dials as fast as a server answers reads. So the reset adds no cadence the
 ///   conversation did not already have — and without it a laptop that sleeps
 ///   nightly would creep to a minute's wait and stay there for the life of the
 ///   process, which is the failure this whole loop exists to shorten.
@@ -162,13 +162,13 @@ pub(super) fn next(series: Duration, predecessor: bool, served: bool) -> (Durati
 /// reads as a foot ignoring a refusal unless it says whose refusal it expects.
 fn waiting(said: &str, predecessor: bool, wait: Duration) -> String {
     let reading = if predecessor {
-        " — the engine refused this box's read, which after a drop is this box's own \
+        " — the server refused this box's read, which after a drop is this box's own \
          connection still dying"
     } else {
         ""
     };
     format!(
-        "{said}{reading}. Dialling this engine again in {}s.",
+        "{said}{reading}. Dialling this server again in {}s.",
         wait.as_secs()
     )
 }

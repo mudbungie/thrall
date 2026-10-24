@@ -20,7 +20,7 @@ use serde_json::{Value, json};
 
 use crate::json::str_of;
 
-/// **What this machine is handed**: the engine's handle on one call, and the
+/// **What this machine is handed**: the server's handle on one call, and the
 /// two facts needed to run it.
 ///
 /// [`Eq`] is written rather than derived for [`Value`]'s reason
@@ -29,7 +29,7 @@ use crate::json::str_of;
 /// reflexive over.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Invocation {
-    /// The engine's handle, minted at the post and quoted by the completion.
+    /// The server's handle, minted at the post and quoted by the completion.
     pub id: String,
     /// The advertised name, as this box spells it.
     pub tool: String,

@@ -12,13 +12,13 @@
 #
 # **The remote carrier is not a convenience, it is the only door for the box
 # class that most needs a foot.** Until bl-605f a foot could be deployed only by
-# a human logged in to the machine that would run it, so the always-on server —
-# the box that is awake when the laptop is not, and the only box that can act on
-# ITSELF — had no foot at all, while its engine held a certificate issued for
+# a human logged in to the machine that would run it, so the always-on box —
+# awake when the laptop is not, and the only box that can act on
+# ITSELF — had no foot at all, while its server held a certificate issued for
 # somebody's laptop. Neither end could say so: REMOTE §5.1 stores one advertised
 # set per identity and §3.7 rules that a working foot is ABSENT from the
-# engine's view, so a foot that is not running looks like a foot that has not
-# spoken lately, and §3.1 forbids the engine probing.
+# server's view, so a foot that is not running looks like a foot that has not
+# spoken lately, and §3.1 forbids the server probing.
 #
 # HOST, when given, is an ssh destination and the ONLY parameter — no address,
 # account or machine name is committed anywhere in this tree. That is the leak
@@ -90,7 +90,7 @@ run 'test -f "${XDG_DATA_HOME:-$HOME/.local/share}/thrall/tools.json"' \
   Write it first — it is the operator's, and thrall never writes it."
 run 'ls -A "${XDG_DATA_HOME:-$HOME/.local/share}/thrall/wire/workspaces" 2>/dev/null | grep -q .' \
     || die "no channel under \$XDG_DATA_HOME/thrall/wire/workspaces/ on $where:
-  that box is enrolled with no engine, and a foot with no channel has nothing to
+  that box is enrolled with no server, and a foot with no channel has nothing to
   dial. Enrol it first — the certificate is the operator's to issue."
 
 say "seating the units and the reconciler on $where"
@@ -107,7 +107,7 @@ run 'chmod 0755 "$HOME/.local/bin/.thrall-reconcile.tmp" && \
     mv -f "$HOME/.local/bin/.thrall-reconcile.tmp" "$HOME/.local/bin/thrall-reconcile"'
 
 # **Lingering, or the foot stops at logout** — and a box that reboots without it
-# comes back with no foot at all, which the engine sees only as tools that are no
+# comes back with no foot at all, which the server sees only as tools that are no
 # longer offered. It is the one act here that is not a file copy, and it is what
 # makes the unit a deployment rather than a convenience.
 say "enabling lingering so the foot outlives a logout on $where"
@@ -155,7 +155,7 @@ state=$(run 'systemctl --user is-active thrall.service' || true)
 #
 # A **protocol mismatch** is that refusal. Every other failure this journal
 # carries is transient by construction — a dropped channel is redialled with
-# backoff, an engine that is down comes back — but a mismatch is fail-closed by
+# backoff, a server that is down comes back — but a mismatch is fail-closed by
 # design (DESIGN §3.6): no wait resolves it, because one of the two components
 # has to publish. So a box in that state is a box with a seated timer and no
 # foot, and saying "seated and serving" over it would be exactly the lie this
@@ -171,11 +171,11 @@ printf '%s\n' "${said:-  (nothing yet)}" | sed 's/^/  | /'
 case $said in
     *'protocol mismatch'*)
         die "the foot on $where is running and can serve nothing: it and its
-  engine speak different wire versions, which is fail-closed by design and never
+  server speak different wire versions, which is fail-closed by design and never
   resolves by waiting. The units are seated and the timer is armed, so that box
   adopts the fix by itself as soon as the older component publishes a release —
   there is nothing to do here but wait for that." ;;
-    # A dial that has not landed yet is NOT a refusal to report: an engine that
+    # A dial that has not landed yet is NOT a refusal to report: a server that
     # is down, a name that has not resolved and a listener not yet up are all
     # transient by construction, and §3.8's backoff is what they are for. But it
     # is not "serving" either, and the first live run of this script said exactly
@@ -183,7 +183,7 @@ case $said in
     # section exists to refuse, arriving through the one arm that had no case.
     # So it is a notice, and the last line below no longer claims service that
     # thrall writes no line to establish.
-    *'Dialling this engine again'*)
+    *'Dialling this server again'*)
         say "note: no channel is open yet — the foot is still dialling. Its own
   words are above; the units are seated and it keeps trying." ;;
 esac

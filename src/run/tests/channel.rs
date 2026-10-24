@@ -10,20 +10,20 @@ use serde_json::json;
 /// order is the evidence.
 #[test]
 fn the_loop_presents_waits_hands_off_and_answers() {
-    let (_scratch, engine, mut channel) = wired(vec![
+    let (_scratch, server, mut channel) = wired(vec![
         advertised(),
         work(vec![row("i-1", "Bash")]),
         receipt("i-1"),
         advertised(),
-        refusal("the engine is going down"),
+        refusal("the server is going down"),
     ]);
     assert_eq!(
         said(hold(&mut channel, &set(), echo, &aside(), None)),
-        "the engine is going down",
+        "the server is going down",
         "the channel ends with the sentence that ended it"
     );
     assert_eq!(
-        ops(&engine),
+        ops(&server),
         [
             "advertise",
             "invocations",
@@ -34,14 +34,14 @@ fn the_loop_presents_waits_hands_off_and_answers() {
     );
     // The presentation is the config's projection: three keys, no argv.
     assert_eq!(
-        gesture(&engine, 0)["tools"],
+        gesture(&server, 0)["tools"],
         json!([{"name": "Bash", "description": "run a command in a shell",
                 "input_schema": {"type": "object"}}])
     );
     // The completion quotes the handle, and carries what the hand-off was
     // given: the invocation's tool, and this box's whole set.
     assert_eq!(
-        gesture(&engine, 2),
+        gesture(&server, 2),
         json!({"op": "complete", "invocation": "i-1",
                "capture": {"stdout": "Bash", "stderr": "1 tools", "exit_code": 0}})
     );
@@ -51,35 +51,35 @@ fn the_loop_presents_waits_hands_off_and_answers() {
 /// A foot that could not say what it offers has nothing to wait for.
 #[test]
 fn a_refused_advertisement_ends_the_channel_before_any_read() {
-    let (_scratch, engine, mut channel) = wired(vec![refusal("this leaf is not registered here")]);
+    let (_scratch, server, mut channel) = wired(vec![refusal("this leaf is not registered here")]);
     assert_eq!(
         said(hold(&mut channel, &set(), echo, &aside(), None)),
         "this leaf is not registered here"
     );
-    assert_eq!(ops(&engine), ["advertise"]);
+    assert_eq!(ops(&server), ["advertise"]);
 }
 
-/// **An empty answer is ordinary.** The engine holds the read for its own bound
+/// **An empty answer is ordinary.** The server holds the read for its own bound
 /// and then answers with what it has, which is usually nothing — so a foot
 /// waiting for hours is a sequence of answered reads, not a hang.
 ///
 /// It is also the proof that the re-assertion costs an idle foot **nothing**
 /// (bl-2d78): no hand-off ends, so no set is presented again, and a foot that
-/// is parked the whole time is the case the engine's own guard already covers.
+/// is parked the whole time is the case the server's own guard already covers.
 #[test]
 fn an_empty_answer_is_waited_through_and_not_an_ending() {
-    let (_scratch, engine, mut channel) = wired(vec![
+    let (_scratch, server, mut channel) = wired(vec![
         advertised(),
         work(vec![]),
         work(vec![]),
-        refusal("the engine is going down"),
+        refusal("the server is going down"),
     ]);
     assert_eq!(
         said(hold(&mut channel, &set(), echo, &aside(), None)),
-        "the engine is going down"
+        "the server is going down"
     );
     assert_eq!(
-        ops(&engine),
+        ops(&server),
         ["advertise", "invocations", "invocations", "invocations"]
     );
 }
@@ -89,7 +89,7 @@ fn an_empty_answer_is_waited_through_and_not_an_ending() {
 /// absent at the far end.
 #[test]
 fn work_in_one_answer_is_run_one_at_a_time_in_order() {
-    let (_scratch, engine, mut channel) = wired(vec![
+    let (_scratch, server, mut channel) = wired(vec![
         advertised(),
         work(vec![row("i-1", "Bash"), row("i-2", "Bash")]),
         receipt("i-1"),
@@ -103,7 +103,7 @@ fn work_in_one_answer_is_run_one_at_a_time_in_order() {
         "stop"
     );
     assert_eq!(
-        ops(&engine),
+        ops(&server),
         [
             "advertise",
             "invocations",
@@ -114,19 +114,19 @@ fn work_in_one_answer_is_run_one_at_a_time_in_order() {
             "invocations"
         ]
     );
-    assert_eq!(gesture(&engine, 2)["invocation"], json!("i-1"));
-    assert_eq!(gesture(&engine, 4)["invocation"], json!("i-2"));
+    assert_eq!(gesture(&server, 2)["invocation"], json!("i-1"));
+    assert_eq!(gesture(&server, 4)["invocation"], json!("i-2"));
 }
 
 /// **The window a foot opens itself is closed at the end of every hand-off**
 /// (bl-2d78, yog bl-1462). The stored set is keyed on this box's identity and
-/// any connection bearing the certificate may replace it; the engine refuses a
+/// any connection bearing the certificate may replace it; the server refuses a
 /// replacement only while this machine holds a parked read, and a foot holds
 /// none while it executes. So each hand-off ends by saying the set again — the
 /// same set, in the same spelling as the first presentation.
 #[test]
 fn the_set_is_asserted_again_at_the_end_of_every_hand_off() {
-    let (_scratch, engine, mut channel) = wired(vec![
+    let (_scratch, server, mut channel) = wired(vec![
         advertised(),
         work(vec![row("i-1", "Bash")]),
         receipt("i-1"),
@@ -138,14 +138,14 @@ fn the_set_is_asserted_again_at_the_end_of_every_hand_off() {
         "stop"
     );
     assert_eq!(
-        gesture(&engine, 3),
-        gesture(&engine, 0),
+        gesture(&server, 3),
+        gesture(&server, 0),
         "the re-assertion is the presentation, not a second projection"
     );
 }
 
-/// **A refused re-assertion ends the channel**, and the engine's sentence is
-/// what the supervisor's log carries. The engine declines a set that would
+/// **A refused re-assertion ends the channel**, and the server's sentence is
+/// what the supervisor's log carries. The server declines a set that would
 /// replace a *serving* machine's own, so a refusal here means another
 /// connection is holding this machine's read under a different set — two
 /// processes claiming one name, which is exactly what this foot must not keep
@@ -153,8 +153,8 @@ fn the_set_is_asserted_again_at_the_end_of_every_hand_off() {
 /// refusal beside it.
 #[test]
 fn a_refused_re_assertion_ends_the_channel() {
-    let refused = "another connection is holding this engine's follow-class read";
-    let (_scratch, engine, mut channel) = wired(vec![
+    let refused = "another connection is holding this server's follow-class read";
+    let (_scratch, server, mut channel) = wired(vec![
         advertised(),
         work(vec![row("i-1", "Bash")]),
         receipt("i-1"),
@@ -165,7 +165,7 @@ fn a_refused_re_assertion_ends_the_channel() {
         refused
     );
     assert_eq!(
-        ops(&engine),
+        ops(&server),
         ["advertise", "invocations", "complete", "advertise"],
         "it stops at the refusal rather than reading for more work"
     );
@@ -176,7 +176,7 @@ fn a_refused_re_assertion_ends_the_channel() {
 /// captures nobody is waiting for.
 #[test]
 fn a_refused_completion_ends_the_channel() {
-    let (_scratch, _engine, mut channel) = wired(vec![
+    let (_scratch, _server, mut channel) = wired(vec![
         advertised(),
         work(vec![row("i-1", "Bash")]),
         refusal("no invocation \"i-1\" is in flight"),
@@ -187,12 +187,12 @@ fn a_refused_completion_ends_the_channel() {
     );
 }
 
-/// An engine that answers the read with something other than this machine's
+/// A server that answers the read with something other than this machine's
 /// work is a disagreement worth stopping on, and the sentence names what came
 /// back.
 #[test]
 fn an_answer_that_is_not_this_machine_s_work_ends_the_channel() {
-    let (_scratch, _engine, mut channel) = wired(vec![advertised(), advertised()]);
+    let (_scratch, _server, mut channel) = wired(vec![advertised(), advertised()]);
     let said = said(hold(&mut channel, &set(), echo, &aside(), None));
     assert!(said.contains("not this machine's work"), "{said}");
     assert!(said.contains("Advertised"), "{said}");
@@ -202,7 +202,7 @@ fn an_answer_that_is_not_this_machine_s_work_ends_the_channel() {
 /// continuing on an answer to a question nobody asked would be guessing.
 #[test]
 fn an_answer_no_foot_gesture_can_earn_ends_the_channel() {
-    let (_scratch, _engine, mut channel) =
+    let (_scratch, _server, mut channel) =
         wired(vec![json!({"ok": true, "kind": "board", "rows": []})]);
     assert_eq!(
         said(hold(&mut channel, &set(), echo, &aside(), None)),

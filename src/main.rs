@@ -9,7 +9,7 @@
 //! Five things are the entry point's rather than the library's, and all five
 //! are the reason the exclusion is honest: **this process's own environment**,
 //! folded once into the data root; **serving**, which is not a value a test can
-//! read back but a program dialling engines until they stop; **where a serving
+//! read back but a program dialling servers until they stop; **where a serving
 //! foot's notices go**, which is this process's stderr — an effect, and the one
 //! thing `serve` cannot answer as a `Verdict` because it has to be said while
 //! the channels are still up rather than after they have all stopped; **the

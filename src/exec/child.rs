@@ -23,7 +23,7 @@ use crate::invocation::Capture;
 
 /// How long a child gets between being asked to stop and being stopped. Long
 /// enough for a tool to flush a file or drop a lock, short enough that the
-/// engine's own patience is not spent on a corpse.
+/// server's own patience is not spent on a corpse.
 const GRACE: Duration = Duration::from_secs(2);
 
 /// How often a running child is looked at when nothing is moving. A latency

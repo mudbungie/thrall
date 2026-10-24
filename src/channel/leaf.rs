@@ -9,7 +9,7 @@
 //! is the half it can keep: carry a leaf of that grade, and refuse to be
 //! configured with anything else.
 //!
-//! **So this end fails closed where the engine fails open, and the asymmetry is
+//! **So this end fails closed where the server fails open, and the asymmetry is
 //! the design.** yog reads a subject with no `OU=foot` as operator grade —
 //! default-operator, so a certificate minted before the grade existed keeps
 //! working. thrall refuses that same certificate: an operator-grade leaf on a
@@ -64,8 +64,8 @@ const SERIAL_TO_SUBJECT: usize = 4;
 /// **This box's identity on this channel, if it is entitled to be a foot.**
 ///
 /// Answers the leaf's subject common name — which *is* the client identity the
-/// engine reads back off the presented certificate (REMOTE §2), so a foot that
-/// knows its own name learned it from the same bytes the engine will. Refuses
+/// server reads back off the presented certificate (REMOTE §2), so a foot that
+/// knows its own name learned it from the same bytes the server will. Refuses
 /// anything else, naming what it read.
 pub fn foot(chain: &Path) -> Result<String, String> {
     let der = first(chain)?;

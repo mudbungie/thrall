@@ -1,8 +1,8 @@
 //! **The client rendezvous** (yog's `docs/REMOTE.md` §13.2–§13.4; DESIGN
-//! §3.11): how a foot finds an engine that cannot be dialled, and the
+//! §3.11): how a foot finds a server that cannot be dialled, and the
 //! connection it then punches.
 //!
-//! The engine end is yog's `src/wire/rendezvous` (bl-4263) and this is its
+//! The server end is yog's `src/wire/rendezvous` (bl-4263) and this is its
 //! mirror, byte for byte where bytes cross: [`pairing`] derives the four
 //! facts both ends compute from the pairing salt, [`item`] seals and opens
 //! the two items the commons carries, [`punch`] is the TCP simultaneous open
@@ -23,7 +23,7 @@ pub(crate) mod say;
 
 /// The mainline DHT's bootstrap nodes, resolved at the moment of a call —
 /// a name lookup is a network act, and opening a channel dials nothing. The
-/// four standard long-lived routers, yog's list: from its deployed engine box
+/// four standard long-lived routers, yog's list: from its deployed server box
 /// only one of the first two answered at all (yog REMOTE §13.7 ruling 3,
 /// bl-9408), so a silent router should cost a quarter of the roster, not half.
 pub(crate) fn mainline() -> Vec<String> {

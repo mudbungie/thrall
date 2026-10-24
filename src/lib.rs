@@ -1,10 +1,10 @@
 //! thrall — the **foot**: a tool-execution client for a yog server.
 //!
 //! A thrall holds an operator-issued, foot-grade certificate and dials in to
-//! an engine it does not administer. Its entire wire surface is three acts:
+//! a server it does not administer. Its entire wire surface is three acts:
 //! advertise what this box offers, wait on its mailbox for work, post the
 //! captures back. It asks nothing, it acts on nothing, and it never listens —
-//! the engine never speaks first.
+//! the server never speaks first.
 //!
 //! `docs/DESIGN.md` states the role and the inherited invariants. yog's
 //! `docs/REMOTE.md` is the protocol authority thrall implements against; where
@@ -23,10 +23,10 @@
 //! **And the bridge** (DESIGN §6, bl-e104): [`mcp`] is the Model Context
 //! Protocol client — `thrall mcp <tool> -- <server argv>` speaks MCP to a
 //! server on this box and answers as an ordinary tool command, so a bridged
-//! tool is a plain entry of the document above and the engine learns nothing.
+//! tool is a plain entry of the document above and yog learns nothing.
 //!
 //! **And the punched wire** (DESIGN §3.11, bl-0a8b; yog REMOTE §13): an entry
-//! carrying the [`rendezvous`] pairing reaches an engine no address can — the
+//! carrying the [`rendezvous`] pairing reaches a server no address can — the
 //! [`dht`] client reads its presence and files a call, the punch crosses a
 //! NAT, and the channel holds what it punched. The dial ladder in
 //! `channel::ladder` is what a redial re-enters.
@@ -61,9 +61,9 @@ pub(crate) mod spawn;
 /// **The confined `unsafe` file** — every raw process effect in the crate.
 pub(crate) mod sys;
 
-/// **The engine's conformance corpus, vendored as literal text** (REMOTE §3):
+/// **The server's conformance corpus, vendored as literal text** (REMOTE §3):
 /// the protocol number and the frames of every shape a foot speaks, copied from
-/// yog rather than derived from anything here. It is what the stand-in engine
+/// yog rather than derived from anything here. It is what the stand-in server
 /// states and what the decoders are judged against, so a drift on the far end
 /// is a red test rather than a channel that will not open (bl-e0f0).
 #[cfg(test)]

@@ -5,7 +5,7 @@ use super::write::{listed, nonce, unix_now};
 use super::*;
 use crate::dht::tests::fake::Mood;
 use crate::rendezvous::item::Call;
-use crate::test_support::roving::{commons, commons_as, engine, pairing, presence, tuned};
+use crate::test_support::roving::{commons, commons_as, pairing, presence, server, tuned};
 use std::net::IpAddr;
 
 pub(super) fn roving(tuning: Tuning) -> Roving {
@@ -45,7 +45,7 @@ fn no_presence_on_the_commons_refuses() {
     let mut r = roving(tuning);
     assert_eq!(
         r.rendezvous().expect_err("refused"),
-        "no presence is published under the engine's rendezvous key"
+        "no presence is published under the server's rendezvous key"
     );
 }
 
@@ -57,7 +57,7 @@ fn a_presence_sealed_under_another_pairing_refuses() {
     }
     .seal(&[7u8; 32])
     .expect("seal");
-    let item = engine().sign(p.presence_salt(), 1, sealed).expect("signed");
+    let item = server().sign(p.presence_salt(), 1, sealed).expect("signed");
     let (_node, tuning) = commons(vec![item]);
     let mut r = roving(tuning);
     assert_eq!(
@@ -72,12 +72,12 @@ fn a_presence_naming_no_endpoint_refuses() {
     let sealed = crate::rendezvous::item::Presence { endpoints: vec![] }
         .seal(&p.seal_key())
         .expect("seal");
-    let item = engine().sign(p.presence_salt(), 1, sealed).expect("signed");
+    let item = server().sign(p.presence_salt(), 1, sealed).expect("signed");
     let (_node, tuning) = commons(vec![item]);
     let mut r = roving(tuning);
     assert_eq!(
         r.rendezvous().expect_err("refused"),
-        "the engine's presence names no endpoint"
+        "the server's presence names no endpoint"
     );
 }
 
@@ -92,7 +92,7 @@ fn a_call_is_filed_sealed_and_a_punch_nobody_answers_is_refused() {
     let refusal = r.rendezvous().expect_err("nobody there");
     assert_eq!(
         refusal,
-        "no SYN crossed toward 1 engine endpoint(s) inside the window"
+        "no SYN crossed toward 1 server endpoint(s) inside the window"
     );
     let p = pairing();
     let inbox = p.inbox_keypair().expect("keypair").public();

@@ -3,7 +3,7 @@
 //!
 //! They are separated from the exchange in [`hello`](super) because they are a
 //! different kind of thing: the exchange is this crate's behaviour, and these
-//! are the ENGINE's facts, copied. A re-vendor rewrites this file and nothing
+//! are the SERVER's facts, copied. A re-vendor rewrites this file and nothing
 //! beside it.
 
 /// The protocol this build speaks, and it is a **major** (REMOTE §3.2).
@@ -11,7 +11,7 @@
 /// **A new verb is not a bump, and neither is a new field or a new word.**
 /// Since bl-e598 the integer moves only on a BREAK — a field removed or
 /// re-typed, a meaning changed under a spelling still in use, a field the
-/// engine newly *requires* on a request. Every addition ships unbumped and is
+/// server newly *requires* on a request. Every addition ships unbumped and is
 /// stamped an **edition** in the corpus ledger instead ([`EDITION`]), which is
 /// the fact this preface now carries beside the number.
 ///
@@ -20,19 +20,19 @@
 /// much a mismatch means when it is. 18 → 19 was the last bump of the old kind
 /// and the first of the new.
 ///
-/// **The number is the engine's and there is nothing here to version.** It must
+/// **The number is the server's and there is nothing here to version.** It must
 /// read whatever yog's own repo-root `PROTOCOL` file reads, so it is stated a
 /// second time — as a literal copied from that file — in `crate::corpus`, which
-/// is what the suite's stand-in engine dials at. The two agreeing is a test
+/// is what the suite's stand-in server dials at. The two agreeing is a test
 /// (`corpus::tests`) rather than a tautology, and that is the whole of the
 /// defence: while the stand-in wrote its preface from *this* constant, both
 /// ends of every test agreed by construction and the pin sat five versions
-/// behind a live engine with the suite green (bl-e0f0).
+/// behind a live server with the suite green (bl-e0f0).
 ///
 /// **This line drifted seven times under the old discipline** (bl-e0f0,
 /// bl-f88f, bl-dc5f, bl-605f, bl-44b4, bl-272d, bl-dc8a), four of them for an
 /// optional field on a shape a foot never decodes. None of the four would move
-/// it now: they are editions, and an engine an edition on is one this foot
+/// it now: they are editions, and a server an edition on is one this foot
 /// still dials.
 ///
 /// **It is not declared here.** The repo-root `PROTOCOL` file states it, one
@@ -46,7 +46,7 @@
 pub use protocol::PROTOCOL;
 
 /// **The edition this build vendored** (REMOTE §3.2): the newest stamp in its
-/// copy of the engine's shape ledger, written beside [`PROTOCOL`] in the
+/// copy of the server's shape ledger, written beside [`PROTOCOL`] in the
 /// preface so the peer can tell what this end can spell without a bump.
 ///
 /// **It is 8, ten under the [`FLOOR`], and that is the honest number.** An

@@ -17,7 +17,7 @@
 //! **Annotations are commentary and never advertised.** A server may hint at a
 //! tool's reach (`readOnlyHint`, `destructiveHint`, `idempotentHint`,
 //! `openWorldHint`); those hints go to stderr, for the operator writing the
-//! engine-side policy row (DESIGN §6.6), and none of them enters the entry.
+//! yog policy row (DESIGN §6.6), and none of them enters the entry.
 //! REMOTE §5.1 admits nothing yog stores and cannot check, and a hint from an
 //! untrusted server is exactly that.
 //!
@@ -37,7 +37,7 @@ use crate::json::str_of;
 
 /// The one line of stderr that is not a tool's: what the rest of it is for.
 const COMMENTARY: &str = "thrall: what follows is each tool's own hints, as the server stated \
-                          them — for the engine-side policy row, and never advertised.\n";
+                          them — for yog's policy row, and never advertised.\n";
 
 /// **The catalog, as entries to paste.** `exe` is the absolute path this box
 /// will spawn — `current_exe`, so a pin run from a build tree prints that

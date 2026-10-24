@@ -1,5 +1,5 @@
 //! The two files, their three states, and the derivations both ends must
-//! agree on — held to the bytes the ENGINE's own code derives.
+//! agree on — held to the bytes the SERVER's own code derives.
 
 use super::*;
 use crate::test_support::Scratch;
@@ -15,12 +15,12 @@ fn write(dir: &Path, name: &str, text: &str) {
     std::fs::write(dir.join(name), text).expect("write");
 }
 
-/// **The engine's bytes, verbatim** (yog `src/wire/rendezvous/material.rs`
+/// **The server's bytes, verbatim** (yog `src/wire/rendezvous/material.rs`
 /// over `salt = [2; 32]`). A label that drifted by one character would derive
 /// a salt nobody files under and a key nothing opens with, and this is where
 /// that would show.
 #[test]
-fn the_four_derivations_are_the_engines_byte_for_byte() {
+fn the_four_derivations_are_the_servers_byte_for_byte() {
     let p = pairing();
     assert_eq!(
         hex(&p.presence_salt()),

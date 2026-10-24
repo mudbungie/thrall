@@ -21,7 +21,7 @@ fn the_edition_this_build_states_is_the_newest_stamp_it_vendored() {
     );
 }
 
-/// The floor is the engine's fact too, so it is stated twice for the same
+/// The floor is the server's fact too, so it is stated twice for the same
 /// reason and held equal here.
 #[test]
 fn the_floor_this_build_defaults_to_is_the_floor_it_vendored() {

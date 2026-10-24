@@ -16,11 +16,11 @@ fn frame(text: &str) -> Value {
     serde_json::from_str(text).expect("a corpus frame is JSON")
 }
 
-/// **The projection replay.** Every reply shape, at every edition an engine of
+/// **The projection replay.** Every reply shape, at every edition a server of
 /// this major can be at, with every key stamped above that edition deleted:
 /// nothing refuses.
 #[test]
-fn every_reply_shape_decodes_at_every_edition_an_engine_can_be_at() {
+fn every_reply_shape_decodes_at_every_edition_an_server_can_be_at() {
     let mut replayed = 0;
     for (name, frames) in REPLIES {
         let signature = ledger::signature(name).expect("a shape this foot speaks");
@@ -53,7 +53,7 @@ fn the_replay_always_has_at_least_the_floor_to_replay_at() {
 /// and could pass on a projector that did nothing at all. This is the other
 /// direction: a FIXTURE signature in which `wrote` arrived after the floor —
 /// the shape of the first post-floor field a foot shape gains — projected at
-/// the floor, which is an engine too old to write it.
+/// the floor, which is a server too old to write it.
 ///
 /// The key goes, and the decoder refuses, because `wrote` is required
 /// (`gestures::Reply::Advertised`). That refusal is the whole point: the day
@@ -131,7 +131,7 @@ fn a_path_the_frame_does_not_carry_is_not_a_mutation() {
 /// already keeps it. `cwd` is optional and its absence means *the subject's own
 /// location*, which is exactly "the fact before the field existed"; so a
 /// fixture signature stamping it after the floor projects to the frame an older
-/// engine would have written, and the decoder answers `None` rather than
+/// server would have written, and the decoder answers `None` rather than
 /// refusing. It is also the walk this replay would otherwise never take: the
 /// path descends through an object into an array and deletes in each element.
 #[test]
@@ -145,7 +145,7 @@ fn a_post_floor_key_on_a_row_is_deleted_and_a_defaulting_reader_goes_on() {
     let projected = project(&frame(QUEUED[2]), &AFTER_THE_FLOOR, FLOOR);
     assert_eq!(projected["rows"][0].get("cwd"), None);
     let Ok(Ok(Reply::Invocations(rows))) = gestures::decode(&projected) else {
-        panic!("a row an older engine wrote still decodes");
+        panic!("a row an older server wrote still decodes");
     };
     assert_eq!(rows[0].cwd, None);
 }

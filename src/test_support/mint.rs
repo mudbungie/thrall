@@ -14,7 +14,7 @@
 //! **What each leaf says**, and every fact here is REMOTE's rather than this
 //! file's:
 //!
-//! - the **engine** leaf carries `serverAuth` and a SAN naming loopback, which
+//! - the **server** leaf carries `serverAuth` and a SAN naming loopback, which
 //!   is what a client verifies against what it dialled;
 //! - the **foot** leaf carries `clientAuth` and `OU=foot` — REMOTE §4.2's
 //!   grade, written by the operator's own CA because that is the only party
@@ -43,8 +43,8 @@ pub(crate) const OPERATOR_NAME: &str = "thrall-test-operator";
 /// subject with the grade and no common name, which is a certificate that
 /// authenticates nobody.
 pub(crate) const NAMELESS: &str = "nameless";
-/// The engine leaf's basename and common name.
-pub(crate) const ENGINE: &str = "engine";
+/// The server leaf's basename and common name.
+pub(crate) const SERVER: &str = "server";
 
 /// Mint a CA and the three leaves into `dir`, in the layout
 /// [`material`](crate::channel::material) reads: the foot's pair is written as
@@ -54,8 +54,8 @@ pub(crate) fn material(dir: &Path) {
     ca(dir);
     leaf(
         dir,
-        ENGINE,
-        &format!("/CN={ENGINE}"),
+        SERVER,
+        &format!("/CN={SERVER}"),
         "IP:127.0.0.1",
         "serverAuth",
     );
@@ -84,7 +84,7 @@ pub(crate) fn material(dir: &Path) {
 
 /// [`material`], plus the address file — the whole of what one provisioned
 /// entry holds, answered as the material a channel opens from. The tests that
-/// stand an [`Engine`](super::engine::Engine) up do not use it: an engine binds
+/// stand an [`Server`](super::server::Server) up do not use it: a server binds
 /// a kernel-chosen port and writes the address itself, because only the
 /// listener knows what `:0` became.
 pub(crate) fn provisioned(dir: &Path, address: &str) -> crate::channel::material::Material {

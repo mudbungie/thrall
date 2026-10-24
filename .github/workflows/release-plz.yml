@@ -182,7 +182,7 @@ name: Release-plz
 # A DISPATCH IS THE RE-JUDGE DOOR (bl-f3a5)
 #
 # Guard 6 below is the only guard whose answer can change with nothing in this
-# repository changing: a held release clears when the ENGINE publishes, which
+# repository changing: a held release clears when the SERVER publishes, which
 # is an event this repository never sees. So a hand needs a way to ask again,
 # and `workflow_dispatch` is it — the same door yog's `release-automerge.yml`
 # names in the comment it leaves on a held pull request.
@@ -228,13 +228,13 @@ name: Release-plz
 #   4. Not a draft, and GitHub says `MERGEABLE`.
 #   5. The head commit's first parent is this run's commit — the tree `ci`
 #      passed, as above.
-#   6. This release does not speak a wire PROTOCOL that no PUBLISHED engine
+#   6. This release does not speak a wire PROTOCOL that no PUBLISHED server
 #      speaks — see THE PROTOCOL GATE below. The only guard whose answer can
 #      change with nothing in this repository changing, and therefore the only
 #      one a re-run of this workflow can clear.
 #
 # ---------------------------------------------------------------------------
-# THE PROTOCOL GATE — A FOOT DOES NOT PUBLISH AHEAD OF THE ENGINE (bl-635b)
+# THE PROTOCOL GATE — A FOOT DOES NOT PUBLISH AHEAD OF THE SERVER (bl-635b)
 #
 # yog mints the wire protocol version; this crate, the seat (`lernie`) and the
 # phone (`yog-android`) each VENDOR a copy of the constant, and the wire is
@@ -245,20 +245,20 @@ name: Release-plz
 #   1. yog publishing a bump ahead of its consumers — held at yog's own release
 #      pull request until this repository's `main`, lernie's and
 #      yog-android's carry the number. That is yog bl-bca2.
-#   2. THIS repository publishing a bump ahead of the engine — held here.
+#   2. THIS repository publishing a bump ahead of the server — held here.
 #      thrall 0.0.15 published PROTOCOL 16 while the newest published yog,
-#      0.0.49, spoke 15: a foot ahead of every engine a user can install,
+#      0.0.49, spoke 15: a foot ahead of every server a user can install,
 #      composing with nothing, by exactly the road the other direction took.
 #
 # **The ordering the two gates produce**: the consumers' mains carry the number
 # first, then yog publishes, then the consumers publish. Landing the constant
 # on `main` is held by neither — it is what gate 1 waits for.
 #
-# **Strictly greater, not different.** A thrall BEHIND the published engine is
+# **Strictly greater, not different.** A thrall BEHIND the published server is
 # direction 1's defect and its release is the fix; holding that would hold the
 # remedy shut.
 #
-# The published engine is yog's newest `v<x.y.z>` tag, because yog's release
+# The published server is yog's newest `v<x.y.z>` tag, because yog's release
 # job cuts the tag in the same act as the crates.io upload. The decision itself
 # is `scripts/protocol-gate.sh` — pure logic, no network — because this
 # workflow cannot run locally; `make protocol-gate` proves it both ways in the
@@ -426,10 +426,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           OWNER: ${{ github.repository_owner }}
-          # The engine whose published PROTOCOL this release may not exceed
+          # The server whose published PROTOCOL this release may not exceed
           # (guard 6). Named here rather than in the script because it is the
           # one fact about GitHub in the whole check.
-          ENGINE_REPO: mudbungie/yog
+          SERVER_REPO: mudbungie/yog
           # The commit `ci` passed in this run. Guard 5 tests the candidate
           # against it.
           GATED_SHA: ${{ github.sha }}
@@ -489,9 +489,9 @@ jobs:
               continue
             fi
             # Guard 6: this release may not speak a PROTOCOL no PUBLISHED
-            # engine speaks (bl-635b). yog's release job cuts the `v<x.y.z>`
+            # server speaks (bl-635b). yog's release job cuts the `v<x.y.z>`
             # tag in the same act as the crates.io upload, so that tag IS the
-            # published engine. Both fetches truncate first and are `|| true`:
+            # published server. Both fetches truncate first and are `|| true`:
             # a missing tag, a tree that states no number or a network fault
             # reads as unreadable and holds rather than merging.
             #
@@ -499,16 +499,16 @@ jobs:
             # one home (bl-c618): this used to name yog's Rust path here, and
             # yog moved it in a module split — so the fetch went on succeeding
             # while the read found nothing, and the hold would have become
-            # permanent at the next engine publish.
+            # permanent at the next server publish.
             gate="$(mktemp -d)"
             file="$(scripts/protocol-gate.sh file)"
             raw() {
               gh api "repos/$1/contents/$3?ref=$2" \
                 -H "Accept: application/vnd.github.raw" >"$4" || true
             }
-            engine_tag="$(gh api "repos/$ENGINE_REPO/releases/latest" -q .tag_name || true)"
-            [ -z "$engine_tag" ] || \
-              raw "$ENGINE_REPO" "$engine_tag" "$file" "$gate/published"
+            server_tag="$(gh api "repos/$SERVER_REPO/releases/latest" -q .tag_name || true)"
+            [ -z "$server_tag" ] || \
+              raw "$SERVER_REPO" "$server_tag" "$file" "$gate/published"
             raw "$GH_REPO" "$sha" "$file" "$gate/candidate"
             gate_rc=0
             gate_says="$(scripts/protocol-gate.sh judge \

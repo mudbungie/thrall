@@ -9,7 +9,7 @@
 //!
 //! **Serving is an outcome and not a `Verdict`, and that is what keeps this
 //! file pure.** A verdict is text and an exit code; serving is dialling
-//! engines, spawning children and blocking until every channel has stopped. So
+//! servers, spawning children and blocking until every channel has stopped. So
 //! the decision *"this argv means serve"* is made here and tested here, and the
 //! doing of it is the entry point's — which is what that file is excluded for.
 
@@ -128,7 +128,7 @@ usage: thrall run
                   as a complete tools.json entry for you to paste. It writes
                   nothing: the document is yours, and pasting the entries you
                   vouch for is the allowlist. The server's own hints about each
-                  tool go to standard error, for the policy row on the engine
+                  tool go to standard error, for the policy row on yog's
                   side; they are never advertised. `pin` is therefore a tool
                   name this verb cannot bridge — rename such a tool in the
                   entry, which is an edit the paste already invites.

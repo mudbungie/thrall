@@ -6,8 +6,8 @@
 # process itself, with a backoff that starts at a second and stops at a minute,
 # so a laptop that sleeps or changes network does not need supervision for
 # that. What supervision IS for is the other exit: a foot that cannot be a foot
-# at all — a missing tool document, a certificate that is not foot-grade, an
-# engine serving another connection under this box's name — exits and says why.
+# at all — a missing tool document, a certificate that is not foot-grade, a
+# server serving another connection under this box's name — exits and says why.
 # README states that restarting then belongs to this machine's own supervision.
 # This file is that supervision.
 #
@@ -26,8 +26,8 @@
 [Unit]
 Description=thrall foot
 Documentation=https://github.com/mudbungie/thrall
-# It dials an engine, so it needs the network. It must NOT order against a local
-# engine unit: the engine this box's foot serves is usually somewhere else, and
+# It dials a server, so it needs the network. It must NOT order against a local
+# server unit: the server this box's foot serves is usually somewhere else, and
 # a foot that waited for a local one would not start on a box that has none.
 After=network-online.target
 Wants=network-online.target
@@ -48,7 +48,7 @@ Restart=always
 RestartSec=5s
 # A stop reaches the whole control group, which is what a deliberate stop should
 # do: an invocation running out of `src/spawn.rs` is a child here and dies with
-# it. The engine's own invocation timeout is what answers for the capture that
+# it. The server's own invocation timeout is what answers for the capture that
 # never comes back; thrall states no deadline of its own, so this is systemd's
 # default made explicit rather than a promise the foot makes.
 TimeoutStopSec=30s

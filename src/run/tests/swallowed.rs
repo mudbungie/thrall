@@ -3,7 +3,7 @@
 //!
 //! The whole of what is asserted here is an ORDER: on the next dial the
 //! advertisement goes out, then the held capture, and only then the read. The
-//! read is what releases the engine's lease, so a capture posted after it would
+//! read is what releases the server's lease, so a capture posted after it would
 //! arrive at a slot already handed out again — the tool re-run, and this box
 //! paying twice for work it had in hand.
 //!
@@ -50,13 +50,13 @@ fn channel_at(dir: &Path) -> Channel {
 ///
 /// The wire swallows the completion of `i-1`; the next channel presents its set
 /// and then, before it reads anything, posts the capture the first channel
-/// computed. The engine's lease is therefore released by a read that arrives
+/// computed. The server's lease is therefore released by a read that arrives
 /// after the answer it was holding out for, and the hand-off ran exactly once
 /// for an invocation this box was handed once.
 #[test]
 fn a_swallowed_capture_is_posted_first_on_the_next_dial() {
     let scratch = Scratch::new();
-    let engine = flapping_at(
+    let server = flapping_at(
         scratch.path(),
         vec![
             Some(advertised()),
@@ -65,7 +65,7 @@ fn a_swallowed_capture_is_posted_first_on_the_next_dial() {
             Some(advertised()),
             Some(receipt("i-1")),
             Some(refusal(
-                "client \"foot-1\" already holds a read on this engine",
+                "client \"foot-1\" already holds a read on this server",
             )),
             Some(refusal("stop")),
         ],
@@ -82,7 +82,7 @@ fn a_swallowed_capture_is_posted_first_on_the_next_dial() {
         "stop"
     );
     assert_eq!(
-        ops(&engine),
+        ops(&server),
         [
             "advertise",
             "invocations",
@@ -95,7 +95,7 @@ fn a_swallowed_capture_is_posted_first_on_the_next_dial() {
         "the re-post is the second channel's first act after its advertisement"
     );
     assert_eq!(
-        gesture(&engine, 4),
+        gesture(&server, 4),
         serde_json::json!({"op": "complete", "invocation": "i-1",
             "capture": {"stdout": "Bash", "stderr": "1 tools", "exit_code": 0}}),
         "it carries the capture the first channel computed, verbatim"
@@ -108,7 +108,7 @@ fn a_swallowed_capture_is_posted_first_on_the_next_dial() {
     assert_eq!(waits.heard().len(), 2, "one drop and one predecessor");
 }
 
-/// **A refused re-post is dropped and the channel reads on.** An engine that
+/// **A refused re-post is dropped and the channel reads on.** A server that
 /// refuses it has swept the slot, restarted, or already answered the driver —
 /// all ordinary — so a foot that ended the channel over a capture nobody is
 /// waiting for would be turning the ordinary case into the terminal one. It is
@@ -116,7 +116,7 @@ fn a_swallowed_capture_is_posted_first_on_the_next_dial() {
 #[test]
 fn a_refused_re_post_is_dropped_and_the_channel_reads_on() {
     let scratch = Scratch::new();
-    let engine = flapping_at(
+    let server = flapping_at(
         scratch.path(),
         vec![
             Some(advertised()),
@@ -126,7 +126,7 @@ fn a_refused_re_post_is_dropped_and_the_channel_reads_on() {
             Some(refusal("no invocation \"i-1\" is in flight")),
             Some(work(vec![])),
             Some(refusal(
-                "client \"foot-1\" already holds a read on this engine",
+                "client \"foot-1\" already holds a read on this server",
             )),
             Some(refusal("stop")),
         ],
@@ -144,7 +144,7 @@ fn a_refused_re_post_is_dropped_and_the_channel_reads_on() {
         "the refusal ended nothing: the channel ran on to its own ending"
     );
     assert_eq!(
-        ops(&engine),
+        ops(&server),
         [
             "advertise",
             "invocations",
@@ -166,7 +166,7 @@ fn a_refused_re_post_is_dropped_and_the_channel_reads_on() {
 #[test]
 fn a_re_post_the_wire_swallowed_again_is_still_held() {
     let scratch = Scratch::new();
-    let _engine = flapping_at(
+    let _server = flapping_at(
         scratch.path(),
         vec![
             Some(advertised()),
@@ -177,7 +177,7 @@ fn a_re_post_the_wire_swallowed_again_is_still_held() {
             Some(advertised()),
             Some(receipt("i-1")),
             Some(refusal(
-                "client \"foot-1\" already holds a read on this engine",
+                "client \"foot-1\" already holds a read on this server",
             )),
         ],
     );
@@ -209,6 +209,6 @@ fn a_re_post_the_wire_swallowed_again_is_still_held() {
     };
     assert!(
         held.is_none(),
-        "a capture the engine has answered for is let go"
+        "a capture the server has answered for is let go"
     );
 }

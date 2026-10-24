@@ -8,13 +8,13 @@
 //! **This is why thrall exists as a separate program and it is not decoration.**
 //! Until the four-component split one crate shipped both ends of every
 //! connection and the wire could not skew. A foot is installed on a box the
-//! engine's operator may not administer, upgraded on that box's own schedule —
+//! server's operator may not administer, upgraded on that box's own schedule —
 //! so the day the two disagree about what a frame means is a day that will
 //! arrive, and it must arrive as a sentence rather than as a gesture answered
 //! wrongly.
 //!
 //! **thrall writes and confirms; it never admits.** A foot dials and is never
-//! dialled, so there is exactly one half of the exchange here. The engine's
+//! dialled, so there is exactly one half of the exchange here. The server's
 //! half — refusing a peer in band on the connection it opened — is the
 //! server's, and a foot that carried it would be a foot that listens.
 //!
@@ -26,20 +26,20 @@
 //! forever, and the operator who installed both ends can upgrade the older one.
 //!
 //! **And a preface that ARRIVED is told apart from one that never did**
-//! (bl-5d62). REMOTE §3 collapses them on the *engine's* side, and rightly: a
+//! (bl-5d62). REMOTE §3 collapses them on the *server's* side, and rightly: a
 //! peer of the wrong version and a peer that hung up mid-preface are both peers
 //! it cannot serve, so one sentence answers both. A foot is deciding a
 //! different question — whether dialling again could help — and there the two
 //! part. A frame this end read and could not agree with is a fact about the two
 //! *binaries*: it will say the same thing on every dial until somebody installs
 //! a new one, so it is [`Failure::Skew`] and it ends the channel. A preface that
-//! never came is an engine restarting, a socket dying, a box waking up — the
+//! never came is a server restarting, a socket dying, a box waking up — the
 //! wire, [`Failure::Wire`], and dialled again. The SENTENCE stays one sentence
 //! either way; what differs is only what this foot does next.
 //!
 //! Under the old reading a foot that met a version bump wrote a line into its
 //! operator's journal every minute forever, and one that met a restarting
-//! engine was indistinguishable from it.
+//! server was indistinguishable from it.
 
 use std::io::{self, Read, Write};
 
@@ -47,7 +47,7 @@ use serde_json::{Value, json};
 
 use super::{Failure, frame};
 
-/// The engine's three numbers, vendored.
+/// The server's three numbers, vendored.
 mod version;
 
 pub use version::{EDITION, FLOOR, PROTOCOL};
@@ -76,12 +76,12 @@ pub fn state(w: &mut dyn Write) -> io::Result<()> {
     frame::write_value(w, &json!({ KEY: PROTOCOL, EDITION_KEY: EDITION }))
 }
 
-/// Read the engine's preface and refuse a mismatch — as the one `Err(String)`
+/// Read the server's preface and refuse a mismatch — as the one `Err(String)`
 /// every other thing that can go wrong with this transport already arrives as,
 /// so nothing above here carries a case for it.
 ///
-/// **What it answers is the engine's EDITION** (REMOTE §3.2): the fact that
-/// says which post-floor fields that engine can spell. A foot reads no
+/// **What it answers is the server's EDITION** (REMOTE §3.2): the fact that
+/// says which post-floor fields that server can spell. A foot reads no
 /// post-floor field today — every path in its vendored ledger is at or under
 /// the floor — so nothing above gates on the answer yet; it is decoded here
 /// rather than ignored because the defaulting is the rule, and a rule nothing
@@ -126,7 +126,7 @@ fn mismatch(peer: Option<u64>) -> String {
     let peer = peer.map_or_else(|| UNSTATED.to_owned(), |v| v.to_string());
     format!(
         "wire protocol mismatch: this foot speaks version {PROTOCOL}, \
-         the engine speaks {peer}. There is no negotiation — \
+         the server speaks {peer}. There is no negotiation — \
          upgrade the older component until both speak one version."
     )
 }

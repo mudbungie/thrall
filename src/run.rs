@@ -20,7 +20,7 @@
 //! test, so each is injected, the one implementation of each lives in
 //! `src/main.rs` — the single coverage exclusion — and the suite hands down a
 //! one-line executor, a recording sink and a recording pause. That is what lets
-//! the whole conversation be tested against an engine that is real.
+//! the whole conversation be tested against a server that is real.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -58,7 +58,7 @@ pub type Handoff = fn(&[Local], &Invocation) -> Capture;
 ///
 /// It is `Arc<dyn Fn>` rather than a bare `fn` because a recording sink has to
 /// capture where it records, and shared across [`fan`]'s threads because a box
-/// with several engines has one place to say things.
+/// with several servers has one place to say things.
 pub type Notice = Arc<dyn Fn(&str) + Send + Sync>;
 
 /// **Where a foot waits between dials** (`redial`).
@@ -73,7 +73,7 @@ pub type Pause = Arc<dyn Fn(Duration) + Send + Sync>;
 /// **Every channel this box holds, served at once** — one thread each, and the
 /// sentence that stopped each one, in the order they were filed.
 ///
-/// Serial stays serial **per channel**: two engines are two conversations, and
+/// Serial stays serial **per channel**: two servers are two conversations, and
 /// a foot that queued one behind the other would be absent from one of them for
 /// reasons the other's operator cannot see. Channels share nothing here — not a
 /// connection, not an identity, not a lock — exactly as their material shares
@@ -88,8 +88,8 @@ pub type Pause = Arc<dyn Fn(Duration) + Send + Sync>;
 /// These threads are joined in filing order, so a sentence read out of a join is
 /// a sentence held until every sibling has stopped — which for a healthy sibling
 /// is forever. A dead channel would then be a live-looking process serving one
-/// engine and silently not serving another, and the two refusals yog bl-1462
-/// added — the loudest thing an engine can say to this box — would arrive, if at
+/// server and silently not serving another, and the two refusals yog bl-1462
+/// added — the loudest thing a server can say to this box — would arrive, if at
 /// all, at a process that would not repeat them. So each channel says its own
 /// terminal sentence through [`Notice`] the moment it stops ([`served`]), and
 /// the vector below is what the exit is written from.
@@ -123,7 +123,7 @@ pub fn fan(
             // this program breaking rather than a channel ending. It is named
             // as its own outcome instead of being swallowed into a transport
             // sentence, and it is never re-raised into the other channels: one
-            // engine's conversation must not take the others down. It is the one
+            // server's conversation must not take the others down. It is the one
             // outcome no channel says for itself, because a thread that unwound
             // past `served` had no sentence to say.
             Err(_) => format!("{leaf}: the channel ended by panicking"),
@@ -158,7 +158,7 @@ fn served(
 }
 
 /// One channel's notices, under the name that channel was filed as — the same
-/// prefix its ending sentence carries. A box holding two engines that was told
+/// prefix its ending sentence carries. A box holding two servers that was told
 /// it had been disarmed, or that a channel is being dialled again, and not by
 /// which one, has been told nothing it can act on.
 fn named(notice: &Notice, leaf: &str) -> Notice {

@@ -1,4 +1,4 @@
-//! **The stand-in engine's punched end** (REMOTE §13.3–§13.4): a punch port
+//! **The stand-in server's punched end** (REMOTE §13.3–§13.4): a punch port
 //! that listens, serves whatever lands on it over the same mTLS the dialled
 //! stand-in serves, and — unlike that one — carries a whole script over ONE
 //! connection, because a punched connection is held between asks.
@@ -6,7 +6,7 @@
 //! It never SYNs toward the foot: on loopback the foot's own SYN lands on
 //! this listener, which is the degenerate case REMOTE §13.3 names (a
 //! publicly reachable end is one whose peer's SYN simply lands). What it
-//! stands in for is the engine's `punch.punch(call.endpoints, window)` and
+//! stands in for is the server's `punch.punch(call.endpoints, window)` and
 //! the `serve` it hands each stream to.
 //!
 //! **Three turns, one per request read.** [`Turn::Answer`] writes frames and
@@ -32,7 +32,7 @@ use crate::rendezvous::punch::Punch;
 /// again. Both bound a stuck test, never a passing one.
 const PATIENCE: Duration = Duration::from_secs(10);
 
-/// What the engine does with the next request it reads.
+/// What the server does with the next request it reads.
 pub(crate) enum Turn {
     /// Write these frames and the terminator.
     Answer(Vec<Value>),
@@ -50,7 +50,7 @@ pub(crate) struct Punched {
 
 impl Punched {
     /// Bind a punch port and serve `script` over the connections that land on
-    /// it. `dir` holds the engine's own material, as [`mint`](super::super::mint)
+    /// it. `dir` holds the server's own material, as [`mint`](super::super::mint)
     /// wrote it.
     pub(crate) fn start(dir: &Path, script: Vec<Turn>) -> Punched {
         let config = super::server_config(dir);
@@ -62,7 +62,7 @@ impl Punched {
         Punched { port, seen }
     }
 
-    /// The port a presence item names for this engine.
+    /// The port a presence item names for this server.
     pub(crate) fn port(&self) -> u16 {
         self.port
     }

@@ -1,5 +1,5 @@
 //! Signing, verifying, the target, and the exact bytes a signature covers —
-//! held to fixtures the ENGINE's own code produced, so interoperation is
+//! held to fixtures the SERVER's own code produced, so interoperation is
 //! asserted rather than assumed (yog bl-0247).
 
 use super::*;
@@ -21,11 +21,11 @@ fn the_signed_bytes_are_the_beps_spelling() {
     );
 }
 
-/// **The engine's bytes, verbatim.** `Keypair::from_seed([1; 32])` signing
+/// **The server's bytes, verbatim.** `Keypair::from_seed([1; 32])` signing
 /// `salt`/`7`/`value` on yog answers exactly this key, this signature and
 /// this target; ed25519 is deterministic, so this end must answer the same.
 #[test]
-fn an_item_signs_byte_for_byte_as_the_engine_does() {
+fn an_item_signs_byte_for_byte_as_the_server_does() {
     let kp = Keypair::from_seed([1u8; 32]).unwrap();
     let item = kp.sign(b"salt".to_vec(), 7, b"value".to_vec()).unwrap();
     assert_eq!(

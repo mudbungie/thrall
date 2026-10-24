@@ -38,7 +38,7 @@ pub(crate) enum Mood {
     /// A mainline bootstrap router as yog measured it (REMOTE §13.7 ruling
     /// 3): answers `find_node`, silent to BEP 44's `get` and `put`.
     Router,
-    /// The one router that answered from yog's deployed engine box (yog
+    /// The one router that answered from yog's deployed server box (yog
     /// bl-d00f): a `Router` whose every `find_node` answer is ONE of its
     /// peers repeated eight times, the next peer on the next query.
     Rotor,

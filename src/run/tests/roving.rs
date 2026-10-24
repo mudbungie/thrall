@@ -6,22 +6,22 @@
 use super::super::redial::{FIRST, redial};
 use super::{advertised, echo, entry_at, receipt, refusal, row, set, work};
 use crate::channel::material::ADDRESS;
-use crate::test_support::engine::punched::{Punched, Turn};
 use crate::test_support::roving::{carried, commons, presence};
+use crate::test_support::server::punched::{Punched, Turn};
 use crate::test_support::{Notices, Scratch, Waits, mint};
 use std::time::Duration;
 
-/// A punched engine drops the held connection under a conversation; the foot
+/// A punched server drops the held connection under a conversation; the foot
 /// says so, waits the floor, and the next dial climbs back to it — one wait,
 /// two connections, a hand-off served over the second, and the channel over
-/// only when the engine refused the re-presentation.
+/// only when the server refused the re-presentation.
 #[test]
 fn a_dropped_held_connection_is_dialled_again_through_the_ladder() {
     let scratch = Scratch::new();
     mint::material(scratch.path());
     carried(scratch.path());
     std::fs::write(scratch.path().join(ADDRESS), "127.0.0.1:1").expect("address");
-    let engine = Punched::start(
+    let server = Punched::start(
         scratch.path(),
         vec![
             Turn::Answer(vec![advertised()]),
@@ -32,7 +32,7 @@ fn a_dropped_held_connection_is_dialled_again_through_the_ladder() {
             Turn::Answer(vec![refusal("stop")]),
         ],
     );
-    let (node, tuning) = commons(vec![presence(engine.port(), 1)]);
+    let (node, tuning) = commons(vec![presence(server.port(), 1)]);
     let mut channel = entry_at(scratch.path()).open().expect("opened");
     channel.tune(Duration::from_secs(5), tuning);
     let (waits, pause) = Waits::new();
@@ -46,7 +46,7 @@ fn a_dropped_held_connection_is_dialled_again_through_the_ladder() {
         .partition(|l| l.starts_with("rendezvous: "));
     assert_eq!(said.len(), 1, "{heard:?}");
     assert!(
-        said[0].contains("the channel to the engine failed"),
+        said[0].contains("the channel to the server failed"),
         "{said:?}"
     );
     assert!(said[0].contains("again in 1s"), "{said:?}");
@@ -100,7 +100,7 @@ fn a_dropped_held_connection_is_dialled_again_through_the_ladder() {
         ladder.iter().filter(|l| l.contains("direct rung")).count(),
         1
     );
-    let prefaces = engine
+    let prefaces = server
         .heard()
         .iter()
         .filter(|v| v.get("protocol").is_some())

@@ -6,7 +6,7 @@
 //! itself and DESIGN §2's *it never listens* kept at the DHT.
 //!
 //! **Reimplemented here rather than shared** (REMOTE §13.7 ruling 2): the
-//! engine's `src/dht` is the original and this is its mirror, byte for byte
+//! server's `src/dht` is the original and this is its mirror, byte for byte
 //! on the wire, because a DHT client is substrate and not protocol — nothing
 //! yog-shaped crosses its interface — and a crate of its own would cost more
 //! in release machinery than the copy costs.

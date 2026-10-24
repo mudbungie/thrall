@@ -51,7 +51,7 @@ fn ou() -> Vec<u8> {
 }
 
 /// A real minted foot leaf answers its own common name — which is the identity
-/// the engine will read off the very same bytes.
+/// the server will read off the very same bytes.
 #[test]
 fn a_minted_foot_leaf_answers_the_client_identity() {
     let scratch = Scratch::new();
@@ -61,7 +61,7 @@ fn a_minted_foot_leaf_answers_the_client_identity() {
 
 /// An operator-grade leaf is refused, and the refusal names the leaf, the word
 /// the subject must carry, and where to get one. thrall fails closed where the
-/// engine fails open: an operator leaf on a foot is a machine holding the whole
+/// server fails open: an operator leaf on a foot is a machine holding the whole
 /// boundary in order to run commands.
 #[test]
 fn an_operator_grade_leaf_is_refused_and_says_how_to_fix_it() {

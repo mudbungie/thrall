@@ -39,7 +39,7 @@
 //! sends the operator to read the launcher's documentation. DESIGN §6.7 rules
 //! out the other obvious repair, quoting the whole argv, because a credential
 //! lives in it; the name the operator typed costs nothing and is the same word
-//! the document, the roster and the engine's hold sentence spell.
+//! the document, the roster and yog's hold sentence spell.
 //!
 //! **The write's failure is not an outcome, and that is a simplification
 //! rather than an omission.** A server whose stdin will not take a byte is a
@@ -79,7 +79,7 @@ pub(super) struct Server {
     output: BufReader<ChildStdout>,
     /// **What a sentence here calls this server: the name the operator
     /// reached it by.** For a bridged call that is the tool name — the word
-    /// the document, the roster and the engine's hold sentence all spell — and
+    /// the document, the roster and yog's hold sentence all spell — and
     /// never the argv's first word, which for the usual `uvx`/`npx`/`docker
     /// run` pin is the launcher: exactly the process that is not the server
     /// (bl-3c8d). `pin` has no tool name to give, so there it is the program,

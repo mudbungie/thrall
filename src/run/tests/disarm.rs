@@ -12,7 +12,7 @@ use super::{advertised, echo, receipt, refusal, restored, row, said, set, wired,
 use crate::test_support::Notices;
 
 /// **A re-assertion that WROTE is a disarming, and it is said out loud.** The
-/// engine writes only a set that differs, so a foot presenting the set it has
+/// server writes only a set that differs, so a foot presenting the set it has
 /// presented all along and being told the document changed is a foot learning
 /// that something replaced it while it was absent.
 ///
@@ -21,7 +21,7 @@ use crate::test_support::Notices;
 #[test]
 fn a_re_assertion_that_wrote_says_the_box_was_disarmed() {
     let (notices, sink) = Notices::new();
-    let (_scratch, _engine, mut channel) = wired(vec![
+    let (_scratch, _server, mut channel) = wired(vec![
         advertised(),
         work(vec![row("i-1", "Bash")]),
         receipt("i-1"),
@@ -45,7 +45,7 @@ fn a_re_assertion_that_wrote_says_the_box_was_disarmed() {
 #[test]
 fn a_disarming_is_said_and_the_channel_goes_on() {
     let (notices, sink) = Notices::new();
-    let (_scratch, engine, mut channel) = wired(vec![
+    let (_scratch, server, mut channel) = wired(vec![
         advertised(),
         work(vec![row("i-1", "Bash")]),
         receipt("i-1"),
@@ -55,7 +55,7 @@ fn a_disarming_is_said_and_the_channel_goes_on() {
     ]);
     assert_eq!(said(hold(&mut channel, &set(), echo, &sink, None)), "stop");
     assert_eq!(
-        super::ops(&engine),
+        super::ops(&server),
         [
             "advertise",
             "invocations",
@@ -69,13 +69,13 @@ fn a_disarming_is_said_and_the_channel_goes_on() {
     assert_eq!(notices.heard().len(), 1);
 }
 
-/// **The ordinary re-assertion says nothing.** The engine compared and wrote
+/// **The ordinary re-assertion says nothing.** The server compared and wrote
 /// nothing, which is what every hand-off on an undisturbed box answers — and a
 /// notice on each of those would be the noise that gets the real one ignored.
 #[test]
 fn a_re_assertion_that_compared_is_silent() {
     let (notices, sink) = Notices::new();
-    let (_scratch, _engine, mut channel) = wired(vec![
+    let (_scratch, _server, mut channel) = wired(vec![
         advertised(),
         work(vec![row("i-1", "Bash")]),
         receipt("i-1"),
@@ -87,26 +87,26 @@ fn a_re_assertion_that_compared_is_silent() {
 }
 
 /// **A write on the FIRST presentation says nothing either**, and that is
-/// REMOTE §5.1's own reading: a fresh channel presents into whatever the engine
+/// REMOTE §5.1's own reading: a fresh channel presents into whatever the server
 /// happens to hold, and the ordinary first presentation writes. Only a
 /// presentation this foot made after a hand-off it just performed can tell a
 /// rival from a beginning.
 #[test]
 fn a_write_on_the_first_presentation_is_ordinary_and_silent() {
     let (notices, sink) = Notices::new();
-    let (_scratch, _engine, mut channel) = wired(vec![restored(), refusal("stop")]);
+    let (_scratch, _server, mut channel) = wired(vec![restored(), refusal("stop")]);
     assert_eq!(said(hold(&mut channel, &set(), echo, &sink, None)), "stop");
     assert_eq!(notices.heard(), Vec::<String>::new());
 }
 
-/// **An engine that answers the advertisement with something else has not said
+/// **A server that answers the advertisement with something else has not said
 /// the set landed**, and the channel stops there. Reading on would be waiting
 /// for work under a set nobody confirmed — and since the receipt is now where
 /// the `wrote` reading comes from, a foot that shrugged at the kind would be
 /// inventing the reading as well.
 #[test]
 fn an_answer_that_is_not_the_receipt_ends_the_channel() {
-    let (_scratch, _engine, mut channel) = wired(vec![work(vec![])]);
+    let (_scratch, _server, mut channel) = wired(vec![work(vec![])]);
     let said = said(hold(
         &mut channel,
         &set(),

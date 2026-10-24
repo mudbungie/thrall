@@ -2,15 +2,15 @@
 //! not speak one protocol version.
 //!
 //! It is a fourth party, beside the three `ending` tells apart. The wire has no
-//! opinion of either binary. The engine refusing and the engine answering
-//! something unreadable are both this engine's reading of this box. A version
+//! opinion of either binary. The server refusing and the server answering
+//! something unreadable are both this server's reading of this box. A version
 //! mismatch is neither: it is a fact about the two *binaries*, stated by yog's
 //! `docs/REMOTE.md` §3 as having no negotiation at all and carrying its own
 //! remedy — *"upgrade the older component"* — so nothing but a new binary on one
 //! of the two boxes can change it, and every dial until then buys the same
 //! handshake and the same sentence.
 //!
-//! On the tree before this ball it was classified as the wire: an engine
+//! On the tree before this ball it was classified as the wire: a server
 //! upgraded ahead of its feet was dialled forever, writing that sentence into
 //! its operator's journal a minute at a time for the life of the process, while
 //! the sentence itself named a remedy the loop then declined to wait for.
@@ -20,16 +20,16 @@ use super::super::redial::redial;
 use super::{advertised, aside, echo, entry_at, set};
 use crate::channel::Channel;
 use crate::channel::material::read_dir;
-use crate::test_support::engine::Engine;
+use crate::test_support::server::Server;
 use crate::test_support::{Notices, Scratch, Waits, mint};
 
-/// An engine standing one version ahead of this foot, answering `dials` times
+/// A server standing one version ahead of this foot, answering `dials` times
 /// if anything ever gets past its preface. More than one, so a loop that took
 /// the skew for the wire would find something to talk to on its second dial —
 /// which is what the tests below assert never happens.
-fn ahead(dir: &std::path::Path, dials: usize) -> Engine {
+fn ahead(dir: &std::path::Path, dials: usize) -> Server {
     mint::material(dir);
-    Engine::start(
+    Server::start(
         dir,
         crate::corpus::PROTOCOL + 1,
         vec![vec![advertised()]; dials],
@@ -43,7 +43,7 @@ fn ahead(dir: &std::path::Path, dials: usize) -> Engine {
 #[test]
 fn a_version_the_two_ends_do_not_share_is_over_and_not_the_wire() {
     let scratch = Scratch::new();
-    let _engine = ahead(scratch.path(), 1);
+    let _server = ahead(scratch.path(), 1);
     let held = read_dir(scratch.path())
         .expect("readable")
         .expect("provisioned");
@@ -53,7 +53,7 @@ fn a_version_the_two_ends_do_not_share_is_over_and_not_the_wire() {
     };
     assert!(
         said.contains(&format!(
-            "the engine speaks {}",
+            "the server speaks {}",
             crate::corpus::PROTOCOL + 1
         )),
         "{said}"
@@ -72,7 +72,7 @@ fn a_version_the_two_ends_do_not_share_is_over_and_not_the_wire() {
 /// wording that assumed another dial was coming.
 ///
 /// **The recorded waits are the proof that only one dial was made**, and not
-/// the engine's own record of what it heard. A refused foot drops the stream
+/// the server's own record of what it heard. A refused foot drops the stream
 /// where it stands, so whether the far end finished reading the two frames it
 /// was sent is a race this end has already won and is nothing about the
 /// lifetime under test (it flaked exactly there, under tarpaulin). `redial`
@@ -81,14 +81,14 @@ fn a_version_the_two_ends_do_not_share_is_over_and_not_the_wire() {
 #[test]
 fn it_is_neither_waited_out_nor_dialled_again() {
     let scratch = Scratch::new();
-    let _engine = ahead(scratch.path(), 2);
+    let _server = ahead(scratch.path(), 2);
     let (waits, pause) = Waits::new();
     let (notices, sink) = Notices::new();
     let said = redial(entry_at(scratch.path()).open(), &set(), echo, &sink, &pause);
     assert!(said.contains("upgrade the older component"), "{said}");
-    assert_eq!(waits.heard(), [], "it waited to dial an engine again");
+    assert_eq!(waits.heard(), [], "it waited to dial a server again");
     assert!(
-        !said.contains("Dialling this engine again"),
+        !said.contains("Dialling this server again"),
         "a fact only a new binary can change is not something to wait on: {said}"
     );
     assert!(

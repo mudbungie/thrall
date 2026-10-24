@@ -5,9 +5,9 @@
 
 use super::super::material::read_dir;
 use super::super::{Channel, Failure, READ_TIMEOUT};
-use crate::test_support::engine::Engine;
-use crate::test_support::engine::punched::{Punched, Turn};
 use crate::test_support::roving::{commons, presence, tuned};
+use crate::test_support::server::Server;
+use crate::test_support::server::punched::{Punched, Turn};
 use crate::test_support::{Scratch, mint, roving};
 use serde_json::{Value, json};
 use std::path::Path;
@@ -25,9 +25,9 @@ pub(super) fn roving_entry(dir: &Path, address: &str) -> crate::channel::materia
     read_dir(dir).expect("readable").expect("provisioned")
 }
 
-/// The number of prefaces a punched engine heard — one per connection.
-fn connections(engine: &Punched) -> usize {
-    engine
+/// The number of prefaces a punched server heard — one per connection.
+fn connections(server: &Punched) -> usize {
+    server
         .heard()
         .iter()
         .filter(|v| v.get("protocol").is_some())
@@ -42,7 +42,7 @@ fn a_direct_address_that_answers_is_taken_and_stays_one_per_ask() {
     let scratch = Scratch::new();
     mint::material(scratch.path());
     roving::carried(scratch.path());
-    let engine = Engine::start(
+    let server = Server::start(
         scratch.path(),
         crate::corpus::PROTOCOL,
         vec![vec![advertised()], vec![advertised()]],
@@ -58,7 +58,7 @@ fn a_direct_address_that_answers_is_taken_and_stays_one_per_ask() {
             Ok(vec![advertised()])
         );
     }
-    assert_eq!(engine.heard().len(), 4, "two connections, two prefaces");
+    assert_eq!(server.heard().len(), 4, "two connections, two prefaces");
     assert!(channel.held.is_none(), "a dialled connection is not held");
 }
 
@@ -70,14 +70,14 @@ fn a_direct_address_that_answers_is_taken_and_stays_one_per_ask() {
 fn a_dead_address_falls_through_to_the_rendezvous_and_the_connection_is_held() {
     let scratch = Scratch::new();
     let held = roving_entry(scratch.path(), "127.0.0.1:1");
-    let engine = Punched::start(
+    let server = Punched::start(
         scratch.path(),
         vec![
             Turn::Answer(vec![advertised()]),
             Turn::Answer(vec![advertised()]),
         ],
     );
-    let (node, tuning) = commons(vec![presence(engine.port(), 1)]);
+    let (node, tuning) = commons(vec![presence(server.port(), 1)]);
     let mut channel = Channel::open(&held).expect("opened");
     channel.tune(READ_TIMEOUT, tuning);
     assert_eq!(
@@ -89,8 +89,8 @@ fn a_dead_address_falls_through_to_the_rendezvous_and_the_connection_is_held() {
         channel.ask(&json!({"op": "invocations"})),
         Ok(vec![advertised()])
     );
-    assert_eq!(connections(&engine), 1, "one connection carried both asks");
-    assert_eq!(engine.heard().len(), 3, "a preface and two requests");
+    assert_eq!(connections(&server), 1, "one connection carried both asks");
+    assert_eq!(server.heard().len(), 3, "a preface and two requests");
     assert_eq!(
         node.held().len(),
         2,
@@ -99,13 +99,13 @@ fn a_dead_address_falls_through_to_the_rendezvous_and_the_connection_is_held() {
 }
 
 /// **A ping is discarded wherever a reply is read** (REMOTE §13.4): the
-/// engine writes `{"ping":true}` into a held connection's silence, and it is
+/// server writes `{"ping":true}` into a held connection's silence, and it is
 /// never the start of a reply stream.
 #[test]
 fn a_ping_in_the_reply_stream_is_discarded() {
     let scratch = Scratch::new();
     let held = roving_entry(scratch.path(), "127.0.0.1:1");
-    let engine = Punched::start(
+    let server = Punched::start(
         scratch.path(),
         vec![Turn::Answer(vec![
             json!({"ping": true}),
@@ -113,7 +113,7 @@ fn a_ping_in_the_reply_stream_is_discarded() {
             advertised(),
         ])],
     );
-    let (_node, tuning) = commons(vec![presence(engine.port(), 1)]);
+    let (_node, tuning) = commons(vec![presence(server.port(), 1)]);
     let mut channel = Channel::open(&held).expect("opened");
     channel.tune(READ_TIMEOUT, tuning);
     assert_eq!(
@@ -130,8 +130,8 @@ fn silence_past_the_bound_hangs_up_as_the_wire() {
     assert_eq!(READ_TIMEOUT, Duration::from_mins(2));
     let scratch = Scratch::new();
     let held = roving_entry(scratch.path(), "127.0.0.1:1");
-    let engine = Punched::start(scratch.path(), vec![Turn::Silence]);
-    let (_node, tuning) = commons(vec![presence(engine.port(), 1)]);
+    let server = Punched::start(scratch.path(), vec![Turn::Silence]);
+    let (_node, tuning) = commons(vec![presence(server.port(), 1)]);
     let mut channel = Channel::open(&held).expect("opened");
     channel.tune(Duration::from_millis(300), tuning);
     let Err(Failure::Wire(said)) = channel.ask(&json!({"op": "advertise"})) else {
@@ -149,7 +149,7 @@ fn silence_past_the_bound_hangs_up_as_the_wire() {
 fn a_dropped_held_connection_is_re_called_without_reading_presence() {
     let scratch = Scratch::new();
     let held = roving_entry(scratch.path(), "127.0.0.1:1");
-    let engine = Punched::start(
+    let server = Punched::start(
         scratch.path(),
         vec![
             Turn::Answer(vec![advertised()]),
@@ -157,7 +157,7 @@ fn a_dropped_held_connection_is_re_called_without_reading_presence() {
             Turn::Answer(vec![advertised()]),
         ],
     );
-    let (_node, tuning) = commons(vec![presence(engine.port(), 1)]);
+    let (_node, tuning) = commons(vec![presence(server.port(), 1)]);
     let mut channel = Channel::open(&held).expect("opened");
     channel.tune(READ_TIMEOUT, tuning);
     assert_eq!(
@@ -167,19 +167,19 @@ fn a_dropped_held_connection_is_re_called_without_reading_presence() {
     let (empty, tuning) = commons(vec![]);
     channel.tune(READ_TIMEOUT, tuning);
     let Err(Failure::Wire(said)) = channel.ask(&json!({"op": "invocations"})) else {
-        panic!("the engine vanished");
+        panic!("the server vanished");
     };
     assert!(said.starts_with("receive 127.0.0.1:1"), "{said}");
     assert_eq!(
         channel.ask(&json!({"op": "advertise"})),
         Ok(vec![advertised()])
     );
-    assert_eq!(connections(&engine), 2, "a second connection landed");
+    assert_eq!(connections(&server), 2, "a second connection landed");
     assert_eq!(empty.held().len(), 1, "exactly one call, and no presence");
 }
 
 /// **Every rung refusing is one sentence naming them all**, so an operator
-/// reads which engine, which address, and why the commons did not help.
+/// reads which server, which address, and why the commons did not help.
 #[test]
 fn no_rung_answering_names_the_address_and_the_rendezvous() {
     let scratch = Scratch::new();
@@ -196,18 +196,18 @@ fn no_rung_answering_names_the_address_and_the_rendezvous() {
     );
 }
 
-/// A held connection the engine has already closed fails on the send or the
+/// A held connection the server has already closed fails on the send or the
 /// receive as the wire, and is dropped.
 #[test]
-fn a_held_connection_the_engine_closed_is_the_wire() {
+fn a_held_connection_the_server_closed_is_the_wire() {
     let scratch = Scratch::new();
     let held = roving_entry(scratch.path(), "127.0.0.1:1");
-    let engine = Punched::start(scratch.path(), vec![Turn::Answer(vec![advertised()])]);
-    let (_node, tuning) = commons(vec![presence(engine.port(), 1)]);
+    let server = Punched::start(scratch.path(), vec![Turn::Answer(vec![advertised()])]);
+    let (_node, tuning) = commons(vec![presence(server.port(), 1)]);
     let mut channel = Channel::open(&held).expect("opened");
     channel.tune(Duration::from_secs(3), tuning);
     assert!(channel.ask(&json!({"op": "advertise"})).is_ok());
-    // The script is spent: the engine drops the connection on the next read.
+    // The script is spent: the server drops the connection on the next read.
     assert!(matches!(
         channel.ask(&json!({"op": "advertise"})),
         Err(Failure::Wire(_))

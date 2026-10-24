@@ -77,7 +77,7 @@ fn a_tool_the_server_described_thinly_still_prints_a_readable_entry() {
 }
 
 /// **Annotations are commentary and never advertised.** They name the tool on
-/// stderr, for the operator's policy row on the engine side, and no entry
+/// stderr, for the operator's policy row on yog's side, and no entry
 /// carries one — REMOTE §5.1 admits nothing yog stores and cannot check.
 #[test]
 fn annotations_go_to_stderr_and_never_into_an_entry() {

@@ -10,7 +10,7 @@
 //! **And strict is not the same as frozen: readers here GROW** (yog's
 //! `docs/REMOTE.md` §3.2). Since bl-e598 the wire's integer is a *major* and an
 //! addition ships without one, stamped an edition in the corpus ledger instead
-//! — so a reader must take a frame from an engine of another edition without
+//! — so a reader must take a frame from a server of another edition without
 //! refusing it. Four rules, and this file is where the next field meets them:
 //!
 //! 1. **An unknown key is ignored.** Structural here and nothing to keep: every
@@ -66,7 +66,7 @@ pub fn opt_str_of(o: &Map<String, Value>, key: &str) -> Result<Option<String>, S
 /// Required rather than defaulted, because the fields that wear this shape are
 /// *readings* — `wrote` on the advertisement's receipt says whether the far end
 /// changed anything (REMOTE §5.1) — and a reading defaulted to `false` is a
-/// foot inventing the reassuring answer for an engine that said nothing. An
+/// foot inventing the reassuring answer for a server that said nothing. An
 /// optional flag the operator may leave out is a different thing and is read
 /// where it is declared (`tools::of_one`'s `subject_cwd`).
 pub fn bool_of(o: &Map<String, Value>, key: &str) -> Result<bool, String> {

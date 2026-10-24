@@ -13,15 +13,15 @@ use std::net::{IpAddr, SocketAddr, TcpStream};
 use std::time::SystemTime;
 
 impl Roving {
-    /// **A call to `engine`, and its punch** — the one act both lower rungs
+    /// **A call to `server`, and its punch** — the one act both lower rungs
     /// share. The write's walk runs first, so the call names where THAT walk
     /// saw this box (`listed`); a re-call says itself as one. **What lands is
-    /// the cache**: the engine endpoints of the last call that was answered,
+    /// the cache**: the server endpoints of the last call that was answered,
     /// and nothing else — the re-call's whole input beside `last_seq`.
     pub(super) fn called(
         &mut self,
         dht: &mut Dht,
-        engine: Vec<SocketAddr>,
+        server: Vec<SocketAddr>,
         again: bool,
     ) -> Result<Option<TcpStream>, String> {
         let port = self.punch()?.port();
@@ -47,9 +47,9 @@ impl Roving {
         };
         self.say.say(Kind::Call, line);
         self.last_seq = seq;
-        let landed = self.punched(nonce, engine.clone())?;
+        let landed = self.punched(nonce, server.clone())?;
         if landed.is_some() {
-            self.cached = Some(engine);
+            self.cached = Some(server);
         }
         Ok(landed)
     }
@@ -60,7 +60,7 @@ impl Roving {
 /// route-local addresses, then every address the call's own write walk voted
 /// it saw this box at (`Dht::observed`) that is not already one of them —
 /// all at the punch port. Behind a carrier or tethered NAT the route-local
-/// ones are private, and the observed one is the only one the engine can
+/// ones are private, and the observed one is the only one the server can
 /// punch to (§13.8). The observed PORT is the DHT socket's UDP mapping, not
 /// the punch port's TCP one, so only the address is taken and port
 /// preservation is trusted; a carrier that rewrites the port is the case

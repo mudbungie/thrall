@@ -1,5 +1,5 @@
 //! Both items round-trip through the seal, everything that is not one of
-//! them opens to nothing, and bytes the ENGINE sealed open here.
+//! them opens to nothing, and bytes the SERVER sealed open here.
 
 use super::*;
 use crate::rendezvous::pairing::unhex;
@@ -13,12 +13,12 @@ fn endpoints() -> Vec<SocketAddr> {
     ]
 }
 
-/// **The engine's bytes, verbatim** (yog `src/wire/rendezvous/item.rs`,
+/// **The server's bytes, verbatim** (yog `src/wire/rendezvous/item.rs`,
 /// sealed under `[9; 32]`): a presence naming the two endpoints above, and a
 /// call with nonce `0x0102030405060708` naming them too. This end must open
 /// both to exactly those values, or the two ends do not share a wire.
 #[test]
-fn what_the_engine_sealed_opens_here() {
+fn what_the_server_sealed_opens_here() {
     let presence = unhex(
         "e128651d113a52ef1c79109796acec5a3e4eff094a1d2143d4ae46519bfe0523849c18f7debdbd\
          99b74d282e32889ba74a27c827904f74",

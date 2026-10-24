@@ -51,7 +51,7 @@ pub struct Tool {
     pub input_schema: Value,
     /// Whether the operator consents to this tool executing at a working
     /// directory the invocation carries (`"subject_cwd": true` in the
-    /// document; absent reads false). Advertised, because the engine
+    /// document; absent reads false). Advertised, because the server
     /// routes the worktree lane on it; severable, because deleting the
     /// key deletes the capability.
     pub subject_cwd: bool,

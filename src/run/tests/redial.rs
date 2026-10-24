@@ -57,7 +57,7 @@ fn a_predecessor_floor_is_overtaken_by_the_series() {
 }
 
 /// **A channel that served returns the series to its floor.** One answered read
-/// is the engine having parked this foot for its own hold; without the reset a
+/// is the server having parked this foot for its own hold; without the reset a
 /// laptop that sleeps nightly would creep to the cap and stay there for the
 /// life of the process, which is the delay this whole loop exists to shorten.
 #[test]
@@ -67,12 +67,12 @@ fn a_channel_that_served_returns_the_wait_to_its_floor() {
 
 /// **The whole point: a channel that drops is dialled again.** The wire goes
 /// away under the first presentation, the foot waits, and the second dial is
-/// answered — where before this ball that engine's tools were silent for the
+/// answered — where before this ball that server's tools were silent for the
 /// life of the process.
 #[test]
 fn a_dropped_channel_is_dialled_again() {
     let scratch = Scratch::new();
-    let engine = flapping_at(scratch.path(), vec![None, Some(refusal("stop"))]);
+    let server = flapping_at(scratch.path(), vec![None, Some(refusal("stop"))]);
     let (waits, pause) = Waits::new();
     let (notices, sink) = Notices::new();
     assert_eq!(
@@ -80,7 +80,7 @@ fn a_dropped_channel_is_dialled_again() {
         "stop"
     );
     assert_eq!(waits.heard(), [FIRST]);
-    let ops: Vec<String> = engine
+    let ops: Vec<String> = server
         .heard()
         .iter()
         .filter_map(|v| v.get("op")?.as_str().map(str::to_owned))
@@ -89,7 +89,7 @@ fn a_dropped_channel_is_dialled_again() {
     let said = notices.heard();
     assert_eq!(said.len(), 1, "{said:?}");
     assert!(
-        said[0].contains("the channel to the engine failed"),
+        said[0].contains("the channel to the server failed"),
         "{said:?}"
     );
     assert!(said[0].contains("again in 1s"), "{said:?}");
@@ -103,8 +103,8 @@ fn a_dropped_channel_is_dialled_again() {
 #[test]
 fn a_refused_read_is_waited_out_and_named() {
     let scratch = Scratch::new();
-    let refused = "client \"foot-1\" already holds a read on this engine";
-    let _engine = flapping_at(
+    let refused = "client \"foot-1\" already holds a read on this server";
+    let _server = flapping_at(
         scratch.path(),
         vec![
             Some(advertised()),
@@ -132,7 +132,7 @@ fn a_refused_read_is_waited_out_and_named() {
 #[test]
 fn an_ending_that_is_over_stops_the_channel_with_no_wait() {
     let scratch = Scratch::new();
-    let _engine = flapping_at(
+    let _server = flapping_at(
         scratch.path(),
         vec![Some(refusal("a rival holds this set"))],
     );
@@ -153,7 +153,7 @@ fn an_ending_that_is_over_stops_the_channel_with_no_wait() {
 fn an_entry_that_cannot_be_opened_is_over_before_any_dial() {
     let (waits, pause) = Waits::new();
     let entry = Entry {
-        leaf: "engine".to_owned(),
+        leaf: "server".to_owned(),
         channel: Err("this entry is empty".to_owned()),
     };
     assert_eq!(
@@ -191,7 +191,7 @@ fn a_second_drop_backs_off_unless_the_channel_served() {
 /// Run one channel against `script` and answer every wait it took.
 fn waits_over(script: Vec<Option<serde_json::Value>>) -> Vec<Duration> {
     let scratch = Scratch::new();
-    let _engine = flapping_at(scratch.path(), script);
+    let _server = flapping_at(scratch.path(), script);
     let (waits, pause) = Waits::new();
     assert_eq!(
         redial(
@@ -208,15 +208,15 @@ fn waits_over(script: Vec<Option<serde_json::Value>>) -> Vec<Duration> {
 
 /// **Nothing crosses a redial, and the disarming is the case that proves it**
 /// (DESIGN §3.8). A redial makes a NEW channel, whose first presentation writes
-/// into whatever the engine happens to hold and says nothing by design (REMOTE
+/// into whatever the server happens to hold and says nothing by design (REMOTE
 /// §5.1). A foot that remembered having been disarmed and read the next
 /// channel's first `wrote` as a rival would cry rival on the most ordinary
-/// redial there is — the engine restarted, or this box's own dying predecessor
+/// redial there is — the server restarted, or this box's own dying predecessor
 /// wrote last — which is the noise that gets the real one ignored.
 #[test]
 fn a_disarming_is_not_remembered_across_a_redial() {
     let scratch = Scratch::new();
-    let _engine = flapping_at(
+    let _server = flapping_at(
         scratch.path(),
         vec![
             Some(restored()),
@@ -240,7 +240,7 @@ fn a_disarming_is_not_remembered_across_a_redial() {
     );
     let said = notices.heard();
     assert_eq!(said.len(), 1, "only the redial spoke: {said:?}");
-    assert!(said[0].contains("Dialling this engine again"), "{said:?}");
+    assert!(said[0].contains("Dialling this server again"), "{said:?}");
     assert!(
         !said[0].contains("was not the set in force"),
         "a fresh channel's first presentation says nothing: {said:?}"

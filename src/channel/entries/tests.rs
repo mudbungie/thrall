@@ -59,7 +59,7 @@ fn a_file_beside_the_entries_is_not_an_entry() {
     assert_eq!(read_dir(scratch.path()).len(), 1);
 }
 
-/// **A refusal is one entry's, never the set's.** A box serving three engines
+/// **A refusal is one entry's, never the set's.** A box serving three servers
 /// does not lose the two that are fine because the third is half-provisioned.
 #[test]
 fn one_broken_entry_does_not_cost_the_others() {
@@ -87,13 +87,13 @@ fn one_broken_entry_does_not_cost_the_others() {
 #[test]
 fn opening_an_entry_is_opening_its_channel() {
     let scratch = Scratch::new();
-    let entry = scratch.join("engine");
-    mint::provisioned(&entry, "engine.example:9000");
+    let entry = scratch.join("server");
+    mint::provisioned(&entry, "server.example:9000");
     let held = read_dir(scratch.path());
     assert_eq!(held.len(), 1);
     let channel = held[0].open().expect("opened");
     assert_eq!(channel.client(), mint::FOOT_NAME);
-    assert_eq!(channel.address(), "engine.example:9000");
+    assert_eq!(channel.address(), "server.example:9000");
 
     std::fs::remove_file(entry.join(ANCHORS)).expect("rm");
     let broken = read_dir(scratch.path());

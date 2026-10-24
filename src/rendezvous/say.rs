@@ -1,5 +1,5 @@
 //! **What the ladder says while it climbs** (bl-3958; yog REMOTE §13.4 "The
-//! operator's view of the loop", the engine's half being yog bl-355c). A dial
+//! operator's view of the loop", the server's half being yog bl-355c). A dial
 //! that fails silently is indistinguishable from one that never ran, so each
 //! rung, the punch and the held line say their outcome through the channel's
 //! notice sink (`run::Notice`, stderr in production) — one line per event,
@@ -12,7 +12,7 @@
 //! could break it. It is also why a DHT failure is said without its reason:
 //! the walk's refusals name the nodes it asked and the target it walked
 //! toward, a derivation of the key and the salt. (The channel's own failure
-//! sentence still names the engine's address, as DESIGN §2 has it say; that
+//! sentence still names the server's address, as DESIGN §2 has it say; that
 //! is the address the operator filed, not one the commons revealed.)
 //!
 //! **A repeated outcome is said once** ([`Say`]): each family remembers the
@@ -98,7 +98,7 @@ pub(crate) const WALK: &str = "the DHT walk failed (reason withheld: it names no
 pub(crate) const NO_WALK: &str =
     "no DHT walk could start (no bootstrap node resolved, or no socket)";
 /// The commons holds nothing under the key.
-pub(crate) const NONE: &str = "none is published under the engine's rendezvous key";
+pub(crate) const NONE: &str = "none is published under the server's rendezvous key";
 /// The item is not this pairing's.
 pub(crate) const SEALED: &str = "the item does not open under this pairing";
 

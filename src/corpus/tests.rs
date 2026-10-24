@@ -1,10 +1,10 @@
-//! **What this foot owes the engine's corpus** (REMOTE §3): every reply frame
+//! **What this foot owes the server's corpus** (REMOTE §3): every reply frame
 //! it can earn decodes into this crate's own types, and every request frame it
 //! emits round-trips — decode then re-encode returning the frame exactly.
 //!
 //! It is the half of conformance the version preface cannot buy. The preface
-//! catches an engine of the wrong *build*; these catch a frame of the wrong
-//! *shape* from an engine of the right one — which is the failure that arrives
+//! catches a server of the wrong *build*; these catch a frame of the wrong
+//! *shape* from a server of the right one — which is the failure that arrives
 //! when the number is correct and a field was added under it.
 
 use super::{ADVERTISE, ADVERTISED, COMPLETE, INVOCATIONS, PROTOCOL, QUEUED, REFUSAL, ROUTED};
@@ -21,17 +21,17 @@ fn frame(text: &str) -> Value {
     serde_json::from_str(text).expect("a corpus frame is JSON")
 }
 
-/// **The pin is the engine's number, and the two have different sources.**
+/// **The pin is the server's number, and the two have different sources.**
 /// [`hello::PROTOCOL`] is what this build states on the wire;
 /// [`PROTOCOL`](super::PROTOCOL) is yog's own line, copied. A bump on the far
 /// end is this test going red naming both numbers — which is the sentence the
 /// wire would otherwise give an operator, one dial too late.
 #[test]
-fn the_version_this_build_states_is_the_version_the_engine_states() {
+fn the_version_this_build_states_is_the_version_the_server_states() {
     assert_eq!(
         hello::PROTOCOL,
         PROTOCOL,
-        "this foot pins {}, the engine's corpus states {PROTOCOL} — \
+        "this foot pins {}, the server's corpus states {PROTOCOL} — \
          re-vendor src/corpus.rs from yog and move the pin with it",
         hello::PROTOCOL,
     );
@@ -83,7 +83,7 @@ fn the_completion_round_trips() {
 /// **The receipt at PROTOCOL 8**: `wrote` is read, both ways round, and it is
 /// the reading the loop acts on.
 #[test]
-fn the_advertised_receipt_carries_the_engine_s_reading() {
+fn the_advertised_receipt_carries_the_server_s_reading() {
     assert_eq!(
         gestures::decode(&frame(ADVERTISED[0])),
         Ok(Ok(Reply::Advertised { wrote: false }))
@@ -97,9 +97,9 @@ fn the_advertised_receipt_carries_the_engine_s_reading() {
 /// **A receipt in the shape this foot used to accept is refused now.** That is
 /// the bump biting: before PROTOCOL 8 the frame below was the whole of the
 /// reply, and a build that read it as *"nothing was restored"* would be
-/// answering the reassuring thing on exactly the engine that cannot say.
+/// answering the reassuring thing on exactly the server that cannot say.
 #[test]
-fn the_receipt_the_engine_sent_before_the_bump_is_refused() {
+fn the_receipt_the_server_sent_before_the_bump_is_refused() {
     assert_eq!(
         gestures::decode(&frame(r#"{"kind":"advertised","ok":true}"#)),
         Err("reply: missing field \"wrote\"".to_owned())
@@ -155,7 +155,7 @@ fn the_routed_receipt_tells_unfinished_from_finished_saying_nothing() {
     );
 }
 
-/// The refusal is the envelope with no `kind`, and it carries the engine's own
+/// The refusal is the envelope with no `kind`, and it carries the server's own
 /// sentence rather than a class this end invented.
 #[test]
 fn the_refusal_is_the_envelope_with_no_kind() {

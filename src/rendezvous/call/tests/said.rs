@@ -8,7 +8,7 @@ use super::{dead_port, roving};
 use crate::dht::tests::fake::Mood;
 use crate::rendezvous::say::{self, Say};
 use crate::test_support::Notices;
-use crate::test_support::roving::{commons, commons_as, engine, pairing, presence};
+use crate::test_support::roving::{commons, commons_as, pairing, presence, server};
 
 /// A roving half speaking into a recorder.
 fn heard(tuning: Tuning) -> (Roving, Notices) {
@@ -43,7 +43,7 @@ fn a_presence_under_another_pairing_is_said_unopened() {
     }
     .seal(&[7u8; 32])
     .expect("seal");
-    let item = engine().sign(p.presence_salt(), 1, sealed).expect("signed");
+    let item = server().sign(p.presence_salt(), 1, sealed).expect("signed");
     let (_node, tuning) = commons(vec![item]);
     let (mut r, notices) = heard(tuning);
     r.rendezvous().expect_err("refused");
@@ -56,7 +56,7 @@ fn a_presence_naming_nothing_is_said_read_with_none() {
     let sealed = crate::rendezvous::item::Presence { endpoints: vec![] }
         .seal(&p.seal_key())
         .expect("seal");
-    let item = engine().sign(p.presence_salt(), 4, sealed).expect("signed");
+    let item = server().sign(p.presence_salt(), 4, sealed).expect("signed");
     let (_node, tuning) = commons(vec![item]);
     let (mut r, notices) = heard(tuning);
     r.rendezvous().expect_err("refused");

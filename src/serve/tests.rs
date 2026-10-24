@@ -1,10 +1,10 @@
 //! What `thrall run` reads, in what order it refuses — and the whole foot,
-//! once around, against an engine that really speaks the protocol.
+//! once around, against a server that really speaks the protocol.
 
 use super::serve;
 use crate::channel::entries;
 use crate::config;
-use crate::test_support::engine::Engine;
+use crate::test_support::server::Server;
 use crate::test_support::{Scratch, aside, mint, unwaited};
 use serde_json::{Value, json};
 use std::path::Path;
@@ -24,12 +24,12 @@ fn running(root: &Path, script: &str) {
     std::fs::write(config::path(root), document.to_string()).expect("write");
 }
 
-/// File one channel under `root`, with an engine standing at it that answers
+/// File one channel under `root`, with a server standing at it that answers
 /// the n-th dial with the n-th entry of `script`.
-fn channel(root: &Path, leaf: &str, script: Vec<Value>) -> Engine {
+fn channel(root: &Path, leaf: &str, script: Vec<Value>) -> Server {
     let dir = entries::dir(root).join(leaf);
     mint::material(&dir);
-    Engine::start(
+    Server::start(
         &dir,
         crate::corpus::PROTOCOL,
         script.into_iter().map(|v| vec![v]).collect(),
@@ -94,7 +94,7 @@ fn every_channel_that_stopped_answers_under_its_own_name() {
     );
 }
 
-/// **The whole foot, once around.** An engine hands this box an invocation for
+/// **The whole foot, once around.** A server hands this box an invocation for
 /// a tool the operator's document enables; the tool runs here; and what comes
 /// back over the wire is what the command actually printed. Every leg is real:
 /// a real mTLS channel, a real version preface, a real child process.
@@ -102,9 +102,9 @@ fn every_channel_that_stopped_answers_under_its_own_name() {
 fn a_foot_advertises_is_invoked_and_answers_with_what_ran() {
     let scratch = Scratch::new();
     offering(scratch.path());
-    let engine = channel(
+    let server = channel(
         scratch.path(),
-        "engine",
+        "server",
         vec![
             advertised(),
             json!({"ok": true, "kind": "invocations",
@@ -112,13 +112,13 @@ fn a_foot_advertises_is_invoked_and_answers_with_what_ran() {
                              "input": {"command": "echo hi"}}]}),
             json!({"ok": true, "kind": "routed", "invocation": "i-1",
                    "capture": {"stdout": "", "stderr": "", "exit_code": 0}}),
-            refusal("the engine is going down"),
+            refusal("the server is going down"),
         ],
     );
     let said = serve(scratch.path(), &aside(), &unwaited());
-    assert_eq!(said.text, "thrall: engine: the engine is going down");
+    assert_eq!(said.text, "thrall: server: the server is going down");
 
-    let gestures: Vec<Value> = engine
+    let gestures: Vec<Value> = server
         .heard()
         .into_iter()
         .filter(|v| v.get("op").is_some())
@@ -157,22 +157,22 @@ fn a_capture_too_big_for_the_wire_is_answered_and_the_channel_goes_on() {
     let scratch = Scratch::new();
     let over = crate::channel::frame::MAX_FRAME + 1;
     running(scratch.path(), &format!("yes hello | head -c {over}"));
-    let engine = channel(
+    let server = channel(
         scratch.path(),
-        "engine",
+        "server",
         vec![
             advertised(),
             json!({"ok": true, "kind": "invocations",
                    "rows": [{"invocation": "i-1", "tool": "Echo", "input": {}}]}),
             json!({"ok": true, "kind": "routed", "invocation": "i-1",
                    "capture": {"stdout": "", "stderr": "", "exit_code": 0}}),
-            refusal("the engine is going down"),
+            refusal("the server is going down"),
         ],
     );
     let said = serve(scratch.path(), &aside(), &unwaited());
-    assert_eq!(said.text, "thrall: engine: the engine is going down");
+    assert_eq!(said.text, "thrall: server: the server is going down");
 
-    let gestures: Vec<Value> = engine
+    let gestures: Vec<Value> = server
         .heard()
         .into_iter()
         .filter(|v| v.get("op").is_some())

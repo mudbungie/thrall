@@ -13,15 +13,15 @@
 //!
 //! **The first stream that lands is the connection** — the client's half of
 //! REMOTE §13.3's rule. Two hosts that can both reach each other's listener
-//! form two connections; the engine serves every one that lands and lets the
+//! form two connections; the server serves every one that lands and lets the
 //! one nobody speaks on die in its handshake, so this end keeps the first and
 //! drops the rest, and no negotiation over which to keep is needed.
 //!
 //! **This is the one socket a foot ever listens on, and DESIGN §2 says so.**
 //! It exists only on an entry holding rendezvous material, it is bound once
 //! per run, and it accepts only inside a window this end opened by calling
-//! the engine. A SYN arriving outside a window sits in the backlog: the next
-//! punch takes it if the engine is still serving it, and a handshake that
+//! the server. A SYN arriving outside a window sits in the backlog: the next
+//! punch takes it if the server is still serving it, and a handshake that
 //! fails is the ordinary wire failure the redial already answers.
 //!
 //! **v6 first** where both ends published it (REMOTE §13.3): a stateful v6
@@ -169,7 +169,7 @@ fn reusable(v6: bool, port: u16) -> std::io::Result<Socket> {
 /// select the default route, and the documentation ranges (RFC 5737, RFC
 /// 3849) do that as well as any real host would. Loopback never appears — a
 /// box with no route has no address to publish, and says so with an empty
-/// list, which is a call the engine answers by listening alone.
+/// list, which is a call the server answers by listening alone.
 pub(crate) fn local_ips() -> Vec<IpAddr> {
     ["[2001:db8::1]:53", "192.0.2.1:53"]
         .iter()

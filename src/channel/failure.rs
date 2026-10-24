@@ -11,7 +11,7 @@
 #[derive(Debug, PartialEq, Eq)]
 pub enum Failure {
     /// **The transport.** It carries no opinion of either binary — a socket
-    /// that would not open, an engine that went away, a peer that hung up
+    /// that would not open, a server that went away, a peer that hung up
     /// before it had said anything — so the same ask down a fresh connection
     /// may well land.
     Wire(String),

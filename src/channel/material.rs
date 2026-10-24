@@ -19,7 +19,7 @@
 //!   times.
 //! - **Provisioned** — `Ok(Some(Material))`: the anchors, this box's leaf and
 //!   key for this channel, the one address it dials, and — when the operator
-//!   carried it — the rendezvous pairing that finds the engine where the
+//!   carried it — the rendezvous pairing that finds the server where the
 //!   address cannot.
 //!
 //! **The four files are REMOTE §8.2's, unchanged.** An operator who provisioned
@@ -33,8 +33,8 @@ use std::path::{Path, PathBuf};
 
 use crate::rendezvous::pairing::{self, Pairing};
 
-/// The operator CA this end verifies the engine against — one anchor set, and
-/// the same one the engine verifies this end with.
+/// The operator CA this end verifies the server against — one anchor set, and
+/// the same one the server verifies this end with.
 pub const ANCHORS: &str = "ca.pem";
 /// This box's certificate chain for this channel. Its subject common name
 /// **is** this client's identity (REMOTE §2), and its organizational unit is
@@ -44,7 +44,7 @@ pub const CHAIN: &str = "client.pem";
 pub const KEY: &str = "client.key";
 /// The `host:port` this channel dials. One address per relationship and no
 /// flag: two spellings of one address is the drift REMOTE §8 removed. **It is
-/// also the engine NAME's one home** (DESIGN §3.11): whichever rung of the
+/// also the server NAME's one home** (DESIGN §3.11): whichever rung of the
 /// ladder answers, the inner mTLS verifies the host written here.
 pub const ADDRESS: &str = "address";
 
@@ -63,7 +63,7 @@ pub struct Material {
     pub chain: PathBuf,
     /// This end's private key, PEM.
     pub key: PathBuf,
-    /// `host:port` — the engine this channel dials.
+    /// `host:port` — the server this channel dials.
     pub address: String,
     /// The rendezvous pairing, where the operator carried one (REMOTE §13.2).
     /// `None` is an entry that roves nowhere, which is most entries.

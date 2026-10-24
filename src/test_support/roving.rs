@@ -1,6 +1,6 @@
 //! **The operator's rendezvous act, performed by the suite** (REMOTE §13.2),
 //! and the commons stood in for: the two files an entry carries, a fake DHT
-//! node holding the engine's presence, and the tuning that points a channel
+//! node holding the server's presence, and the tuning that points a channel
 //! at both in milliseconds.
 
 use std::net::{Ipv4Addr, SocketAddr};
@@ -15,21 +15,21 @@ use crate::rendezvous::call::Tuning;
 use crate::rendezvous::item::Presence;
 use crate::rendezvous::pairing::{self, Pairing, hex};
 
-/// The engine's rendezvous seed — the half a foot never holds.
+/// The server's rendezvous seed — the half a foot never holds.
 const SEED: [u8; 32] = [5u8; 32];
 /// The pairing salt both ends share.
 const SALT: [u8; 32] = [6u8; 32];
 
-/// The pairing as this box reads it: the engine's PUBLIC key and the salt.
+/// The pairing as this box reads it: the server's PUBLIC key and the salt.
 pub(crate) fn pairing() -> Pairing {
     Pairing {
-        key: engine().public(),
+        key: server().public(),
         salt: SALT,
     }
 }
 
-/// The engine's keypair, for signing what the engine would sign.
-pub(crate) fn engine() -> Keypair {
+/// The server's keypair, for signing what the server would sign.
+pub(crate) fn server() -> Keypair {
     Keypair::from_seed(SEED).expect("a keypair")
 }
 
@@ -39,8 +39,8 @@ pub(crate) fn carried(dir: &Path) {
     std::fs::write(dir.join(pairing::SALT), hex(&SALT)).expect("the salt");
 }
 
-/// The engine's presence item, naming loopback at `port`, sealed and signed
-/// as the engine's loop would.
+/// The server's presence item, naming loopback at `port`, sealed and signed
+/// as the server's loop would.
 pub(crate) fn presence(port: u16, seq: i64) -> Mutable {
     let p = pairing();
     let sealed = Presence {
@@ -48,7 +48,7 @@ pub(crate) fn presence(port: u16, seq: i64) -> Mutable {
     }
     .seal(&p.seal_key())
     .expect("seal");
-    engine()
+    server()
         .sign(p.presence_salt(), seq, sealed)
         .expect("signed")
 }

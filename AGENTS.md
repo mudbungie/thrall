@@ -80,12 +80,12 @@ skew is two-directional and each direction is gated where it can be decided:
 1. **yog does not publish a bump ahead of its consumers** — its release pull
    request is held until this repository's `main`, lernie's and
    yog-android's carry the new number.
-2. **This repository does not publish a bump ahead of the engine** — the
+2. **This repository does not publish a bump ahead of the server** — the
    `merge-release-pr` job holds a release whose `PROTOCOL` **exceeds** the
    newest published yog's (its newest `v<x.y.z>` tag, cut in the same act as
-   the crates.io upload). thrall 0.0.15 shipped 16 while the published engine
+   the crates.io upload). thrall 0.0.15 shipped 16 while the published server
    spoke 15, which composes with nothing. Strictly greater, not different: a
-   thrall *behind* the engine is defect 1 and its release is the fix.
+   thrall *behind* the server is defect 1 and its release is the fix.
 
 **The ordering this produces, and the whole of what to remember: the
 consumers' mains carry the number first, then yog publishes, then the consumers
@@ -96,7 +96,7 @@ network, because the workflow that spends it cannot run locally) and
 
 **A held release is re-judged by a `workflow_dispatch` of Release-plz**
 (bl-f3a5). Gate 2 is the one gate whose answer changes with nothing in this
-repository changing — it clears when the ENGINE publishes, an event this
+repository changing — it clears when the SERVER publishes, an event this
 repository never sees — so without a hand-wakeable door a held release waits
 for an unrelated landing on `main`. `merge-release-pr` therefore runs on a
 dispatch as well as on a push, re-judging the open release pull request against
@@ -106,10 +106,10 @@ the newest published yog tag. The gate itself does not move: `ci` and
 **Bump it by editing `PROTOCOL`, and nothing else.** Both gates read that path
 at the root of whatever tree, tag or main they judge, and **no gate, workflow
 or roster in any of the four repositories names a Rust path for the number**
-(bl-c618). It used to: this repository fetched the engine's constant from
+(bl-c618). It used to: this repository fetched the server's constant from
 `src/wire/hello.rs`, yog split that file, and the fetch went on succeeding
 while the read found nothing — so this gate held on an input it could not
-read, and the engine's next publish would have made that hold permanent
+read, and the server's next publish would have made that hold permanent
 instead of clearing it.
 
 ### The disclosure gate

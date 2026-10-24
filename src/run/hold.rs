@@ -8,7 +8,7 @@
 //! **Nothing in it is thrall speaking unprompted.** Every leg is a reply to
 //! something this end asked for: the advertisement is an act it sends, the work
 //! arrives as the answer to a read it issued, and the capture goes back as
-//! another act. The engine never speaks first (REMOTE §3), and the shape of
+//! another act. The server never speaks first (REMOTE §3), and the shape of
 //! this file is that invariant rather than a consequence of it.
 //!
 //! **The advertisement is presented once per channel and again after every
@@ -20,7 +20,7 @@
 //!
 //! The re-assertion is there because the stored set is keyed on this box's
 //! *identity*, not on this connection, and any connection bearing the
-//! certificate may replace it. The engine refuses a replacement while this
+//! certificate may replace it. The server refuses a replacement while this
 //! machine holds a parked read (REMOTE §5.1), which covers the whole of an idle
 //! foot's life — so the one window left open is the one this foot opens itself:
 //! it is **absent** while it executes, and a set blanked in that window would
@@ -29,13 +29,13 @@
 //! that window to one tool's runtime instead of forever.
 //!
 //! **And since PROTOCOL 8 it also buys knowing** (yog bl-66d4). The receipt
-//! carries `wrote`: false when the engine compared, true when it changed the
+//! carries `wrote`: false when the server compared, true when it changed the
 //! document. So a re-assertion that WROTE is this machine being told it was
 //! disarmed while it was absent — the set it presented was not the set in
 //! force — and that is said out loud rather than healed in silence.
 //!
 //! **A true on the FIRST presentation of a channel says nothing** and is not
-//! reported: every fresh channel presents into whatever the engine holds, and
+//! reported: every fresh channel presents into whatever the server holds, and
 //! the ordinary first one writes. Only a re-assertion — a presentation this
 //! foot made after a hand-off it just performed — can distinguish a rival from
 //! a beginning. **A redial makes a fresh channel** (`redial`), so that silence
@@ -45,7 +45,7 @@
 //! **The loop is serial, and that is what makes a busy foot absent** (REMOTE
 //! §5's presence amendment). It runs one invocation at a time and holds a
 //! connection only while it is waiting, so the far end sees it vanish for as
-//! long as a tool takes — which is why the engine's routing predicate is the
+//! long as a tool takes — which is why the server's routing predicate is the
 //! mailbox queue and never presence.
 //!
 //! **The execution itself is a hand-off, and it is not here** (bl-4cda). What
@@ -75,7 +75,7 @@ use crate::invocation::Invocation;
 
 /// **What this machine says when a re-assertion actually wrote.**
 ///
-/// The engine writes only a set that differs, so a `true` here means the set in
+/// The server writes only a set that differs, so a `true` here means the set in
 /// force was not the set this foot presents — something replaced it while this
 /// box was executing and could not be told apart from a machine that had gone
 /// away (REMOTE §5.1). The restoration is automatic; being told is not, and it
@@ -85,7 +85,7 @@ use crate::invocation::Invocation;
 /// them apart and guessing would be worse than saying so.
 const DISARMED: &str = "this box's advertised set was not the set in force and has just been \
     restored: it was replaced while a tool was running. Either another connection is bearing \
-    this box's identity, or the engine lost the set it was holding.";
+    this box's identity, or the server lost the set it was holding.";
 
 /// **One channel, served** — until something ends it, and then what ended it.
 ///
@@ -95,7 +95,7 @@ const DISARMED: &str = "this box's advertised set was not the set in force and h
 ///
 /// **A capture a previous channel could not post is this one's first act**
 /// ([`Held`], REMOTE §5.6 ruling 1) — after the advertisement and before the
-/// first read, because the read is what releases the engine's lease, so a
+/// first read, because the read is what releases the server's lease, so a
 /// capture posted ahead of it lands on a slot still held with no capture and
 /// the driver collects a result this box computed once.
 pub(crate) fn hold(
@@ -108,7 +108,7 @@ pub(crate) fn hold(
     let presenting = gestures::advertise(&config::advertisement(set));
     let mut served = false;
     // The first presentation's reading is discarded on purpose: a fresh channel
-    // writes whenever the engine held something else, and there is no rival in
+    // writes whenever the server held something else, and there is no rival in
     // that. Only a re-assertion below can mean one.
     if let Err(failed) = present(channel, &presenting) {
         return failed.at(Leg::Advertisement, served);
@@ -145,12 +145,12 @@ pub(crate) fn hold(
 /// config, so "the set this foot presents" has one spelling and the
 /// re-assertion cannot drift from the presentation.
 ///
-/// **It answers the engine's reading**: whether that presentation WROTE the
+/// **It answers the server's reading**: whether that presentation WROTE the
 /// stored set or found it identical and compared (REMOTE §5.1's `wrote`,
 /// PROTOCOL 8). What that means depends on which presentation it was, so the
 /// judgement is the caller's and this is only the reading.
 ///
-/// **And it is strict about the kind.** An engine that answered the
+/// **And it is strict about the kind.** A server that answered the
 /// advertisement with something other than the advertisement's receipt has not
 /// said the set landed, and a foot that read on regardless would be waiting for
 /// work under a set nobody confirmed.
@@ -158,7 +158,7 @@ fn present(channel: &mut Channel, presenting: &Value) -> Result<bool, Failed> {
     match tell(channel, presenting)? {
         Reply::Advertised { wrote } => Ok(wrote),
         other => Err(Failed::Unusable(format!(
-            "the engine answered {other:?}, not that the advertisement landed"
+            "the server answered {other:?}, not that the advertisement landed"
         ))),
     }
 }
@@ -169,7 +169,7 @@ fn waited(channel: &mut Channel) -> Result<Vec<Invocation>, Failed> {
     match tell(channel, &gestures::invocations())? {
         Reply::Invocations(rows) => Ok(rows),
         other => Err(Failed::Unusable(format!(
-            "the engine answered {other:?}, not this machine's work"
+            "the server answered {other:?}, not this machine's work"
         ))),
     }
 }
@@ -183,16 +183,16 @@ fn waited(channel: &mut Channel) -> Result<Vec<Invocation>, Failed> {
 ///
 /// **The ways it can fail are different parties**, and keeping them apart here
 /// is what lets [`Failed::at`] decide a lifetime without reading a sentence:
-/// the socket, the engine's refusal, an answer no foot gesture can earn, and —
+/// the socket, the server's refusal, an answer no foot gesture can earn, and —
 /// arriving through the channel's own [`Failure`](crate::channel::Failure) —
 /// the two binaries disagreeing about the protocol. A stream that terminated
 /// with no frame in it belongs to the third: the terminator is a zero-length
-/// frame the engine deliberately wrote, where a peer that went away is a read
+/// frame the server deliberately wrote, where a peer that went away is a read
 /// error instead.
 pub(super) fn tell(channel: &mut Channel, request: &Value) -> Result<Reply, Failed> {
     let stream = channel.ask(request).map_err(Failed::from)?;
     let last = stream.last().ok_or_else(|| {
-        Failed::Unusable("the engine ended the stream without answering".to_owned())
+        Failed::Unusable("the server ended the stream without answering".to_owned())
     })?;
     match gestures::decode(last) {
         Ok(Ok(reply)) => Ok(reply),

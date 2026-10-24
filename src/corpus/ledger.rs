@@ -1,4 +1,4 @@
-//! **The engine's shape ledger, vendored** (yog's `docs/REMOTE.md` §3.2) — the
+//! **The server's shape ledger, vendored** (yog's `docs/REMOTE.md` §3.2) — the
 //! edition every field path of every shape a foot speaks appeared at.
 //!
 //! §3.2's ruling: `PROTOCOL` is a **major**, moved only by a breaking change,
@@ -10,9 +10,9 @@
 //!
 //! **[`FLOOR`] is what makes a stamp actionable.** It is the edition the
 //! current major was cut at: every path stamped at or below it is present on
-//! every engine speaking this major, so a reader may require it — which is what
+//! every server speaking this major, so a reader may require it — which is what
 //! every reader here does today. Every path stamped ABOVE it is optional to
-//! read, because an engine of an older edition does not write it, and that is
+//! read, because a server of an older edition does not write it, and that is
 //! the one class this crate has no member of yet (its newest stamp is 8, ten
 //! editions under the floor). The replay in [`replay`](super::replay) is what
 //! keeps that true rather than accidental.
@@ -47,7 +47,7 @@ pub(crate) const DEPRECATED: [&str; 0] = [];
 /// A path is spelled exactly as `shapes.json` spells it — `"<path>:<type>"`,
 /// segments separated by `/`, `[]` for every element of an array, the empty
 /// path for the frame itself — because a re-spelling is a second copy of the
-/// engine's fact and this file exists to hold exactly one.
+/// server's fact and this file exists to hold exactly one.
 pub(crate) struct Shape {
     /// The corpus name, `request/<op>` or `reply/<kind>`.
     pub(crate) name: &'static str,
@@ -60,7 +60,7 @@ pub(crate) struct Shape {
 /// states on the wire, and the two agreeing is a test rather than a tautology —
 /// the same discipline the protocol pin keeps (`corpus::tests`).
 ///
-/// **It is 8 rather than the engine's 18, and that is honest.** An edition is a
+/// **It is 8 rather than the server's 18, and that is honest.** An edition is a
 /// statement about what this end can READ, and a foot reads nothing stamped
 /// past 8: every field added since is on a seat-facing shape it never decodes.
 /// A field added at 14 to a shape this crate has no decoder for cannot make
