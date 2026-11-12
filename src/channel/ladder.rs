@@ -12,11 +12,14 @@
 //! will not hairpin — so the operator states the LAN address second and a
 //! foot at home falls through to it.
 //!
-//! **A rung is a TCP connect under a bound, and nothing more.** Whatever
-//! answers at an endpoint still has to present the operator's CA in the
-//! handshake that follows, so dialling a private address from somebody else's
-//! network is harmless — and a handshake that fails there is the channel's
-//! failure, not a reason to say the request again somewhere else.
+//! **A rung is the connect AND the handshake, each under a bound** (bl-45e9).
+//! A socket that opens proves only that something is there: a private
+//! address dialled from somebody else's network may well be answered, and so
+//! may any address behind a captive network. Whatever answers must present
+//! the operator's CA, and what cannot is passed over exactly as a socket that
+//! would not open is. **Nothing of the gesture has crossed by then** — the
+//! handshake is driven to its end here, before this end's preface or its
+//! request is written — so the next rung repeats nothing.
 //!
 //! **What answered is kept, and only in RAM.** The next dial tries it first,
 //! which is what keeps a foot at home from paying the public name's bound on
@@ -25,15 +28,18 @@
 //! the run's finding is not.
 
 use std::net::{TcpStream, ToSocketAddrs};
+use std::sync::Arc;
 use std::time::Duration;
 
-use super::Endpoint;
-use rustls::pki_types::ServerName;
+use super::{Endpoint, Tls};
+use rustls::{ClientConfig, ClientConnection, StreamOwned};
 
-/// How long one connect may take before the next rung is tried. A NAT that
-/// drops the SYN answers nothing, and the kernel's own patience is minutes; a
-/// rung has to give up sooner than that to be a rung.
-const BOUND: Duration = Duration::from_secs(10);
+/// How long one connect, and one read of the handshake after it, may take
+/// before the next rung is tried. A NAT that drops the SYN answers nothing,
+/// and so does a listener that takes the socket and never speaks; the
+/// kernel's own patience is minutes, and a rung has to give up sooner than
+/// that to be a rung.
+const BOUND: Duration = Duration::from_secs(5);
 
 /// The rung that answered.
 pub(super) struct Kept {
@@ -41,21 +47,24 @@ pub(super) struct Kept {
     pub(super) at: usize,
     /// The endpoint as the entry states it.
     pub(super) address: String,
-    /// The name its certificate is verified against.
-    pub(super) name: ServerName<'static>,
 }
 
-/// A connection to the server and the rung that gave it: `kept` first, then
-/// the rest in the entry's order. No rung answering is every rung's sentence.
-pub(super) fn climb(endpoints: &[Endpoint], kept: usize) -> Result<(TcpStream, Kept), String> {
+/// A verified connection to the server and the rung that gave it: `kept`
+/// first, then the rest in the entry's order. No rung answering is every
+/// rung's sentence.
+pub(super) fn climb(
+    config: &Arc<ClientConfig>,
+    endpoints: &[Endpoint],
+    kept: usize,
+) -> Result<(Tls, Kept), String> {
     let first = endpoints.iter().enumerate().skip(kept).take(1);
     let rest = endpoints.iter().enumerate().filter(|(at, _)| *at != kept);
     let mut refused = Vec::new();
-    for (at, (address, name)) in first.chain(rest) {
-        match connect(address) {
-            Ok(tcp) => {
-                let (address, name) = (address.clone(), name.clone());
-                return Ok((tcp, Kept { at, address, name }));
+    for (at, endpoint) in first.chain(rest) {
+        match rung(config, endpoint) {
+            Ok(tls) => {
+                let address = endpoint.0.clone();
+                return Ok((tls, Kept { at, address }));
             }
             Err(sentence) => refused.push(sentence),
         }
@@ -63,7 +72,26 @@ pub(super) fn climb(endpoints: &[Endpoint], kept: usize) -> Result<(TcpStream, K
     Err(refused.join("; "))
 }
 
-/// One rung: every address the name resolves to, each under one bound, and
+/// One rung: the socket, then the mTLS over it verifying the name read off
+/// that same endpoint, driven until both ends have finished — so what comes
+/// back has been proved to be the server and has been told nothing.
+///
+/// The bound is left on the socket's reads; the channel sets its own before
+/// it says anything.
+fn rung(config: &Arc<ClientConfig>, (address, name): &Endpoint) -> Result<Tls, String> {
+    let refused = |e| format!("handshake {address}: {e}");
+    let tcp = connect(address)?;
+    tcp.set_read_timeout(Some(BOUND)).map_err(refused)?;
+    let conn = ClientConnection::new(Arc::clone(config), name.clone())
+        .map_err(|e| format!("tls {address}: {e}"))?;
+    let mut tls = StreamOwned::new(conn, tcp);
+    while tls.conn.is_handshaking() {
+        tls.conn.complete_io(&mut tls.sock).map_err(refused)?;
+    }
+    Ok(tls)
+}
+
+/// One socket: every address the name resolves to, each under one bound, and
 /// the sentence of the last that refused. The registration door is reached
 /// through the same connect (`crate::register`).
 pub(crate) fn connect(address: &str) -> Result<TcpStream, String> {

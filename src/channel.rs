@@ -17,7 +17,9 @@
 //!
 //! **The entry states a list of endpoints and the dial tries them in order**
 //! (REMOTE §15.3; [`ladder`]): the one that answered is kept for the rest of
-//! the run, in RAM and never on disk, and is the first tried next time.
+//! the run, in RAM and never on disk, and is the first tried next time. An
+//! endpoint is passed over when its socket will not open or its handshake
+//! does not verify.
 //!
 //! **It knows nothing about being dialled again** (DESIGN §3.8). A channel
 //! that fails answers the sentence that failed it, and what happens next is
@@ -139,10 +141,11 @@ impl Channel {
         }
     }
 
-    /// Climb the ladder to a connection, handshake and send. The TLS handshake
-    /// happens inside the first write, and the one frame read here is the
-    /// server's version preface — so what this hands back is a stream with a
-    /// request on it and no *answer* yet read.
+    /// Climb the ladder to a verified connection and send. The TLS handshake
+    /// is the ladder's — an endpoint that cannot present the operator's CA is
+    /// a rung passed over, not a failure of the dial — and the one frame read
+    /// here is the server's version preface, so what this hands back is a
+    /// stream with a request on it and no *answer* yet read.
     ///
     /// **Both ends state a version before either reads** (REMOTE §3), and the
     /// request goes out in the same breath as this end's preface — so
@@ -151,14 +154,12 @@ impl Channel {
     /// back from that confirmation and is dropped here** (REMOTE §3.2): a foot
     /// reads no post-floor field, so nothing above consults it yet.
     fn dial(&mut self, request: &Value) -> Result<(Tls, String), Failure> {
-        let (tcp, kept) = ladder::climb(&self.endpoints, self.kept).map_err(Failure::Wire)?;
+        let (mut tls, kept) =
+            ladder::climb(&self.config, &self.endpoints, self.kept).map_err(Failure::Wire)?;
         self.kept = kept.at;
         let address = kept.address;
-        tcp.set_read_timeout(Some(READ_TIMEOUT))
-            .map_err(|e| Failure::Wire(format!("connect {address}: {e}")))?;
-        let conn = ClientConnection::new(Arc::clone(&self.config), kept.name)
-            .map_err(|e| Failure::Wire(format!("tls {address}: {e}")))?;
-        let mut tls = StreamOwned::new(conn, tcp);
+        let bounded = tls.sock.set_read_timeout(Some(READ_TIMEOUT));
+        bounded.map_err(|e| Failure::Wire(format!("connect {address}: {e}")))?;
         hello::state(&mut tls).map_err(|e| Failure::Wire(failed("send", &address, &e)))?;
         frame::write_value(&mut tls, request)
             .map_err(|e| Failure::Wire(failed("send", &address, &e)))?;

@@ -229,9 +229,10 @@ What can go wrong, and what thrall says:
 | `client.key` | this box's private key, mode 0600 |
 | `address` | where the server is: one `host:port` per line, in the order to try them |
 
-**`address` is a list.** A dial tries each line in order and keeps the one
-that answered for the rest of the run — in memory only; the file is never
-rewritten. A file of one line is a list of one. The usual reason for a second
+**`address` is a list.** A dial tries each line in order — passing over one
+whose socket will not open or whose certificate does not verify — and keeps
+the one that answered for the rest of the run, in memory only; the file is
+never rewritten. A file of one line is a list of one. The usual reason for a second
 line is a home router that will not route its own public name back inside: the
 operator states the LAN address second, and a foot at home falls through to
 it. Each endpoint's host is also the name the server's certificate is verified

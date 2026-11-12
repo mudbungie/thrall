@@ -934,21 +934,40 @@ line is a list of one, which is every entry filed before this.
    the entry states;
 2. **every other endpoint**, in the entry's order.
 
-A rung is one TCP connect under a ten-second bound. The first that connects
-is the connection, and its place in the list is **kept for the rest of the
-run — in RAM, never on disk**: the file is the operator's statement and the
-run's finding is not. No rung answering is every rung's sentence, joined.
+A rung is one TCP connect and the mTLS handshake over it, each under a
+five-second bound. The first endpoint that connects **and verifies** is the
+connection, and its place in the list is **kept for the rest of the run — in
+RAM, never on disk**: the file is the operator's statement and the run's
+finding is not. No rung answering is every rung's sentence, joined — `connect
+<endpoint>: …` for a socket that would not open, `handshake <endpoint>: …` for
+one that opened and was not the server.
 
 **Why a list.** A box on the server's own network cannot reach the server's
 public name through a router that will not hairpin, so the operator states
 the LAN address second and a foot at home falls through to it — and, having
 kept it, does not pay the public name's bound on every ask.
 
-**A rung is the connect and not the handshake.** Whatever answers at an
-endpoint must still present the operator's CA, so dialling a private address
-from somebody else's network is harmless. But a handshake that fails is the
-channel's failure (§3.8), not a reason to try the next endpoint: by then the
-request is in flight, and saying it twice is not this file's to decide.
+**A rung is the connect AND the handshake** (bl-45e9). This paragraph used
+to say the opposite — that a failed handshake was the channel's failure and
+ended the dial — on the grounds that the request was already in flight. It was
+in flight only because the handshake was left to happen inside the first
+write. The ladder now drives the handshake to its end before this end's
+preface or its request is written, so when an endpoint cannot present the
+operator's CA **nothing has crossed** and the next rung repeats no gesture.
+That is the case a list exists for as much as the dead socket is: a private
+address dialled from somebody else's network may well be answered, and a
+captive network answers everything. The seat passes over the same two
+failures (lernie bl-2723). What still ends the dial is everything after the
+rung — a write that fails, a preface that never comes, a server that refuses
+this box's own leaf (which a TLS 1.3 client learns only on its first read) —
+because by then the endpoint has proved it is the server and the request has
+been said to it (§3.8).
+
+**The bound is per step, not per rung.** Each resolved address gets five
+seconds to take the connect, and each read of the handshake gets five seconds
+to arrive; a listener that takes the socket and never speaks costs one bound,
+not the kernel's minutes. The channel replaces it with its own two-minute read
+bound before it says anything.
 
 **The server's name is the endpoint's.** Each endpoint's host is what the
 mTLS verifies when that endpoint answers — an IP literal as an `IP:` subject
@@ -971,7 +990,7 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/main.rs` | The process entry and nothing else: argv in, stream selected by the code, exit. The single `tarpaulin.toml` exclusion. |
 | `src/channel.rs` | **The channel** (bl-a4a5): one wire to one server. There is an `ask` and there is nothing else — the shape of the file is the dial-in invariant. A connection is one per ask, held only while waiting; the entry's endpoints and the one kept for the run live here (§3.11). |
 | `src/channel/failure.rs` | Why a channel could not carry a gesture, in the two classes that differ in what to do next — the wire, and version skew (split from `channel.rs` by bl-0a8b at the pre-split band). |
-| `src/channel/ladder.rs` | **The dial ladder** (§3.11, bl-bc2c): the endpoint that answered last, then every other the entry states, each one TCP connect under a bound — stopping at the first that answers and saying which it was. The registration door is reached through the same connect. |
+| `src/channel/ladder.rs` | **The dial ladder** (§3.11, bl-bc2c): the endpoint that answered last, then every other the entry states, each one TCP connect and the mTLS handshake over it under a bound — stopping at the first that connects and verifies and saying which it was (bl-45e9). The registration door is reached through the same connect. |
 | `src/channel/frame.rs` | The framing: a big-endian `u32` length, then that many bytes of JSON; a zero-length frame terminates an answer (REMOTE §3). |
 | `src/channel/hello.rs` | The version preface, and this end's half of it — state the major and the edition beside it (REMOTE §3.2), confirm, refuse fail-closed naming both versions. The server's edition comes back from the confirmation, defaulted at the floor when it states none. The number itself is in no Rust file: the repo-root `PROTOCOL` file states it and `build.rs` compiles it into the constant this module re-exports (bl-c618), because the release gates that read it are other repositories fetching one path out of a tree they do not build. A foot never *admits*, because a foot is never dialled. It also draws §3.8's one distinction REMOTE does not: a preface that arrived and states a version this end cannot speak is skew, one that never arrived is the wire. |
 | `src/channel/hello/version.rs` | The three vendored numbers and nothing else (bl-6fcf): the major, the edition this build states, and the floor an absent one reads as. Split from the exchange because they are the SERVER's facts copied, and a re-vendor rewrites this file alone. |
