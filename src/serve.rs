@@ -56,11 +56,9 @@ pub fn serve(root: &Path, notice: &run::Notice, pause: &run::Pause) -> Verdict {
 
 /// What a box with a tool document and no channel is told.
 ///
-/// It names the shape rather than a command, because there is no command: the
-/// material is minted on the box that holds the operator's CA and carried here
-/// by hand (REMOTE §1.4). A remedy thrall could run would be a bootstrap flow,
-/// and a foot that could provision itself over the wire would be a foot any
-/// wire could provision.
+/// It names the shape and the two ways one is filed (`material::REMEDY`):
+/// claiming an operator's offer with `thrall register`, or the pair the
+/// operator minted on the CA's own box and carried here (REMOTE §15.4).
 fn unprovisioned(root: &Path) -> String {
     format!(
         "this box holds no channel. One channel is one directory under {}, \

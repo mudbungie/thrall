@@ -1,11 +1,13 @@
-//! **The operator's act, performed by the suite** (REMOTE §1.4, DESIGN §3.3).
+//! **The operator's act, performed by the suite** (REMOTE §15.1, §15.4;
+//! DESIGN §3.3).
 //!
-//! thrall mints nothing. A certificate and its key are issued by the operator's
-//! own CA on the box that holds it and carried to the foot by hand — so there
-//! is no production caller here, and there must never be one: a foot that could
-//! provision itself over the wire would be a foot any wire could provision.
-//! What the suite needs is a channel to test, and the honest way to get one is
-//! to do out of band exactly what the operator does out of band.
+//! thrall signs nothing. A certificate is issued by the operator's own CA on
+//! the box that holds it — carried to the foot by hand with its key, or signed
+//! for a key the foot made when it registers — so there is no production
+//! caller here, and there must never be one: a foot that could sign its own
+//! leaf would be a foot any wire could provision. What the suite needs is a
+//! channel to test, and the honest way to get one is to do exactly what the
+//! operator's CA does.
 //!
 //! It shells to `openssl`, which is the tool an operator would use, through the
 //! crate's one spawn boundary. Nothing is committed: a fixture key in a tree is
@@ -127,12 +129,25 @@ fn ca(dir: &Path) {
 /// spelling both toolsets have, and it is the more honest model besides — what
 /// a certificate asserts is decided by whoever signs it, not by whoever asked.
 fn leaf(dir: &Path, name: &str, subject: &str, san: &str, eku: &str) {
-    let ext = dir.join(format!("{name}.ext"));
-    std::fs::write(
-        &ext,
-        format!("[leaf]\nsubjectAltName={san}\nextendedKeyUsage={eku}\n"),
-    )
-    .expect("the extension file");
+    request(dir, name, subject);
+    sign(dir, name, san, eku, &[]);
+}
+
+/// **The registration door's act** (REMOTE §15.1 step 2): a leaf for a
+/// public key somebody else made, under `subject`, answered as PEM. It is the
+/// server's own recipe — a request from a scratch key, signed with
+/// `-force_pubkey` so the certificate carries the device's key instead.
+pub(crate) fn claimed(dir: &Path, public: &str, name: &str, subject: &str) -> String {
+    let stated = dir.join(format!("{name}.pub"));
+    std::fs::write(&stated, public).expect("the public key");
+    request(dir, name, subject);
+    let forced = ["-force_pubkey", &stated.to_string_lossy()];
+    sign(dir, name, &format!("DNS:{name}"), "clientAuth", &forced);
+    std::fs::read_to_string(dir.join(format!("{name}.pem"))).expect("the signed leaf")
+}
+
+/// A key and a bare request under `subject`.
+fn request(dir: &Path, name: &str, subject: &str) {
     tool(&[
         "req",
         "-new",
@@ -149,7 +164,17 @@ fn leaf(dir: &Path, name: &str, subject: &str, san: &str, eku: &str) {
         "-out",
         &path(dir, &format!("{name}.csr")),
     ]);
-    tool(&[
+}
+
+/// The issuer's half: sign `name`'s request, with whatever `more` adds.
+fn sign(dir: &Path, name: &str, san: &str, eku: &str, more: &[&str]) {
+    let ext = dir.join(format!("{name}.ext"));
+    std::fs::write(
+        &ext,
+        format!("[leaf]\nsubjectAltName={san}\nextendedKeyUsage={eku}\n"),
+    )
+    .expect("the extension file");
+    let signing = [
         "x509",
         "-req",
         "-sha256",
@@ -170,7 +195,8 @@ fn leaf(dir: &Path, name: &str, subject: &str, san: &str, eku: &str) {
         "-CAcreateserial",
         "-out",
         &path(dir, &format!("{name}.pem")),
-    ]);
+    ];
+    tool(&[signing.as_slice(), more].concat());
 }
 
 /// One path, as the string `openssl` takes.

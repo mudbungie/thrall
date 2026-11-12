@@ -76,6 +76,14 @@ pub enum Decided {
     /// entry point performs it, because it is the only thing here that is not
     /// a value.
     Serve,
+    /// **Claim an operator's offer** (yog REMOTE §15.1; `crate::register`):
+    /// make a key, post its public half to this URL, file the entry that
+    /// comes back and dial the wire once. The entry point performs it,
+    /// because the data root and the web's roots are this process's own.
+    Register {
+        /// The registration URL, as the seat that minted the offer showed it.
+        url: String,
+    },
     /// **Print the entries an MCP server's catalog would make** (DESIGN
     /// §6.3), for the operator to paste into this box's document. It reads no
     /// input and writes no file; the entry point performs it because the
@@ -113,6 +121,7 @@ advertises what this box offers, waits for work, and posts the captures back.
 It never listens and it never speaks first.
 
 usage: thrall run
+       thrall register <url>
        thrall mcp pin -- <server argv...>
        thrall mcp <tool> -- <server argv...>
        thrall [--example-tools | --version | --help]
@@ -124,6 +133,15 @@ usage: thrall run
                   a channel that cannot be served at all is an exit naming
                   it, and restarting the process belongs to this machine's
                   own supervision.
+  register <url>  join a server, from the one-time URL an operator's seat shows
+                  when it mints an offer (https://<host>/yog/register/<code>).
+                  This box makes its own key, posts the public half, and files
+                  the channel the server answers under <data root>/wire/
+                  workspaces/. It then prints a six-character confirmation
+                  word: the operator approves the row showing that word from a
+                  connected seat, and only then does `thrall run` get work. An
+                  offer is claimed once and lasts ten minutes; a channel that
+                  already exists is never overwritten.
   mcp pin         run an MCP server once, and print every tool of its catalog
                   as a complete tools.json entry for you to paste. It writes
                   nothing: the document is yours, and pasting the entries you
@@ -146,9 +164,9 @@ usage: thrall run
   -V, --version   print the name and version
   -h, --help      print this
 
-What it reads, both provisioned by hand and never by thrall: the tool document
-at <data root>/tools.json, and one channel per directory under <data
-root>/wire/workspaces/. The data root is $XDG_DATA_HOME/thrall, or
+What it reads: the tool document at <data root>/tools.json, which you write,
+and one channel per directory under <data root>/wire/workspaces/, which
+`thrall register` files. The data root is $XDG_DATA_HOME/thrall, or
 $HOME/.local/share/thrall.
 
 See docs/DESIGN.md for the role and the module map, and yog's docs/REMOTE.md
@@ -168,6 +186,14 @@ pub fn run(args: Vec<String>) -> Decided {
     let words: Vec<&str> = args.iter().map(String::as_str).collect();
     match words.as_slice() {
         ["run"] => Decided::Serve,
+        ["register", url] => Decided::Register {
+            url: (*url).to_owned(),
+        },
+        ["register", ..] => Decided::Say(Verdict::refused(
+            "register takes one thing, the URL a seat showed when it minted the \
+             offer: thrall register https://<host>/yog/register/<code>"
+                .to_string(),
+        )),
         ["mcp", "pin", "--", server @ ..] if !server.is_empty() => Decided::Pin {
             server: owned(server),
         },

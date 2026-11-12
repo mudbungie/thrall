@@ -21,7 +21,7 @@
 # never copies it, so the Makefile's former `--engine llvm` ran ptrace (the
 # Linux default) silently, every run until bl-9580. ptrace attributes lines by
 # stepping breakpoints across threads, so which lines it credits depends on
-# thread timing — the 4-core GitHub runner read `src/dht.rs:167` as uncovered
+# thread timing — the 4-core GitHub runner read one line of the since-retired DHT client as uncovered
 # while the 40-core builder read the same tree at 100%, and `main` sat red for a
 # day with no release able to cut. llvm reads the instrumented profile, which
 # is deterministic, and also counts untaken branches ptrace never saw: a

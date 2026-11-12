@@ -1,110 +1,81 @@
-//! **The dial ladder** (REMOTE §13.4; DESIGN §3.11): the rungs a dial runs
-//! before there is a connection to speak on, in the order that costs least.
+//! **The dial ladder** (REMOTE §15.3; DESIGN §3.11): the entry's endpoints,
+//! tried in order until one connects.
 //!
 //! ```text
-//! the live held connection      — `Channel::ask`, before this file is reached
-//! the entry's direct address    — one bounded connect
-//! a re-call from cached presence — one DHT walk, a punch window
-//! the full rendezvous           — presence, call, punch
+//! the endpoint that answered last   — kept for the run, in RAM
+//! every other endpoint the entry states, in the order it states them
 //! ```
 //!
-//! **An entry with no rendezvous material has a one-rung ladder**, and it is
-//! today's dial byte for byte: the connect either lands or its sentence is
-//! the failure. The lower rungs exist only where the operator carried the
-//! pairing, and they are climbed only when the direct address did not answer
-//! — a LAN, a stable client and loopback never pay for the machinery.
+//! **An entry with one endpoint has a one-rung ladder**: the connect either
+//! lands or its sentence is the failure. A list exists for the box that
+//! cannot reach the server's public name from where it stands — a router that
+//! will not hairpin — so the operator states the LAN address second and a
+//! foot at home falls through to it.
 //!
-//! **The third rung is a call, never a bare re-punch** (yog REMOTE §13.3,
-//! ruling bl-278f): a held connection's pings are the only thing keeping a
-//! NAT mapping alive, so once the line has dropped the server's side holds
-//! none, and a punch no call asked the server to answer is one-sided. The
-//! re-call skips the presence read and nothing else; one it cannot land
-//! clears the cache, and the full rendezvous under it reads presence afresh.
+//! **A rung is a TCP connect under a bound, and nothing more.** Whatever
+//! answers at an endpoint still has to present the operator's CA in the
+//! handshake that follows, so dialling a private address from somebody else's
+//! network is harmless — and a handshake that fails there is the channel's
+//! failure, not a reason to say the request again somewhere else.
 //!
-//! **What comes back says which kind of connection it is**, because the
-//! channel holds a punched one and not a dialled one: a punch costs seconds
-//! and is reused across asks (REMOTE §13.4); a direct connect costs
-//! milliseconds and stays one per ask, which is what keeps a busy foot
-//! absent at the far end (DESIGN §3.7).
+//! **What answered is kept, and only in RAM.** The next dial tries it first,
+//! which is what keeps a foot at home from paying the public name's bound on
+//! every ask; when it stops answering the rest are tried in the entry's own
+//! order. Nothing is written back: the file is the operator's statement and
+//! the run's finding is not.
 
-use std::io::ErrorKind;
-use std::net::{IpAddr, TcpStream, ToSocketAddrs};
+use std::net::{TcpStream, ToSocketAddrs};
 use std::time::Duration;
 
-use crate::rendezvous::call::Roving;
-use crate::rendezvous::say::{self, Kind};
+use super::Endpoint;
+use rustls::pki_types::ServerName;
 
-/// How long one direct connect may take before the next rung is tried. A
-/// NAT that drops the SYN answers nothing, and the kernel's own patience is
-/// minutes; a rung has to give up sooner than that to be a rung.
-const DIRECT: Duration = Duration::from_secs(10);
+/// How long one connect may take before the next rung is tried. A NAT that
+/// drops the SYN answers nothing, and the kernel's own patience is minutes; a
+/// rung has to give up sooner than that to be a rung.
+const BOUND: Duration = Duration::from_secs(10);
 
-/// The direct rung refusing: the sentence, and what the ladder says of it —
-/// the families it tried and whether the last one timed out, never the
-/// addresses.
-struct Missed {
-    sentence: String,
-    tried: Vec<IpAddr>,
-    timed_out: bool,
+/// The rung that answered.
+pub(super) struct Kept {
+    /// Its place in the entry's list — what the channel tries first next time.
+    pub(super) at: usize,
+    /// The endpoint as the entry states it.
+    pub(super) address: String,
+    /// The name its certificate is verified against.
+    pub(super) name: ServerName<'static>,
 }
 
-/// A connection to the server and whether it was punched. Only a roving
-/// entry's ladder says its rungs (`rendezvous::say`): a one-rung ladder's
-/// only outcome already reaches the operator as the channel's sentence.
-pub(super) fn climb(
-    address: &str,
-    roving: Option<&mut Roving>,
-) -> Result<(TcpStream, bool), String> {
-    let direct = direct(address);
-    let Some(roving) = roving else {
-        return direct.map(|tcp| (tcp, false)).map_err(|m| m.sentence);
-    };
-    let refusal = match direct {
-        Ok(tcp) => {
-            roving.say.say(Kind::Direct, say::direct_connected());
-            return Ok((tcp, false));
+/// A connection to the server and the rung that gave it: `kept` first, then
+/// the rest in the entry's order. No rung answering is every rung's sentence.
+pub(super) fn climb(endpoints: &[Endpoint], kept: usize) -> Result<(TcpStream, Kept), String> {
+    let first = endpoints.iter().enumerate().skip(kept).take(1);
+    let rest = endpoints.iter().enumerate().filter(|(at, _)| *at != kept);
+    let mut refused = Vec::new();
+    for (at, (address, name)) in first.chain(rest) {
+        match connect(address) {
+            Ok(tcp) => {
+                let (address, name) = (address.clone(), name.clone());
+                return Ok((tcp, Kept { at, address, name }));
+            }
+            Err(sentence) => refused.push(sentence),
         }
-        Err(missed) => {
-            let line = say::direct_refused(&missed.tried, missed.timed_out);
-            roving.say.say(Kind::Direct, line);
-            missed.sentence
-        }
-    };
-    if let Some(tcp) = roving.recall() {
-        return Ok((tcp, true));
     }
-    match roving.rendezvous() {
-        Ok(tcp) => Ok((tcp, true)),
-        Err(why) => Err(format!("{refusal}; rendezvous: {why}")),
-    }
+    Err(refused.join("; "))
 }
 
-/// The direct rung: every address the name resolves to, each under one
-/// bound, and the sentence of the last that refused.
-fn direct(address: &str) -> Result<TcpStream, Missed> {
-    let resolved = address.to_socket_addrs().map_err(|e| Missed {
-        sentence: format!("connect {address}: {e}"),
-        tried: Vec::new(),
-        timed_out: false,
-    })?;
-    let mut last = None;
-    let mut tried = Vec::new();
+/// One rung: every address the name resolves to, each under one bound, and
+/// the sentence of the last that refused. The registration door is reached
+/// through the same connect (`crate::register`).
+pub(crate) fn connect(address: &str) -> Result<TcpStream, String> {
+    let resolved = address
+        .to_socket_addrs()
+        .map_err(|e| format!("connect {address}: {e}"))?;
+    let mut last = "no address resolved".to_owned();
     for at in resolved {
-        tried.push(at.ip());
-        match TcpStream::connect_timeout(&at, DIRECT) {
+        match TcpStream::connect_timeout(&at, BOUND) {
             Ok(tcp) => return Ok(tcp),
-            Err(e) => last = Some(e),
+            Err(e) => last = e.to_string(),
         }
     }
-    let timed_out = last
-        .as_ref()
-        .is_some_and(|e| e.kind() == ErrorKind::TimedOut);
-    Err(Missed {
-        sentence: format!(
-            "connect {address}: {}",
-            last.map_or_else(|| "no address resolved".to_owned(), |e| e.to_string())
-        ),
-        tried,
-        timed_out,
-    })
+    Err(format!("connect {address}: {last}"))
 }

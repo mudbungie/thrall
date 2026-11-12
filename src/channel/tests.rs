@@ -11,10 +11,8 @@ use crate::test_support::server::Server;
 use crate::test_support::{Scratch, mint};
 use serde_json::{Value, json};
 
-/// The dial ladder: the rungs, the held connection, the ping and the hangup.
+/// The dial ladder: the entry's endpoints, tried in order.
 mod ladder;
-/// What the ladder says as it climbs, into a captured sink.
-mod said;
 
 /// A scratch box with a server standing at the far end, answering the n-th
 /// dial with the n-th entry of `script`.
@@ -42,14 +40,17 @@ fn advertised() -> Value {
 }
 
 /// **Nothing is dialled when a channel opens**, and what it answers about
-/// itself is read off the leaf and the address rather than off any server.
+/// itself is read off the leaf rather than off any server.
 #[test]
 fn opening_a_channel_dials_nothing_and_names_this_box() {
     let scratch = Scratch::new();
     let held = mint::provisioned(scratch.path(), "server.example:9000");
     let channel = Channel::open(&held).expect("opened");
     assert_eq!(channel.client(), mint::FOOT_NAME);
-    assert_eq!(channel.address(), "server.example:9000");
+    assert_eq!(
+        channel.kept, 0,
+        "and the first endpoint is the first dialled"
+    );
 }
 
 /// **A foot refuses to be configured as anything else** (DESIGN §3.2). The
@@ -209,7 +210,7 @@ fn a_server_that_vanishes_names_the_leg_and_the_address() {
             .expect_err("the server went away"),
     );
     assert!(said.starts_with("receive "), "the leg comes first: {said}");
-    assert!(said.contains(&held.address), "no address: {said}");
+    assert!(said.contains(&held.address.join("")), "no address: {said}");
     assert!(
         said.contains("the channel to the server failed"),
         "no diagnosis: {said}"

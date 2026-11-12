@@ -365,8 +365,12 @@ that is worth more than a gate that implies otherwise.
   itself, and no long-lived registry credential is stored in this repository.
 - Never add a dependency that is not on the approved set. **`Cargo.toml`'s
   `[dependencies]` comment is that set** (bl-e5ba, approved 2026-08-29): rustls
-  with `ring` and no default features, `serde_json`, `thiserror` — each landing
-  in the manifest with the ball that first LINKS it, never in advance. `clap`
+  with `ring` and no default features, `serde_json`, `thiserror`, `ring` named
+  directly, and `webpki-roots` (bl-bc2c, approved 2026-11-11: the public web's
+  roots, for `thrall register`'s one HTTPS request and nothing else) — each
+  landing in the manifest with the ball that first LINKS it, never in advance.
+  `socket2` was on the set for the punched wire and left the manifest with it
+  (bl-bc2c). `clap`
   is deferred pending a verb surface that needs it; `tokio` and `rcgen` are
   refused outright. Anything else needs a fresh approval, and the reasons live
   beside the list rather than here.

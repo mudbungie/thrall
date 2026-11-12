@@ -13,7 +13,7 @@
 #
 # User-level and not system-level, because the data root is the operator's:
 # `$XDG_DATA_HOME/thrall`, holding the tool document and one directory per
-# channel, both put there by hand. `%h` keeps this file free of any account
+# channel (the operator's document, and what `thrall register` filed). `%h` keeps this file free of any account
 # name.
 #
 # **The binary is `%h/.local/bin/thrall`**, which is the Makefile's

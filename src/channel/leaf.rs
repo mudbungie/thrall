@@ -3,8 +3,8 @@
 //!
 //! REMOTE §4.2 gives the grade one home — *"the subject's organizational unit,
 //! read by the walk that already reads the common name: `CN=<client>, OU=foot`
-//! is a foot"* — and one issuer: the operator's own CA, out of channel, on the
-//! same act §1.4 already requires. **Enforcement is the server's**, because the
+//! is a foot"* — and one issuer: the operator's own CA, in the act that signs
+//! the leaf (REMOTE §15.1). **Enforcement is the server's**, because the
 //! server is the party that can be trusted to enforce it. thrall's obligation
 //! is the half it can keep: carry a leaf of that grade, and refuse to be
 //! configured with anything else.
@@ -80,7 +80,7 @@ pub fn foot(chain: &Path) -> Result<String, String> {
         return Err(format!(
             "{}: the leaf {name:?} is not foot grade — a thrall carries a \
              certificate whose subject says OU={FOOT} and nothing else \
-             (REMOTE §4.2). Mint one on the box that holds the CA.",
+             (REMOTE §4.2). Mint an offer at grade foot and register again.",
             chain.display()
         ));
     }

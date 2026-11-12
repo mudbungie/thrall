@@ -18,10 +18,10 @@
 //!   and the rule's own text says why it does not: a test's serialization lock
 //!   is scaffolding, and folding it into the chokepoint would put test
 //!   machinery in the file that inventories the program.
-//! - **The certificate mint** ([`mint`]). thrall mints nothing (REMOTE §1.4,
-//!   DESIGN §3.3) — the operator carries a pair to the box by hand — so the
-//!   suite has to perform that act on the operator's behalf before it can test
-//!   a channel at all. It is `cfg(test)`, it shells to the tool an operator
+//! - **The certificate mint** ([`mint`]). thrall signs nothing (DESIGN §3.3)
+//!   — a leaf is the operator's CA's to issue, to a registration or by hand —
+//!   so the suite has to perform that act on the operator's behalf before it
+//!   can test a channel at all. It is `cfg(test)`, it shells to the tool an operator
 //!   would use, and **no certificate is ever committed**: a fixture key in a
 //!   tree is a private key in a repository, which is the exact class
 //!   `make leak-scan` refuses.
@@ -32,10 +32,10 @@ use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
+/// The stand-in for the registration door.
+pub(crate) mod door;
 /// The operator's out-of-channel act, performed by the suite.
 pub(crate) mod mint;
-/// The rendezvous material and the commons, stood in for.
-pub(crate) mod roving;
 /// The stand-in for the far end of the wire.
 pub(crate) mod server;
 

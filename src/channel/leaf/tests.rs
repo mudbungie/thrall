@@ -72,7 +72,7 @@ fn an_operator_grade_leaf_is_refused_and_says_how_to_fix_it() {
     assert!(refusal.contains(mint::OPERATOR_NAME), "{refusal}");
     assert!(refusal.contains("not foot grade"), "{refusal}");
     assert!(refusal.contains(&format!("OU={FOOT}")), "{refusal}");
-    assert!(refusal.contains("box that holds the CA"), "{refusal}");
+    assert!(refusal.contains("Mint an offer at grade foot"), "{refusal}");
 }
 
 /// A leaf carrying the grade and no common name authenticates nobody, and is

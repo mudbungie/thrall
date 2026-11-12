@@ -73,14 +73,9 @@ to add and would dissolve the reason thrall exists.
 
 - **It never listens.** No port, no socket, no callback address. thrall dials.
 
-  **One qualification, and it is REMOTE §13.3's rather than a loosening**
-  (§3.11, bl-0a8b): an entry carrying rendezvous material binds a **punch
-  port** — bound once per run, on the first rendezvous, never on open — and a
-  TCP simultaneous open needs a listener on the port the SYNs leave from. It
-  accepts only inside a window this foot opened by calling the server; a SYN
-  arriving outside one sits in the backlog for the next window or dies in a
-  handshake the redial already answers. Nothing is served from it, nothing is
-  announced on it, and an entry without the material binds nothing.
+  The one qualification this bullet ever carried — the punch port of the
+  retired rendezvous — left with it (§3.11, bl-bc2c): nothing in this crate
+  binds a socket.
 - **It never speaks first, and neither does the server to it.** Every leg of
   the path is a reply to something the foot asked for (REMOTE §3, §5).
 - **It never asks and never acts.** No query about a conversation, no gesture
@@ -173,12 +168,65 @@ different questions. The check runs when the channel **opens**, before anything
 is dialled, so a mis-provisioned box learns it from its own configuration and
 never from a connection failure.
 
-### 3.3 Certificates arrive out of channel
+### 3.3 A foot makes its key; the operator's CA makes it a foot (bl-bc2c)
 
-REMOTE §1.4, and it does not expire: the certificate and key are carried to
-this box by hand. thrall mints nothing, enrols nothing in band, and has no
-bootstrap flow. A foot that could provision itself over the wire would be a
-foot any wire could provision.
+REMOTE §15 reversed what this section used to say. It read *"the certificate
+and key are carried to this box by hand; thrall mints nothing, enrols nothing
+in band, and has no bootstrap flow"* (REMOTE §1.4 as it stood). The carried
+pair put a private key on a clipboard, and a copy of it was the device. So a
+foot now joins by claiming an **offer**, and `thrall register <url>` is that
+claim (`src/register.rs`). In the order it happens:
+
+1. **The URL is read** (`register::url`): `https://<host>[:port]/yog/register/<code>`.
+   It carries no key and no certificate. The code must be letters and digits
+   and the authority a name or address the TLS layer accepts, because both are
+   written into a request.
+2. **A P-256 key pair is made here** (`register::key`), with `ring`, as
+   PKCS#8. The private half is written to the entry's `client.key` at mode
+   0600 and never leaves this box.
+3. **The public half is posted** (`register::post`), as PEM
+   `SubjectPublicKeyInfo` in the one JSON object `{"public_key": …}`, over
+   HTTPS with no client certificate. The door's certificate is verified
+   against the public web's roots — `webpki-roots`, the one dependency this
+   act added. The request is hand-written HTTP/1.1 (a line, four headers, a
+   body) and the reply is read under a 64 KiB cap and a ten-second socket
+   bound; no HTTP library is linked. **The root store is a parameter**, so the
+   suite posts to a listener of its own under a root of its own.
+4. **Anything but a `200` is one answer**: *this offer cannot be claimed*.
+   The door says the same bare `404` for a code that is unknown, expired or
+   already claimed, so there is nothing to tell apart.
+5. **The reply is judged before anything is written** (`register::claim`).
+   It states `workspace`, `name`, `grade`, `address` (a list), `ca` and
+   `cert`. A `grade` that is not `foot` files nothing — a foot only opens on
+   a foot-grade leaf (§3.2) — and so does a `workspace` that is not one
+   directory name, since that field becomes a path here.
+6. **The entry is filed**, at `wire/workspaces/<workspace>/`: the four files
+   of §4's last paragraph. The directory is made by the call that fails when
+   it exists, so **an existing entry is never overwritten**.
+7. **The confirmation word is said**: SHA-256 over the public key (DER
+   `SubjectPublicKeyInfo`) followed by the CA certificate (DER, the first
+   block of `ca`), the first thirty bits read five at a time as six symbols
+   of `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`. `register::key::tests` pins yog's
+   vector (`2LFTUR`). The operator approves the row showing that word.
+8. **The wire is dialled once** with the new entry (`Channel::ask` of
+   `invocations` — a foot says three things and that is the one which changes
+   nothing). The server holds an unapproved client and refuses it everything;
+   that refused request is what marks the offer *proved*. thrall says
+   *waiting for approval* and exits 0. It does not wait for the approval.
+
+**What did not change.** thrall makes a key and never a certificate: a leaf is
+the operator CA's to sign, and nothing a foot holds lets it act until an
+operator approves the row. The wire is mTLS on the operator's CA exactly as
+before (§3.1, `channel::tls`), and the web's roots are the door's trust and
+never the wire's. The hand-carried pair (`yog wire-certs WIRE_LEAF`) remains
+for a box with no route to the door, and is the same four files.
+
+**The holes this leaves, stated.** The grade and the workspace are the
+*reply's*, so a claim refused for either — or for an entry that already exists
+— has already spent the offer; the refusal says so and names the remedy
+(decline, mint again). And an entry filed whose wire cannot be reached is
+filed all the same: the exit is 1, the word is repeated, and `thrall run`'s
+first dial that lands is the proof.
 
 Key material lives **beside** any generated state, never inside it, for one
 reason: a reseed must not be a revocation.
@@ -745,16 +793,11 @@ under. Four consequences, and each is deliberate:
   over. That sentence is now **said as well as returned** (§3.9): the return is
   the exit's, and the saying is the operator's.
 
-**And since bl-0a8b every dial is the whole ladder** (§3.11). A redial does
-not know which rung the last connection came from and does not need to: the
-live held connection is gone by definition, the direct address is tried under
-a bound, a fresh call is written from the presence the run cached — one DHT
-walk and a punch window, no presence read — and only then is presence read
-again. That is what yog bl-0247 meant by the redial becoming load-bearing — a
-foot behind a cellular NAT that flaps is answered by a call and a punch
-window, not a poll period, and a foot that does not come back has no roving
-value at all. The wait between climbs is unchanged: the ladder is inside one
-dial and `run::redial::next` is between them.
+**Every dial is the whole ladder** (§3.11). A redial does not know which
+endpoint the last connection came from and does not need to: the one that
+answered last is tried first, then every other the entry states. The wait
+between climbs is unchanged: the ladder is inside one dial and
+`run::redial::next` is between them.
 
 **Where the loop sits is the whole of why it is safe** (`run::redial`, between
 `Entry::open` and `run::hold`). `fan` already owns the per-channel lifetime, so
@@ -869,219 +912,52 @@ operational:
   the unit of install is a published version and a box that cannot install one
   can hold a foot but never a deployment.
 
-### 3.11 The punched wire — rendezvous, the ladder, held connections (bl-0a8b; yog bl-0247, REMOTE §13)
+### 3.11 The public wire — the address list and its ladder (bl-bc2c; yog REMOTE §15.3)
 
-REMOTE §13 puts the server behind a NAT that drops every unsolicited SYN, with
-no port-forward and no rented anchor: discovery rides the BitTorrent mainline
-DHT and the data path is a TCP simultaneous open. The server's end landed as
-yog bl-4263; this section is the foot's, and it is REMOTE §13.2–§13.4 stated
-from this side. Nothing here is protocol thrall gets a vote on.
+**This section used to be the punched wire** (bl-0a8b; REMOTE §13): a server
+behind a NAT found through the mainline DHT and reached by a TCP simultaneous
+open, with a held connection, keepalive pings and a four-rung ladder. REMOTE
+§15 retired it — the punch measured out as unreliable where it mattered, and
+the server now listens on a public port. So it is deleted here rather than
+kept beside its replacement: `src/rendezvous*`, `src/dht*`, the `socket2`
+dependency, the held connection, the ping discard and every `rendezvous:`
+notice line are gone. An entry that still holds `rendezvous.pub` and
+`pairing.salt` works unchanged, because nothing reads them.
 
-**The material** (`channel::material`, `rendezvous::pairing`). An entry may
-carry two more files beside `ca.pem`: `rendezvous.pub`, the server's ed25519
-public key, and `pairing.salt`, 32 random bytes the two ends share — both hex,
-both carried by the operator's hand exactly as the anchors are (§3.3). Both or
-neither: half is the same refusal half a trust store earns, and neither is
-today's entry, which roves nowhere and is not a failure. **A foot holds no
-keypair of its own.** Everything else both ends need is HKDF-SHA256 over the
-salt with the salt `yog rendezvous` and one label each — `presence salt` and
-`inbox salt` are the DHT salts the two items are filed under, `seal key` seals
-both, and `inbox key` is an ed25519 seed, so the inbox is signed under a
-keypair *derived from the salt* and the server holds no client key to poll it.
-`address` stays required and is the server NAME's one home: whichever rung
-answers, the inner mTLS verifies the host written there against the same
-`ca.pem` (REMOTE §13.3), so a punched stream is authenticated exactly as a
-dialled one and §4's identity model is untouched.
+**The material** (`channel::material`). An entry's `address` file is a list:
+one `host:port` per line, in dial order, blank lines ignored. A file of one
+line is a list of one, which is every entry filed before this.
 
-**The substrate, reimplemented** (`dht`, REMOTE §13.7 ruling 2). A pure BEP 5
-/ BEP 44 client — bencode, the KRPC query shapes, ed25519-signed mutable
-items, the iterative walk, `get` and `put` — mirrored from yog's `src/dht`
-because a DHT client is substrate and not protocol: nothing yog-shaped crosses
-its interface, and a crate of its own would cost more release machinery than
-the copy. Never a node: no routing answers, no storage, no listener. Crypto
-through `ring`, which rustls already linked; `socket2` for the punch port's
-`SO_REUSEADDR`/`SO_REUSEPORT`, the one new crate, approved by operator ruling
-2026-09-23 (`Cargo.toml` records the terms).
+**The ladder** (`channel::ladder`). One dial tries, in order:
 
-**The walk is yog's as measured, not BEP 5's as written** (bl-921e, porting
-yog bl-f6e1, bl-9408, bl-d00f and bl-d9c1; the evidence is yog REMOTE §13.7
-ruling 3's four tables). It was mirrored before yog walked the live mainline,
-and all four of the defects yog then measured were here too:
+1. **the endpoint that answered last** in this run — until one has, the first
+   the entry states;
+2. **every other endpoint**, in the entry's order.
 
-- **The bootstrap is a door, never a result.** It is asked `find_node`
-  whatever the walk's verb is — the routers never answer BEP 44's `get` — and
-  its answers seed the pool, but it is not a node near the target: a walk
-  whose learned nodes are all silent is the dark-commons `Err`, not an empty
-  success.
-- **The walk converges on a frontier, not the pool**: the K closest nodes that
-  replied, are not yet asked, or are still in the air. A node silent past its
-  deadline, one that answered only an error (live, a `get` refused as an
-  unknown query), and one this socket cannot send to (a v6 address from a v4
-  socket, which spends no query) leave it. One `(id, address)` is one node,
-  so the router's one node named eight times is learned once.
-- **A dry frontier re-asks the door** while fewer than K nodes past it have
-  replied and it has ever named anyone, up to `max_queries` — the one answering
-  router names a single random node per ask, so re-asking draws fresh seeds.
-  **A re-ask knocks only where the door answered** (yog bl-f519): a bootstrap
-  address silent past its first deadline leaves the door for the rest of the
-  walk, as a silent node leaves the frontier. From yog's deployed box the
-  roster resolves to five addresses of which three never answer, and
-  re-asking all five spent three of every five door queries on nothing — in
-  the walks that ended dark, most of the cap.
-- **`put` names which zero it met** (yog bl-f519). A walk that reached no
-  token holder sends nothing and fails *no DHT node near T offered a write
-  token*; *no DHT node stored the item* is kept for holders that were sent the
-  item and none stored it. The two used to read as one.
-- **A sliding window, not lockstep rounds**: up to α walk queries in the air,
-  each with its own deadline, the next node asked the moment any answers or
-  times out; `put` sends to every token holder at once. Defaults α 8, K 8,
-  deadline 1 s, `max_queries` 64.
-- **Four bootstrap routers**, yog's list, since only one of the first two
-  answered from yog's deployed box.
+A rung is one TCP connect under a ten-second bound. The first that connects
+is the connection, and its place in the list is **kept for the rest of the
+run — in RAM, never on disk**: the file is the operator's statement and the
+run's finding is not. No rung answering is every rung's sentence, joined.
 
-Live, from yog's box after all four: lookup median ~6.5 s, `put` ~7.5 s,
-`get` ~7.5 s.
+**Why a list.** A box on the server's own network cannot reach the server's
+public name through a router that will not hairpin, so the operator states
+the LAN address second and a foot at home falls through to it — and, having
+kept it, does not pay the public name's bound on every ask.
 
-**The observed address** (bl-d340, porting yog bl-efae). Every answering
-node's reply may carry BEP 42's `ip` — where it saw the query come from, in
-either family's compact form — and the walk keeps one claim per answering
-node, the door's included. `Dht::observed` is the vote over the LAST walk:
-per family, the endpoint the most nodes named, and nothing for a family
-whose top count is tied or that no node spoke to; a dark walk clears it. A
-foot publishes no presence, but its sealed call is an endpoint list too, and
-yog REMOTE §13.2 rules that such a list carry the observed endpoint — behind
-a carrier or tethered NAT the route-local addresses are private and the
-observed one is the only one the server can punch to (§13.8). So the call
-appends each observed ADDRESS not already listed, at the punch port — voted
-by the call's own write walk (`Dht::holders`, since bl-536d), which a re-call
-runs with no presence read before it and which is therefore always fresh: the
-observed port is the DHT socket's UDP mapping, not the punch port's TCP one,
-so only the address is taken and port preservation is trusted (a carrier
-that rewrites the port is the case this does not reach, §13.8). The sealed
-byte format is unchanged — it was always a list.
+**A rung is the connect and not the handshake.** Whatever answers at an
+endpoint must still present the operator's CA, so dialling a private address
+from somebody else's network is harmless. But a handshake that fails is the
+channel's failure (§3.8), not a reason to try the next endpoint: by then the
+request is in flight, and saying it twice is not this file's to decide.
 
-**Interoperation is asserted, not assumed.** `rendezvous::pairing::tests`,
-`rendezvous::item::tests` and `dht::mutable::tests` hold bytes the SERVER's
-own code produced from known inputs — the four derivations, a sealed presence
-and a sealed call, a signed item and its target — and this end must derive,
-open and sign to exactly those bytes. A label off by a character, a nonce in
-the wrong place or a bencoding out of order is a red test here rather than a
-call nobody answers.
+**The server's name is the endpoint's.** Each endpoint's host is what the
+mTLS verifies when that endpoint answers — an IP literal as an `IP:` subject
+alternative name, anything else as a DNS name — so every host the operator
+lists must be on the server's certificate. An endpoint that names no server
+refuses when the channel opens, before anything is dialled.
 
-**The ladder** (`channel::ladder`; REMOTE §13.4). A dial runs four rungs in
-the order that costs least, and stops at the first that answers:
-
-1. **The live held connection** — a punched stream the channel kept from the
-   last ask (`Channel::ask`, before the ladder is reached).
-2. **The entry's direct address** — one connect under a ten-second bound, so a
-   NAT that drops the SYN costs a rung and not the kernel's minutes. An entry
-   without rendezvous material has this rung alone, and it is today's dial
-   byte for byte.
-3. **A re-call from the cached presence** (thrall bl-536d; yog REMOTE §13.3,
-   ruling bl-278f) — a fresh call written to the server endpoints of the last
-   call that landed, and punched: one DHT walk rather than two, because the
-   presence read is skipped and nothing else is. The cache is those
-   endpoints alone, beside the rising `seq` basis and the punch port bound
-   once; it is RAM for the run, never disk (REMOTE §13.4's runtime half of
-   §8's `:0` discipline). **A re-call that does not land clears it**, so the
-   next rung reads presence afresh — the presence it came from is then the
-   suspect — and a call nobody answered never fills it.
-4. **The full rendezvous** (`rendezvous::call`) — `get` the server's presence
-   under `(rendezvous.pub, presence salt)` and open it; then the call both
-   lower rungs share (`rendezvous::call::write`): walk to the inbox's
-   write-token holders, `put` a sealed call — an 8-byte nonce, then this
-   box's route-local addresses and the address that walk observed (above)
-   at its punch port — signed under the inbox keypair with a rising `seq`;
-   then punch.
-
-**Why the third rung is a call and never a bare re-punch.** It was a re-punch
-at the cached endpoints with no DHT round trip, on REMOTE §13.3's premise that
-a NAT mapping outlives the punch window. For TCP on a home NAT it does not:
-measured on yog bl-65dc, a client re-punched from exactly the port its landed
-call named, its SYNs left for the whole window, and none reached the server's
-kernel — the server's NAT held no mapping once the served stream had ended,
-and the server sends no SYN outside a call's window, so the re-punch was
-one-sided. The held connection's twenty-five-second pings are the only thing
-that keeps a mapping alive, so **a dropped line is always a re-call**: the
-server must be asked, through its inbox, to punch back.
-
-**The punch** (`rendezvous::punch`; REMOTE §13.3): bind one port with the two
-reuse options, listen on it per family, connect from it toward every server
-endpoint, v6 first, one SYN per two seconds. **The first stream that lands is
-the connection** — the server serves every stream it obtains and lets the
-unspoken ones die in the handshake, so this end keeps the first and needs no
-negotiation over which. The window is thirty-five seconds: the server reads
-its inbox every fifteen and punches for twenty after a call, so a client that
-stopped at twenty would miss the server's whole window when the poll came late. It
-still holds with the server's read counted (bl-921e): the call is stored when
-`put` returns and this window opens, a read that just missed it is followed
-within fifteen seconds by one that lands when its walk ends — bounded near
-`max_queries / α` deadlines, ~8 s, and measured ~7.5 s — so the server punches
-by ~24 s and the windows overlap by ~11 s. The lockstep walk's ~20 s `get`
-had put the server's start at the window's very edge.
-A stated default, to be revisited on evidence (REMOTE §13.7 ruling 3).
-
-**What is held is what was punched.** A direct connection stays one per ask —
-§3.7's whole absent-while-executing argument rests on it, and it costs
-milliseconds. A punched one cost a presence read, an inbox write and a punch
-window, which is §10's criterion for a held connection met in its own terms,
-so it is kept across asks: the preface is exchanged once, every later ask is
-one request frame, and the server's serving loop takes them in turn. Two facts
-of the held wire are this end's to honour (REMOTE §13.4): the server writes
-`{"ping":true}` into twenty-five seconds of silence and **the ping is
-discarded wherever a reply stream is read** — it is never the start of one —
-and **two minutes of silence is the hangup**, which is the channel's existing
-socket bound (`channel::READ_TIMEOUT`) doing on a held connection what it
-always did on a dialled one. It is a socket bound and not an injected clock on
-purpose: rustls has no clean resume from a half-read record, so a timeout is
-"the connection is gone" and never a retry, and the suite drives it by
-shortening the bound rather than by faking time. The hangup is the wire, and
-the wire is dialled again (§3.8).
-
-**What the ladder says** (`rendezvous::say`, bl-3958; the server's half is
-yog bl-355c, REMOTE §13.4 "The operator's view of the loop"). A dial that
-fails silently is indistinguishable from one that never ran, so a roving
-entry's ladder says each step through the channel's §3.7 notice sink —
-stderr, under the channel's own name — one line apiece:
-
-    rendezvous: direct rung connected — no punch needed
-    rendezvous: direct rung refused — <n> address(es) tried (1 v4)
-    rendezvous: direct rung timed out — <n> address(es) tried (1 v6, 1 v4)
-    rendezvous: presence read — seq <s>, <k> endpoint(s) (1 v4)
-    rendezvous: presence not read — <class>
-    rendezvous: call nonce <n> written — seq <s>, <k> endpoint(s) (1 v6, 1 v4), <a> ack(s)
-    rendezvous: call nonce <n> not written — the DHT walk failed (reason withheld: it names nodes)
-    rendezvous: punch for call nonce <n> at <k> endpoint(s) (1 v4) — window 35s
-    rendezvous: re-call from cached presence — nonce <n>, <k> endpoint(s) (1 v6, 1 v4), <a> ack(s)
-    rendezvous: punch landed (1 v4)
-    rendezvous: punch expired after 35s with no stream
-    rendezvous: held line kept — the punched connection carries the next ask
-    rendezvous: held line dropped — the <send|receive> failed (<silent past the hangup|closed by the far end|a transport error>)
-    rendezvous: ping discarded off the held line
-
-A presence `<class>` is one of four fixed phrases — no walk could start, the
-walk failed, none is published, the item does not open under this pairing.
-**Counts, sequence numbers, nonces and address families, never an address, a
-key, a salt or a sealed byte**, and a DHT failure is said without its reason,
-because the walk's refusals name the nodes asked. **A repeated outcome is said
-once**: each family remembers its last line and stays quiet while the next is
-the same, so a roving entry whose direct address answers — dialled per ask —
-says so once, a box with no network does not re-say its ladder every minute,
-and a held line says its first ping and not the next hundred (a held line kept
-or dropped lets the next ping be said). An entry that does not rove says
-nothing here: its one rung's only outcome is already the channel's sentence.
-The line that would warn before spending the window when every address the
-call carries is an overlay or tunnel address waits on yog bl-f612, which
-decides what that class is.
-
-**What a foot does not do.** It does not publish presence, poll anything or
-hold a thread for the commons: a foot touches the DHT only at the moment it
-wants a connection, on that channel's own thread. It does not keep the server
-awake through a long tool — a hand-off past the server's two minutes costs the
-held connection, and the capture rides the next dial exactly as REMOTE §5.6
-already provides (`run::held`). It carries no relay, because REMOTE §13.6
-parks one. And it does not choose the rung: the ladder is a fixed order, and
-an entry opts into the lower rungs by the material it holds.
+**Nothing is held.** A connection is one per ask (§3.7). The held connection
+existed only because a punch cost seconds; a dial costs milliseconds again.
 
 ## 4. Module map
 
@@ -1093,16 +969,15 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/lib.rs` | Crate root. Module declarations and the crate's own statement of what it is. |
 | `src/cli.rs` | The command line as a pure function: arguments in, a `Verdict` (exit code + text) out. No process state is touched, which is what lets `main.rs` be the one coverage exclusion without excluding a decision. |
 | `src/main.rs` | The process entry and nothing else: argv in, stream selected by the code, exit. The single `tarpaulin.toml` exclusion. |
-| `src/channel.rs` | **The channel** (bl-a4a5): one wire to one server. There is an `ask` and there is nothing else — the shape of the file is the dial-in invariant. A dialled connection is one per ask, held only while waiting; a punched one is held across asks (§3.11, bl-0a8b), its pings discarded and its silence bounded. Knows nothing about being dialled again. |
+| `src/channel.rs` | **The channel** (bl-a4a5): one wire to one server. There is an `ask` and there is nothing else — the shape of the file is the dial-in invariant. A connection is one per ask, held only while waiting; the entry's endpoints and the one kept for the run live here (§3.11). |
 | `src/channel/failure.rs` | Why a channel could not carry a gesture, in the two classes that differ in what to do next — the wire, and version skew (split from `channel.rs` by bl-0a8b at the pre-split band). |
-| `src/channel/ladder.rs` | **The dial ladder** (§3.11): the direct address under a bound, the re-call from cached presence, the full rendezvous — in that order, stopping at the first that answers, and saying whether what answered was punched. An entry without rendezvous material has a one-rung ladder. |
-| `src/channel/speak.rs` | The channel's half of §3.11's lines (bl-3958): the sink the loop hands down (`speak_to`), and the held line lost and the ping discarded — the two things only the channel sees. Split from `channel.rs` at the pre-split band. |
+| `src/channel/ladder.rs` | **The dial ladder** (§3.11, bl-bc2c): the endpoint that answered last, then every other the entry states, each one TCP connect under a bound — stopping at the first that answers and saying which it was. The registration door is reached through the same connect. |
 | `src/channel/frame.rs` | The framing: a big-endian `u32` length, then that many bytes of JSON; a zero-length frame terminates an answer (REMOTE §3). |
 | `src/channel/hello.rs` | The version preface, and this end's half of it — state the major and the edition beside it (REMOTE §3.2), confirm, refuse fail-closed naming both versions. The server's edition comes back from the confirmation, defaulted at the floor when it states none. The number itself is in no Rust file: the repo-root `PROTOCOL` file states it and `build.rs` compiles it into the constant this module re-exports (bl-c618), because the release gates that read it are other repositories fetching one path out of a tree they do not build. A foot never *admits*, because a foot is never dialled. It also draws §3.8's one distinction REMOTE does not: a preface that arrived and states a version this end cannot speak is skew, one that never arrived is the wire. |
 | `src/channel/hello/version.rs` | The three vendored numbers and nothing else (bl-6fcf): the major, the edition this build states, and the floor an absent one reads as. Split from the exchange because they are the SERVER's facts copied, and a re-vendor rewrites this file alone. |
 | `src/channel/tls.rs` | The rustls client configuration: the operator CA as anchors, this box's leaf as its identity, `ring` named rather than defaulted. |
 | `src/channel/leaf.rs` | The foot grade, read off this box's own certificate — a DER walk, because thrall links no certificate library. |
-| `src/channel/material.rs` | What the operator carried here, and the three answers a directory can give: nothing, half, or a channel — with the rendezvous pairing beside it where the operator carried one (§3.11). |
+| `src/channel/material.rs` | What an entry holds, and the three answers a directory can give: nothing, half, or a channel — the address read as a list, one endpoint per line (§3.11). It only reads; `register` is what files one. |
 | `src/channel/entries.rs` | The entries this box holds, one per channel. A refusal is one entry's, never the set's. |
 | `src/config.rs` | **The operator's document** (bl-05fe): what this box offers, and the projection that drops the local half. The gate on what is enabled. It also holds `EXAMPLE`, the worked document compiled in from `docs/tools.example.json` so `thrall --example-tools` can print it on a box that has only the binary (bl-bb7d). |
 | `src/tools.rs` | The advertised element — the three facts REMOTE §5.1 fixes, in one spelling spent by the wire and by the document alike, and the check that a set is addressable. |
@@ -1119,22 +994,11 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/exec/pipes.rs` | The child's three pipes, pumped without blocking and read within a bound (bl-6c14, bl-6028; §3.5). A read answers with what the pipe holds now, so a write end a helper still holds cannot outlast the invocation — and the drains and the input feed stop being threads, because none of them can block any more. Past `exec::CAPTURE_LIMIT` it keeps reading and stops keeping, counting what it dropped so the capture can say so. |
 | `src/serve.rs` | What `thrall run` does: read the document, read the channels, serve until they stop. There is no success exit, so none is spelled. |
 | `src/paths.rs` | The one data root, named by `$XDG_DATA_HOME` or `$HOME` and by nothing of thrall's own. Neither set is a refusal, never a relative guess. |
-| `src/rendezvous.rs` | **The client rendezvous** (§3.11, bl-0a8b): the root that names the four files below and the mainline bootstrap nodes, resolved at the moment of a call and never on open. |
-| `src/rendezvous/pairing.rs` | The two rendezvous files an entry carries — the server's public key and the pairing salt — and the four HKDF derivations both ends compute from the salt. Tested against the server's own bytes. |
-| `src/rendezvous/item.rs` | The two sealed items: the presence this end opens and the call it seals — `nonce ‖ ciphertext ‖ tag`, the fixed-width endpoint list. Tested against bytes the server sealed. |
-| `src/rendezvous/punch.rs` | The TCP simultaneous open from one port: the listeners, the connectors, v6 first, the first stream kept. The one socket a foot listens on (§2). |
-| `src/rendezvous/say.rs` | **What the ladder says** (§3.11, bl-3958): every line a roving channel says as it climbs, built here and nowhere else so none can carry an address, and the speaker that says a repeated outcome once. |
-| `src/rendezvous/call.rs` | The act — presence, call, punch — the third rung's re-call, and the RAM cache it re-calls from; every duration a `Tuning` field a test can shorten. |
-| `src/rendezvous/call/write.rs` | Writing a call, the act both lower rungs share: walk to the inbox's token holders, seal a call naming where that walk saw this box, store it, punch — and refill the cache when the punch lands (bl-536d). |
-| `src/dht.rs` | **The DHT client** (REMOTE §13.2, §13.7 ruling 2): a pure client of the mainline DHT, never a node; the root holds `Config`, the client and its observed-address vote, and re-exports the shape the rendezvous consumes. Mirrored from yog's `src/dht`. |
-| `src/dht/bencode.rs` | Bencode: one enum, a canonical encoder, a strict bounded decoder. |
-| `src/dht/krpc.rs` | KRPC, the client's half: the query shape, the reply (with its BEP 42 `ip` claim) and error read back, compact nodes and addresses. |
-| `src/dht/mutable.rs` | BEP 44's signed mutable item, its target and the exact bytes a signature covers. |
-| `src/dht/lookup.rs` | The iterative walk: the door (re-asked only at the addresses that answered, yog bl-f519), the frontier loop and its end, bounded by per-query deadlines and a query cap (bl-921e). |
-| `src/dht/frontier.rs` | A walk's state — every node heard of, asked, replied, and the door addresses that answered — and the frontier read off it against the flight. |
-| `src/dht/flight.rs` | The sliding window: one query sent with its own deadline, and the wait for the flight's next event. |
-| `src/dht/items.rs` | `get`, and a write as `holders` (the walk, run before the value exists so its observed address can go into it) then `store` (the flight); a walk that found no token holder is its own error and sends nothing (yog bl-f519). |
-| `src/dht/transport.rs` | The datagram seam: one trait, and the std UDP socket that fills it. |
+| `src/register.rs` | **`thrall register <url>`** (§3.3, bl-bc2c): the claim in the order it happens — read the URL, make a key, post the public half, judge the reply, file the entry, say the word, dial the wire once. Also `web_roots`, the one place `webpki-roots` is named. |
+| `src/register/url.rs` | The registration URL read as three facts — where to connect, the `Host` to state, the path to post to — with every part judged before a byte is sent. |
+| `src/register/key.rs` | The P-256 pair made with `ring`, its public half wrapped as `SubjectPublicKeyInfo`, PEM written by hand, and the confirmation word — pinned to yog's vector. |
+| `src/register/post.rs` | The one HTTPS request: hand-written HTTP/1.1 over `rustls`, roots as a parameter, the reply read under a cap, and anything but a `200` one answer. |
+| `src/register/claim.rs` | The door's reply read as a claim, and the claim filed as an entry: a directory made once and never overwritten, the key at 0600. |
 | `src/spawn.rs` | **The spawn boundary.** Every child process is built AND forked here — nowhere else builds a `Command`, and nowhere else spends one. It decides three things a spawn site could forget: the git-environment scrub, the **process group** the child is born leading (bl-a78e, §3.5), and the fork lock the suite needs. **Founded by bl-a4a5**, before it had a production tenant, which is the point of the row: a boundary rule that arrives after the first spawn site is a rule that has to be argued with. |
 | `src/sys.rs` | **The confined `unsafe` file**, and it holds two things, both raw process effects `std` does not wrap. Signalling a process GROUP, which `std` has no spelling for at all (`Child::kill` is `SIGKILL` to one process, and there is no `Child::terminate`); the sign guard did not move when the group arrived (§3.5) — the negation is this file's, the callers pass a positive id. And putting a pipe into non-blocking mode (bl-6c14), which `std` spells for sockets and for nothing else — a `ChildStdout` has no `set_nonblocking`, and borrowing the socket one by wrapping the descriptor in a `UnixStream` would read the pipe with `recv(2)`, which a pipe refuses. Both are declared rather than depended on: `kill(2)` and `fcntl(2)` are in the libc `std` already links, so neither costs a crate, a build script or a lockfile line. |
 | `src/state.rs` | **The lock chokepoint.** Every `Mutex`/`RwLock` in the crate. Unbuilt, and it stayed that way: the only cross-thread hand-offs thrall has are a `JoinHandle`'s own answer (the pipes a child writes, the sentence a channel ends with), which need no lock. The suite's fork lock is **not** a tenant — a test's serialization lock is scaffolding, and the rule's own text sends it to `src/test_support.rs`. |
@@ -1143,9 +1007,7 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/corpus/ledger/shapes.rs` | `cfg(test)` only. The seven shapes a foot speaks, every field path stamped with the edition it appeared at, copied key for key out of `corpus/shapes.json`. A file of data, so a re-vendor's diff is the whole file and reads as one. |
 | `src/corpus/replay.rs` | `cfg(test)` only. **The two replays a consumer owes** (REMOTE §3.2, §3.6): projection — one record replayed at every edition a server can be at, with every key stamped above it deleted — and word mutation, a token no build has heard of in every string-typed path but `kind`. It replaces the by-hand frame-by-frame comparison every re-vendor up to 18 was paid for. |
 | `src/test_support.rs` | `cfg(test)` only. The scratch directory, the fork lock, the stand-in server, the recording notice sink (§3.7 — a serving foot writes to stderr, and a test cannot read that back), and the certificate mint the suite performs on the operator's behalf. |
-| `src/test_support/server/punched.rs` | `cfg(test)` only. The stand-in server's punched end: a punch port that listens, and a whole script served over ONE held connection — an answer, a vanish, a silence — so the ladder, the ping discard and the hangup are driven over a real punched wire. |
-| `src/test_support/roving.rs` | `cfg(test)` only. The operator's rendezvous act performed by the suite — the two files, the server's presence item signed as the server signs it — and a fake commons on loopback UDP — a router door that answers only `find_node` and the node past it holding the items — with the tuning that walks it in milliseconds. |
-| `src/dht/tests/fake.rs` | `cfg(test)` only. A fake DHT node on loopback UDP: scripted routing, a BEP 44 store that checks what a real node checks, and a mood for each way the commons misbehaves — the measured router, rotor and mute among them. It listens, which is why it is scaffolding; its datagrams are `fake/wire.rs`. |
+| `src/test_support/door.rs` | `cfg(test)` only. The stand-in registration door: an HTTPS listener under the mint's server leaf that takes one request with no client certificate and answers what the test hands it. |
 | `src/packaged_tests/embeds.rs` | `cfg(test)` only. **What the build reads, and whether it ships** (split from `packaged_tests.rs` by bl-bb7d): every compile-time embed under `src`, resolved against the file that names it and held to both halves of the policy — the class `is_ruled_in` admits and the path `cargo package --list` actually carries. It was a prohibition (*there are no embeds*) until the crate wanted one; a prohibition that has to be lifted the first time it binds was never the check. |
 | `src/packaged_tests.rs` | `cfg(test)` only. **The publication guard** (bl-d25a): what `cargo publish` would upload, read off the real `cargo package --list` and judged against the classes `Cargo.toml`'s `include` allowlist rules in — both directions, since a shape guard dies by matching nothing. It is in `src` rather than a `tests/` crate because it forks a child and the spawn boundary is `pub(crate)`; an integration crate could only reach a bare `Command::new`, which the confinement rules refuse. |
 
@@ -1161,8 +1023,8 @@ the address it binds. A foot never binds anything (§2), so that second meaning
 does not exist here and one shape covers every case: every channel is an entry
 at `wire/workspaces/<leaf>/`, and a box that dials one server has one entry. The four
 file names inside are REMOTE §8.2's, unchanged, so a pair the operator minted
-for a client box is filed the same way whichever program reads it — and the two
-optional rendezvous files beside them are REMOTE §13.2's (§3.11).
+for a client box is filed the same way whichever program reads it, and so is
+the entry `thrall register` files (§3.3). `address` is a list (§3.11).
 
 The last three rows are named by their **confinement rules** (bl-1827) rather
 than by the code that will fill them, and the naming is deliberately ahead of

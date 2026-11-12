@@ -6,9 +6,11 @@
 //! library, where a test reads it back as a value. That is what earns this file
 //! its place as the single exclusion in `tarpaulin.toml`.
 //!
-//! Five things are the entry point's rather than the library's, and all five
+//! Six things are the entry point's rather than the library's, and all six
 //! are the reason the exclusion is honest: **this process's own environment**,
-//! folded once into the data root; **serving**, which is not a value a test can
+//! folded once into the data root; **registering**, which posts to a door on
+//! the public web and writes an entry — an effect whose every decision is
+//! `register`'s, tested there against a door of the suite's own; **serving**, which is not a value a test can
 //! read back but a program dialling servers until they stop; **where a serving
 //! foot's notices go**, which is this process's stderr — an effect, and the one
 //! thing `serve` cannot answer as a `Verdict` because it has to be said while
@@ -18,7 +20,7 @@
 //! minute proving arithmetic; and **this process's own stdin**, which the
 //! bridge's input arrives on (DESIGN §6.2) — with this process's own PATH
 //! beside it, which is the one fact a pinned entry's `command` must carry
-//! (§6.3). All five are effects, and the
+//! (§6.3). All six are effects, and the
 //! decision of WHICH of them one argv calls for is `cli::run`'s, where a test
 //! reads it back as a value.
 //!
@@ -41,6 +43,7 @@ fn main() -> ExitCode {
     match thrall::cli::run(std::env::args().skip(1).collect()) {
         Decided::Say(verdict) => said(verdict),
         Decided::Serve => said(serve()),
+        Decided::Register { url } => said(register(&url)),
         Decided::Bridge { tool, server } => {
             captured(&thrall::mcp::bridge(&tool, &server, &input()))
         }
@@ -55,6 +58,19 @@ fn serve() -> Verdict {
             let notice: Notice = Arc::new(|line: &str| eprintln!("{line}"));
             let pause: Pause = Arc::new(std::thread::sleep);
             thrall::serve::serve(&root, &notice, &pause)
+        }
+        Err(reason) => Verdict::failed(reason),
+    }
+}
+
+/// Claim an offer into this box's data root, against the public web's roots.
+/// What it says before the wire is dialled — the confirmation word — goes to
+/// stdout as it happens, because the operator reads it while the dial runs.
+fn register(url: &str) -> Verdict {
+    match thrall::paths::data_root() {
+        Ok(root) => {
+            let notice: Notice = Arc::new(|line: &str| println!("{line}"));
+            thrall::register::register(&root, url, thrall::register::web_roots(), &notice)
         }
         Err(reason) => Verdict::failed(reason),
     }

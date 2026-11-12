@@ -1,5 +1,5 @@
 //! **The mTLS half** (REMOTE §1.3, §4): the rustls configuration a foot dials
-//! with, built from the material the operator carried here.
+//! with, built from the material an entry holds.
 //!
 //! **Certificates are the entire authentication story.** The server requires a
 //! client certificate that chains to the operator CA; this end requires the

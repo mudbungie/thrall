@@ -1,38 +1,33 @@
 //! **The channel**: thrall's end of one wire to one server (yog's
-//! `docs/REMOTE.md` §3, §5.4, §13.4; DESIGN §3.1, §3.11).
+//! `docs/REMOTE.md` §3, §5.4, §15.3; DESIGN §3.1, §3.11).
 //!
 //! **A foot dials and is never dialled.** Every leg is a reply to something
 //! this end asked for, so there is no inbound direction to secure because there
 //! is no inbound direction. That is not a property of this file — it is the
 //! whole shape of it: there is a [`Channel::ask`] and there is nothing else.
 //!
-//! **One connection per ask, held only while waiting — where a dial costs
-//! milliseconds.** A foot's life is one follow-class read (`invocations`,
-//! bl-a2ea) whose answer takes as long as it takes, and a dialled connection is
-//! held for exactly that. Between asks, and for the whole time it is executing
-//! something, it is *absent* — which is why the server does not treat presence
-//! as the routing predicate (REMOTE §5's amendment: the mailbox queue is).
+//! **One connection per ask, held only while waiting.** A foot's life is one
+//! follow-class read (`invocations`, bl-a2ea) whose answer takes as long as it
+//! takes, and a connection is held for exactly that. Between asks, and for the
+//! whole time it is executing something, it is *absent* — which is why the
+//! server does not treat presence as the routing predicate (REMOTE §5's
+//! amendment: the mailbox queue is). Nothing is held across asks: the server
+//! listens on a public port (REMOTE §15), so a dial costs milliseconds and
+//! there is no connection dear enough to keep.
 //!
-//! **A punched connection is held across asks** (REMOTE §13.4), because it
-//! cost seconds — a presence read, an inbox write, a punch window — and §10's
-//! criterion for a held connection is met in its own terms. What is held is
-//! exactly what was punched: the ladder ([`ladder`]) says which kind of
-//! connection it climbed to, a dialled one is spent with its ask, and a punched
-//! one is kept for the next. The server pings a held connection through its
-//! silence and the ping is discarded wherever a reply is read; two minutes of
-//! nothing is the hangup, and it ends the conversation like any other wire
-//! failure — which is to say it is dialled again.
+//! **The entry states a list of endpoints and the dial tries them in order**
+//! (REMOTE §15.3; [`ladder`]): the one that answered is kept for the rest of
+//! the run, in RAM and never on disk, and is the first tried next time.
 //!
 //! **It knows nothing about being dialled again** (DESIGN §3.8). A channel
 //! that fails answers the sentence that failed it, and what happens next is
 //! `run::redial`'s: a dropped wire is taken up again after a wait, through the
-//! same ladder, and a foot that cannot be a foot at all still exits.
+//! same list, and a foot that cannot be a foot at all still exits.
 //!
-//! **The server's name comes from the address and from nowhere else.** A dotted
-//! quad or a bracketed v6 literal is verified as an IP address — the server's
-//! leaf must carry the matching `IP:` subject alternative name — and anything
-//! else is a DNS name. Whichever rung answered, that is the name the inner
-//! mTLS verifies (REMOTE §13.3): there is nothing to configure and nothing
+//! **The server's name comes from the endpoint dialled and from nowhere
+//! else.** A dotted quad or a bracketed v6 literal is verified as an IP address
+//! — the server's leaf must carry the matching `IP:` subject alternative name
+//! — and anything else is a DNS name: there is nothing to configure and nothing
 //! that can disagree with what was dialled.
 
 use std::net::{IpAddr, TcpStream};
@@ -51,20 +46,17 @@ mod failure;
 pub mod frame;
 /// The version preface.
 pub mod hello;
-/// The dial ladder: how a connection is obtained, rung by rung.
+/// The dial ladder: the entry's endpoints, tried in order.
 mod ladder;
 /// The foot grade, read off this box's own leaf.
 pub mod leaf;
-/// What the operator carried to this box.
+/// What an entry holds.
 pub mod material;
-/// What a roving channel says of its held line, into the loop's sink.
-mod speak;
 /// The mTLS configuration.
 pub mod tls;
 
-use crate::rendezvous::call::{Roving, Tuning};
-use crate::rendezvous::say::{self, Kind};
 pub use failure::Failure;
+pub(crate) use ladder::connect;
 use material::Material;
 
 /// How long one read may wait before the channel is judged gone.
@@ -74,13 +66,14 @@ use material::Material;
 /// if there was none — so a foot waiting for hours is a *sequence* of answered
 /// reads, never one read held for hours. This has to sit comfortably above that
 /// hold, because a read timeout below it would turn the server's ordinary empty
-/// answer into a dead channel. **On a held connection it is the hangup** the
-/// server states from its end too (REMOTE §13.4): the server pings every
-/// twenty-five seconds of silence, so a live connection never reaches it, and
-/// one that does is gone. It is a socket bound and not a clock, because rustls
-/// has no clean resume from a half-read record — a timeout is "the connection
-/// is gone", never a retry.
+/// answer into a dead channel. It is a socket bound and not a clock, because
+/// rustls has no clean resume from a half-read record — a timeout is "the
+/// connection is gone", never a retry.
 const READ_TIMEOUT: Duration = Duration::from_mins(2);
+
+/// One endpoint of the entry's list: the `host:port` as stated, and the name
+/// its certificate is verified against.
+type Endpoint = (String, ServerName<'static>);
 
 /// One connection's TLS stream.
 type Tls = StreamOwned<ClientConnection, TcpStream>;
@@ -89,59 +82,37 @@ type Tls = StreamOwned<ClientConnection, TcpStream>;
 #[derive(Debug)]
 pub struct Channel {
     config: Arc<ClientConfig>,
-    address: String,
-    name: ServerName<'static>,
+    /// The endpoints the entry states, in its order, each with the name its
+    /// certificate is verified against.
+    endpoints: Vec<Endpoint>,
+    /// The endpoint that answered last — tried first next time. RAM for the
+    /// run, never disk (REMOTE §15.3).
+    kept: usize,
     client: String,
-    /// The roving half, where the entry carries rendezvous material.
-    roving: Option<Roving>,
-    /// The punched connection being held between asks, if there is one.
-    held: Option<Tls>,
-    quiet: Duration,
 }
 
 impl Channel {
     /// Open the channel from provisioned material. **Nothing is dialled here**:
     /// a channel is a fact about what this box may say, not about whether a
-    /// server happens to be up — and nothing is bound either, the punch port
-    /// being taken on the first rendezvous.
+    /// server happens to be up.
     ///
     /// The grade is read first, because a leaf that is not a foot's is a
     /// refusal about *this box's configuration* and has nothing to do with any
     /// server — it must not arrive as a connection failure.
     pub fn open(m: &Material) -> Result<Self, String> {
         let client = leaf::foot(&m.chain)?;
+        let named = |address: &String| Ok((address.clone(), server_name(address)?));
         Ok(Self {
             config: tls::client_config(m)?,
-            address: m.address.clone(),
-            name: server_name(&m.address)?,
+            endpoints: m.address.iter().map(named).collect::<Result<_, String>>()?,
+            kept: 0,
             client,
-            roving: m
-                .rendezvous
-                .clone()
-                .map(|pairing| Roving::new(pairing, Tuning::default())),
-            held: None,
-            quiet: READ_TIMEOUT,
         })
-    }
-
-    /// The suite's knobs: the silence bound, and the rendezvous tuning where
-    /// the entry roves. Production runs on the defaults and has no caller.
-    #[cfg(test)]
-    pub(crate) fn tune(&mut self, quiet: Duration, tuning: Tuning) {
-        self.quiet = quiet;
-        if let Some(roving) = self.roving.as_mut() {
-            roving.tuning = tuning;
-        }
     }
 
     /// The client identity this channel presents — the leaf's own common name.
     pub fn client(&self) -> String {
         self.client.clone()
-    }
-
-    /// The address it dials.
-    pub fn address(&self) -> String {
-        self.address.clone()
     }
 
     /// Send one request and read its whole answer: every frame up to the
@@ -155,68 +126,23 @@ impl Channel {
     /// is the sentence — while a version the two ends do not share is the one
     /// fact that is about the two *binaries* and survives every dial.
     ///
-    /// **A held connection is spoken on first and dropped on any failure**: a
-    /// failure there is the wire, the next dial climbs the ladder, and nothing
-    /// here retries inside one ask.
+    /// Nothing here retries inside one ask.
     pub fn ask(&mut self, request: &Value) -> Result<Vec<Value>, Failure> {
-        let (mut tls, punched, fresh) = if let Some(mut tls) = self.held.take() {
-            frame::write_value(&mut tls, request).map_err(|e| self.lost("send", &e, true))?;
-            (tls, true, false)
-        } else {
-            let (tls, punched) = self.dial(request)?;
-            (tls, punched, punched)
-        };
-        let answer = self.answer(&mut tls, punched)?;
-        if fresh {
-            self.say(Kind::Held, say::held_kept());
-        }
-        if punched {
-            self.held = Some(tls);
-        }
-        Ok(answer)
-    }
-
-    /// Every frame of one answer, in order, up to the terminator — and never
-    /// a ping, which the server writes into a held connection's silence
-    /// (REMOTE §13.4) and which is never the start of a reply stream.
-    fn answer(&mut self, tls: &mut Tls, punched: bool) -> Result<Vec<Value>, Failure> {
+        let (mut tls, address) = self.dial(request)?;
         let mut stream = Vec::new();
         loop {
-            match frame::read_value(tls).map_err(|e| self.lost("receive", &e, punched))? {
-                Some(chunk) if is_ping(&chunk) => self.say(Kind::Ping, say::ping()),
-                Some(chunk) => stream.push(chunk),
-                None => return Ok(stream),
+            match frame::read_value(&mut tls) {
+                Ok(Some(chunk)) => stream.push(chunk),
+                Ok(None) => return Ok(stream),
+                Err(e) => return Err(Failure::Wire(failed("receive", &address, &e))),
             }
         }
-    }
-
-    /// **A channel that failed, in this box's own words** (bl-52ba).
-    ///
-    /// The sentence IS the product on this path: what a supervisor's log or an
-    /// operator's terminal carries is the whole of what they get — and what
-    /// they need from it is which server went away and whether anything is
-    /// going to happen next. A library's own diagnosis answers neither: it
-    /// names no address, and "peer closed connection without sending TLS
-    /// close_notify" is a fact about TLS rather than about what to do. **It
-    /// follows the sentence rather than replacing it**, because it is the right
-    /// text for the one reader who wants it and the wrong text for the one who
-    /// has to act. What this box will do next is `run::redial`'s to say in the
-    /// same breath (bl-916d).
-    ///
-    /// `leg` is the half that failed, so this reads like the connect refusals
-    /// beside it: the act, the address, then what happened.
-    fn failed(&self, leg: &str, e: &std::io::Error) -> String {
-        format!(
-            "{leg} {}: the channel to the server failed. What the {leg} \
-             reported: {e}",
-            self.address
-        )
     }
 
     /// Climb the ladder to a connection, handshake and send. The TLS handshake
     /// happens inside the first write, and the one frame read here is the
     /// server's version preface — so what this hands back is a stream with a
-    /// request on it and no *answer* yet read, and whether it was punched.
+    /// request on it and no *answer* yet read.
     ///
     /// **Both ends state a version before either reads** (REMOTE §3), and the
     /// request goes out in the same breath as this end's preface — so
@@ -224,30 +150,47 @@ impl Channel {
     /// before a frame of the answer is decoded. **The server's EDITION comes
     /// back from that confirmation and is dropped here** (REMOTE §3.2): a foot
     /// reads no post-floor field, so nothing above consults it yet.
-    fn dial(&mut self, request: &Value) -> Result<(Tls, bool), Failure> {
-        let (tcp, punched) =
-            ladder::climb(&self.address, self.roving.as_mut()).map_err(Failure::Wire)?;
-        tcp.set_read_timeout(Some(self.quiet))
-            .map_err(|e| Failure::Wire(format!("connect {}: {e}", self.address)))?;
-        let conn = ClientConnection::new(Arc::clone(&self.config), self.name.clone())
-            .map_err(|e| Failure::Wire(format!("tls {}: {e}", self.address)))?;
+    fn dial(&mut self, request: &Value) -> Result<(Tls, String), Failure> {
+        let (tcp, kept) = ladder::climb(&self.endpoints, self.kept).map_err(Failure::Wire)?;
+        self.kept = kept.at;
+        let address = kept.address;
+        tcp.set_read_timeout(Some(READ_TIMEOUT))
+            .map_err(|e| Failure::Wire(format!("connect {address}: {e}")))?;
+        let conn = ClientConnection::new(Arc::clone(&self.config), kept.name)
+            .map_err(|e| Failure::Wire(format!("tls {address}: {e}")))?;
         let mut tls = StreamOwned::new(conn, tcp);
-        hello::state(&mut tls).map_err(|e| Failure::Wire(self.failed("send", &e)))?;
+        hello::state(&mut tls).map_err(|e| Failure::Wire(failed("send", &address, &e)))?;
         frame::write_value(&mut tls, request)
-            .map_err(|e| Failure::Wire(self.failed("send", &e)))?;
+            .map_err(|e| Failure::Wire(failed("send", &address, &e)))?;
         hello::confirm(&mut tls)?;
-        Ok((tls, punched))
+        Ok((tls, address))
     }
 }
 
-/// The server's keepalive on a held connection: `{"ping":true}` and nothing
-/// else (yog `wire::server::peer`).
-fn is_ping(frame: &Value) -> bool {
-    frame.get("ping").and_then(Value::as_bool) == Some(true)
+/// **A channel that failed, in this box's own words** (bl-52ba).
+///
+/// The sentence IS the product on this path: what a supervisor's log or an
+/// operator's terminal carries is the whole of what they get — and what
+/// they need from it is which server went away and whether anything is
+/// going to happen next. A library's own diagnosis answers neither: it
+/// names no address, and "peer closed connection without sending TLS
+/// close_notify" is a fact about TLS rather than about what to do. **It
+/// follows the sentence rather than replacing it**, because it is the right
+/// text for the one reader who wants it and the wrong text for the one who
+/// has to act. What this box will do next is `run::redial`'s to say in the
+/// same breath (bl-916d).
+///
+/// `leg` is the half that failed, so this reads like the connect refusals
+/// beside it: the act, the endpoint that was dialled, then what happened.
+fn failed(leg: &str, address: &str, e: &std::io::Error) -> String {
+    format!(
+        "{leg} {address}: the channel to the server failed. What the {leg} \
+         reported: {e}"
+    )
 }
 
 /// The name to verify the server's certificate against, read off the address.
-fn server_name(address: &str) -> Result<ServerName<'static>, String> {
+pub(crate) fn server_name(address: &str) -> Result<ServerName<'static>, String> {
     let host = address.rsplit_once(':').map_or(address, |(head, _)| head);
     let host = host.trim_start_matches('[').trim_end_matches(']');
     if let Ok(ip) = host.parse::<IpAddr>() {

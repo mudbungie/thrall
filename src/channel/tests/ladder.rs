@@ -1,216 +1,95 @@
-//! **The dial ladder, rung by rung** (DESIGN §3.11): a direct address that
-//! answers, one that does not and the rendezvous under it, the held
-//! connection that comes back, the ping discarded off it, the silence that
-//! hangs it up, and the re-call that needs no presence read.
+//! **The dial ladder, rung by rung** (REMOTE §15.3; DESIGN §3.11): a list
+//! whose first endpoint is dead, the endpoint that answered kept for the next
+//! ask, the kept one failing and the rest tried, and no rung answering at all.
 
-use super::super::material::read_dir;
-use super::super::{Channel, Failure, READ_TIMEOUT};
-use crate::test_support::roving::{commons, presence, tuned};
+use super::super::material::{ADDRESS, read_dir};
+use super::super::{Channel, Failure};
+use super::{advertised, said};
 use crate::test_support::server::Server;
-use crate::test_support::server::punched::{Punched, Turn};
-use crate::test_support::{Scratch, mint, roving};
-use serde_json::{Value, json};
-use std::path::Path;
-use std::time::Duration;
+use crate::test_support::{Scratch, mint};
+use serde_json::json;
 
-fn advertised() -> Value {
-    json!({"ok": true, "kind": "advertised", "wrote": false})
-}
+/// Port 1 is below the ephemeral range and unbindable without privilege, so
+/// no other test's freed port can answer a dial there.
+const DEAD: &str = "127.0.0.1:1";
 
-/// A roving entry: the operator carried the pairing beside the four files.
-pub(super) fn roving_entry(dir: &Path, address: &str) -> crate::channel::material::Material {
-    mint::material(dir);
-    roving::carried(dir);
-    std::fs::write(dir.join(super::super::material::ADDRESS), address).expect("address");
-    read_dir(dir).expect("readable").expect("provisioned")
-}
-
-/// The number of prefaces a punched server heard — one per connection.
-fn connections(server: &Punched) -> usize {
-    server
-        .heard()
-        .iter()
-        .filter(|v| v.get("protocol").is_some())
-        .count()
-}
-
-/// **The second rung**: a roving entry whose address answers is dialled
-/// directly, per ask, and the commons is never consulted — the bootstrap
-/// here resolves to nothing, so a walk would refuse.
-#[test]
-fn a_direct_address_that_answers_is_taken_and_stays_one_per_ask() {
+/// A channel over a live server answering `dials` asks, whose entry lists
+/// the endpoints `order` builds from the address the server bound.
+fn listed(dials: usize, order: fn(&str) -> String) -> (Scratch, Server, Channel) {
     let scratch = Scratch::new();
     mint::material(scratch.path());
-    roving::carried(scratch.path());
-    let server = Server::start(
-        scratch.path(),
-        crate::corpus::PROTOCOL,
-        vec![vec![advertised()], vec![advertised()]],
-    );
+    let script = vec![vec![advertised()]; dials];
+    let server = Server::start(scratch.path(), crate::corpus::PROTOCOL, script);
+    let file = scratch.join(ADDRESS);
+    let bound = std::fs::read_to_string(&file).expect("the bound address");
+    std::fs::write(&file, order(&bound)).expect("the list");
     let held = read_dir(scratch.path())
         .expect("readable")
         .expect("provisioned");
-    let mut channel = Channel::open(&held).expect("opened");
-    channel.tune(READ_TIMEOUT, tuned(vec![]));
+    let channel = Channel::open(&held).expect("opened");
+    (scratch, server, channel)
+}
+
+/// **A dead first endpoint falls through to the second, and the second is
+/// kept**: the next ask dials it first, and the list on disk is untouched.
+#[test]
+fn the_endpoint_that_answered_is_kept_for_the_run_and_never_written() {
+    let (scratch, server, mut channel) = listed(2, |bound| format!("{DEAD}\n{bound}\n"));
+    let before = std::fs::read_to_string(scratch.join(ADDRESS)).expect("the list");
+    assert_eq!(channel.kept, 0, "nothing has answered yet");
     for _ in 0..2 {
         assert_eq!(
             channel.ask(&json!({"op": "advertise"})),
             Ok(vec![advertised()])
         );
+        assert_eq!(channel.kept, 1, "the second endpoint answered");
     }
     assert_eq!(server.heard().len(), 4, "two connections, two prefaces");
-    assert!(channel.held.is_none(), "a dialled connection is not held");
+    let after = std::fs::read_to_string(scratch.join(ADDRESS)).expect("the list");
+    assert_eq!(before, after, "what worked is RAM, never disk");
 }
 
-/// **The fourth rung, and the connection is held.** The direct address
-/// refuses at once, nothing is cached, so the channel reads presence off the
-/// commons, files its call, punches — and the second ask rides the same
-/// connection with no second preface.
+/// **A kept endpoint that stops answering costs nothing but its own bound**:
+/// the rest of the list is tried, in the entry's order, and the one that
+/// answers is kept in its place.
 #[test]
-fn a_dead_address_falls_through_to_the_rendezvous_and_the_connection_is_held() {
-    let scratch = Scratch::new();
-    let held = roving_entry(scratch.path(), "127.0.0.1:1");
-    let server = Punched::start(
-        scratch.path(),
-        vec![
-            Turn::Answer(vec![advertised()]),
-            Turn::Answer(vec![advertised()]),
-        ],
-    );
-    let (node, tuning) = commons(vec![presence(server.port(), 1)]);
-    let mut channel = Channel::open(&held).expect("opened");
-    channel.tune(READ_TIMEOUT, tuning);
+fn a_kept_endpoint_that_stops_answering_falls_back_to_the_rest() {
+    let (_scratch, _server, mut channel) = listed(1, |bound| format!("{bound}\n{DEAD}"));
+    channel.kept = 1;
     assert_eq!(
         channel.ask(&json!({"op": "advertise"})),
         Ok(vec![advertised()])
     );
-    assert!(channel.held.is_some(), "a punched connection is held");
-    assert_eq!(
-        channel.ask(&json!({"op": "invocations"})),
-        Ok(vec![advertised()])
-    );
-    assert_eq!(connections(&server), 1, "one connection carried both asks");
-    assert_eq!(server.heard().len(), 3, "a preface and two requests");
-    assert_eq!(
-        node.held().len(),
-        2,
-        "the presence, and this box's call beside it"
-    );
+    assert_eq!(channel.kept, 0);
 }
 
-/// **A ping is discarded wherever a reply is read** (REMOTE §13.4): the
-/// server writes `{"ping":true}` into a held connection's silence, and it is
-/// never the start of a reply stream.
+/// **No rung answering is every rung's sentence**, in the order they were
+/// tried — and an endpoint that is not a `host:port` at all says so itself.
 #[test]
-fn a_ping_in_the_reply_stream_is_discarded() {
+fn no_rung_answering_names_every_endpoint_it_tried() {
     let scratch = Scratch::new();
-    let held = roving_entry(scratch.path(), "127.0.0.1:1");
-    let server = Punched::start(
-        scratch.path(),
-        vec![Turn::Answer(vec![
-            json!({"ping": true}),
-            json!({"ping": true}),
-            advertised(),
-        ])],
-    );
-    let (_node, tuning) = commons(vec![presence(server.port(), 1)]);
+    mint::material(scratch.path());
+    std::fs::write(scratch.join(ADDRESS), format!("{DEAD}\nno-port-here\n")).expect("the list");
+    let held = read_dir(scratch.path())
+        .expect("readable")
+        .expect("provisioned");
     let mut channel = Channel::open(&held).expect("opened");
-    channel.tune(READ_TIMEOUT, tuning);
-    assert_eq!(
-        channel.ask(&json!({"op": "advertise"})),
-        Ok(vec![advertised()])
-    );
+    let failure = channel
+        .ask(&json!({"op": "advertise"}))
+        .expect_err("refused");
+    assert!(matches!(failure, Failure::Wire(_)), "a transport failure");
+    let said = said(failure);
+    let (first, second) = said.split_once("; ").expect("two sentences");
+    assert!(first.starts_with("connect 127.0.0.1:1: "), "{said}");
+    assert!(second.starts_with("connect no-port-here: "), "{said}");
 }
 
-/// **Two minutes of silence is the hangup**, and it is the wire — dialled
-/// again by the loop above. The bound is shortened here; its production
-/// value is asserted beside it.
+/// An endpoint that names no server refuses when the channel opens — it is
+/// this box's configuration, and no dial would improve it.
 #[test]
-fn silence_past_the_bound_hangs_up_as_the_wire() {
-    assert_eq!(READ_TIMEOUT, Duration::from_mins(2));
+fn an_endpoint_that_names_no_server_refuses_to_open() {
     let scratch = Scratch::new();
-    let held = roving_entry(scratch.path(), "127.0.0.1:1");
-    let server = Punched::start(scratch.path(), vec![Turn::Silence]);
-    let (_node, tuning) = commons(vec![presence(server.port(), 1)]);
-    let mut channel = Channel::open(&held).expect("opened");
-    channel.tune(Duration::from_millis(300), tuning);
-    let Err(Failure::Wire(said)) = channel.ask(&json!({"op": "advertise"})) else {
-        panic!("silence is the wire");
-    };
-    assert!(said.starts_with("receive 127.0.0.1:1"), "{said}");
-    assert!(channel.held.is_none(), "a hung-up connection is not held");
-}
-
-/// **The third rung** (ruling yog bl-278f): a held connection that drops is
-/// re-called from the cached presence — the commons is re-tuned to one that
-/// holds no presence, so a read would refuse — and exactly one call is
-/// written there before the second connection lands.
-#[test]
-fn a_dropped_held_connection_is_re_called_without_reading_presence() {
-    let scratch = Scratch::new();
-    let held = roving_entry(scratch.path(), "127.0.0.1:1");
-    let server = Punched::start(
-        scratch.path(),
-        vec![
-            Turn::Answer(vec![advertised()]),
-            Turn::Vanish,
-            Turn::Answer(vec![advertised()]),
-        ],
-    );
-    let (_node, tuning) = commons(vec![presence(server.port(), 1)]);
-    let mut channel = Channel::open(&held).expect("opened");
-    channel.tune(READ_TIMEOUT, tuning);
-    assert_eq!(
-        channel.ask(&json!({"op": "advertise"})),
-        Ok(vec![advertised()])
-    );
-    let (empty, tuning) = commons(vec![]);
-    channel.tune(READ_TIMEOUT, tuning);
-    let Err(Failure::Wire(said)) = channel.ask(&json!({"op": "invocations"})) else {
-        panic!("the server vanished");
-    };
-    assert!(said.starts_with("receive 127.0.0.1:1"), "{said}");
-    assert_eq!(
-        channel.ask(&json!({"op": "advertise"})),
-        Ok(vec![advertised()])
-    );
-    assert_eq!(connections(&server), 2, "a second connection landed");
-    assert_eq!(empty.held().len(), 1, "exactly one call, and no presence");
-}
-
-/// **Every rung refusing is one sentence naming them all**, so an operator
-/// reads which server, which address, and why the commons did not help.
-#[test]
-fn no_rung_answering_names_the_address_and_the_rendezvous() {
-    let scratch = Scratch::new();
-    let held = roving_entry(scratch.path(), "127.0.0.1:1");
-    let mut channel = Channel::open(&held).expect("opened");
-    channel.tune(READ_TIMEOUT, tuned(vec![]));
-    let Err(Failure::Wire(said)) = channel.ask(&json!({"op": "advertise"})) else {
-        panic!("nothing answered");
-    };
-    assert!(said.starts_with("connect 127.0.0.1:1"), "{said}");
-    assert!(
-        said.ends_with("; rendezvous: no DHT bootstrap node resolved"),
-        "{said}"
-    );
-}
-
-/// A held connection the server has already closed fails on the send or the
-/// receive as the wire, and is dropped.
-#[test]
-fn a_held_connection_the_server_closed_is_the_wire() {
-    let scratch = Scratch::new();
-    let held = roving_entry(scratch.path(), "127.0.0.1:1");
-    let server = Punched::start(scratch.path(), vec![Turn::Answer(vec![advertised()])]);
-    let (_node, tuning) = commons(vec![presence(server.port(), 1)]);
-    let mut channel = Channel::open(&held).expect("opened");
-    channel.tune(Duration::from_secs(3), tuning);
-    assert!(channel.ask(&json!({"op": "advertise"})).is_ok());
-    // The script is spent: the server drops the connection on the next read.
-    assert!(matches!(
-        channel.ask(&json!({"op": "advertise"})),
-        Err(Failure::Wire(_))
-    ));
-    assert!(channel.held.is_none());
+    let held = mint::provisioned(scratch.path(), "server.example:9000\nnot a name:9000\n");
+    let refusal = Channel::open(&held).expect_err("refused");
+    assert!(refusal.contains("not a server name"), "{refusal}");
 }

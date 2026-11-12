@@ -95,9 +95,9 @@ COPY --from=build /src/target/release/thrall /usr/local/bin/thrall
 # the extra level is XDG's, not the image's: `XDG_DATA_HOME` is a parent of
 # per-application roots by definition and an image does not get to collapse it.
 #
-# Mount the operator's provisioned data root at /state/thrall. It holds
-# `tools.json` and `wire/workspaces/<leaf>/`, both put there by hand, neither
-# ever written by thrall, and NEITHER IN THIS IMAGE — a certificate baked into
+# Mount this foot's data root at /state/thrall. It holds `tools.json`, which
+# the operator writes, and `wire/workspaces/<leaf>/`, which `thrall register`
+# files there, and NEITHER IS IN THIS IMAGE — a certificate baked into
 # a layer is a certificate published to everyone who can pull it.
 #
 # There is no VOLUME instruction. A VOLUME would make an unmounted run succeed

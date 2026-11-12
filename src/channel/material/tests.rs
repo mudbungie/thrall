@@ -1,7 +1,6 @@
 //! The three answers a directory can give.
 
 use super::{ADDRESS, ANCHORS, CHAIN, KEY, read_dir};
-use crate::rendezvous::pairing;
 use crate::test_support::Scratch;
 use std::path::Path;
 
@@ -29,7 +28,8 @@ fn a_directory_that_is_not_there_reads_as_nothing_provisioned() {
     assert_eq!(read_dir(&tmp.path().join("never-made")), Ok(None));
 }
 
-/// Everything present is the material, with the address trimmed.
+/// Everything present is the material, with the address trimmed — and a file
+/// of one line is a list of one.
 #[test]
 fn a_provisioned_directory_answers_its_material() {
     let tmp = Scratch::new();
@@ -37,7 +37,7 @@ fn a_provisioned_directory_answers_its_material() {
     let held = read_dir(tmp.path())
         .expect("readable")
         .expect("provisioned");
-    assert_eq!(held.address, "server.example:9000");
+    assert_eq!(held.address, ["server.example:9000"]);
     assert_eq!(held.anchors, tmp.path().join(ANCHORS));
     assert_eq!(held.chain, tmp.path().join(CHAIN));
     assert_eq!(held.key, tmp.path().join(KEY));
@@ -57,16 +57,16 @@ fn a_half_provisioned_directory_names_every_gap_at_once() {
     assert!(refusal.contains("half-provisioned"), "{refusal}");
 }
 
-/// The remedy is an act on another box by another hand, and the refusal says
-/// so. thrall must never look like something that could mint its own way in.
+/// The remedy is filing an entry whole — by registering, or by the operator's
+/// hand — and the refusal names both: a gap is never patched file by file.
 #[test]
-fn every_refusal_says_the_material_arrives_by_hand() {
+fn every_refusal_names_the_two_ways_an_entry_is_filed() {
     let tmp = Scratch::new();
     provision(tmp.path(), "server.example:9000");
     std::fs::remove_file(tmp.path().join(ANCHORS)).expect("rm");
     let refusal = read_dir(tmp.path()).expect_err("refused");
-    assert!(refusal.contains("thrall mints nothing"), "{refusal}");
-    assert!(refusal.contains("carried here by hand"), "{refusal}");
+    assert!(refusal.contains("thrall register <url>"), "{refusal}");
+    assert!(refusal.contains("carried here"), "{refusal}");
 }
 
 /// An address file that is empty, whitespace, or unreadable is one refusal:
@@ -88,27 +88,39 @@ fn an_address_that_says_nothing_refuses_however_it_says_it() {
     assert!(refusal.contains("half-provisioned"), "{refusal}");
 }
 
-/// **The rendezvous pairing rides beside the four files** (REMOTE §13.2): an
-/// entry without it is today's entry and roves nowhere, one with both files
-/// carries the pairing, and half of it is the same refusal half a trust
-/// store earns.
+/// **The address file is a list, one endpoint per line, in dial order**
+/// (REMOTE §15.3) — blank lines and stray whitespace say nothing.
 #[test]
-fn the_rendezvous_pairing_is_read_beside_the_material_or_absent() {
+fn an_address_file_of_several_lines_is_the_list_in_its_order() {
     let tmp = Scratch::new();
-    provision(tmp.path(), "server.example:9000");
-    let plain = read_dir(tmp.path())
-        .expect("readable")
-        .expect("provisioned");
-    assert_eq!(plain.rendezvous, None, "no roving, and not a failure");
-    crate::test_support::roving::carried(tmp.path());
-    let roving = read_dir(tmp.path())
+    provision(
+        tmp.path(),
+        "server.example:7737\n\n  192.0.2.7:7737 \n[2001:db8::7]:7737\n",
+    );
+    let held = read_dir(tmp.path())
         .expect("readable")
         .expect("provisioned");
     assert_eq!(
-        roving.rendezvous,
-        Some(crate::test_support::roving::pairing())
+        held.address,
+        [
+            "server.example:7737",
+            "192.0.2.7:7737",
+            "[2001:db8::7]:7737"
+        ]
     );
-    std::fs::remove_file(tmp.path().join(pairing::SALT)).expect("rm");
-    let refusal = read_dir(tmp.path()).expect_err("half");
-    assert!(refusal.contains(pairing::SALT), "{refusal}");
+}
+
+/// **The retired rendezvous files are ignored, never required and never
+/// read** (REMOTE §15.4): an entry filed before the public wire still holds
+/// them, garbage or not, and is the same entry without them.
+#[test]
+fn an_entry_still_holding_the_retired_rendezvous_files_simply_works() {
+    let tmp = Scratch::new();
+    provision(tmp.path(), "server.example:9000");
+    let plain = read_dir(tmp.path()).expect("readable");
+    std::fs::write(tmp.path().join("rendezvous.pub"), b"not hex at all").expect("write");
+    std::fs::write(tmp.path().join("pairing.salt"), b"").expect("write");
+    assert_eq!(read_dir(tmp.path()).expect("readable"), plain);
+    std::fs::remove_file(tmp.path().join("pairing.salt")).expect("rm");
+    assert_eq!(read_dir(tmp.path()).expect("half of them, too"), plain);
 }

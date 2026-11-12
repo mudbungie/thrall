@@ -45,7 +45,7 @@ fn entries_are_answered_in_one_order() {
     assert_eq!(names, ["first", "second"]);
     assert_eq!(
         held[0].channel.as_ref().expect("provisioned").address,
-        "a.example:9000"
+        ["a.example:9000"]
     );
 }
 
@@ -79,7 +79,7 @@ fn one_broken_entry_does_not_cost_the_others() {
     assert!(half.contains("half-provisioned"), "{half}");
     let empty = held[0].channel.as_ref().expect_err("refused");
     assert!(empty.contains("is an empty entry"), "{empty}");
-    assert!(empty.contains("thrall mints nothing"), "{empty}");
+    assert!(empty.contains("thrall register <url>"), "{empty}");
 }
 
 /// Opening an entry is opening its channel, and an entry with no material
@@ -93,7 +93,6 @@ fn opening_an_entry_is_opening_its_channel() {
     assert_eq!(held.len(), 1);
     let channel = held[0].open().expect("opened");
     assert_eq!(channel.client(), mint::FOOT_NAME);
-    assert_eq!(channel.address(), "server.example:9000");
 
     std::fs::remove_file(entry.join(ANCHORS)).expect("rm");
     let broken = read_dir(scratch.path());

@@ -80,7 +80,7 @@ pub(crate) fn command(program: &str) -> Command {
 /// Run `cmd` to completion and collect what it said.
 ///
 /// `cfg(test)`, because its one tenant is the suite's stand-in for the
-/// operator's certificate mint — thrall itself mints nothing (REMOTE §1.4) and
+/// operator's certificate mint — thrall itself signs nothing (DESIGN §3.3) and
 /// the executor cannot use this shape at all (see [`spawn`]). It stays here
 /// rather than in the suite because the boundary is a location, not a
 /// convenience: a fork written anywhere else would be a second inventory.

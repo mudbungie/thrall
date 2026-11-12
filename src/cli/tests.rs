@@ -44,13 +44,32 @@ fn usage_leads_with_the_version_line_then_says_what_thrall_is() {
     );
 }
 
-/// The usage names the verb, and names the two files an operator has to
-/// put on the box by hand — because a foot arrives on a machine whose
-/// operator did not necessarily choose to install it.
+/// **`register` takes exactly the URL** and decides nothing else here: the
+/// claim is an effect, so the entry point performs it.
+#[test]
+fn register_takes_one_url_and_nothing_else() {
+    let url = "https://engine.example/yog/register/ABCD2345";
+    let Decided::Register { url: taken } = run(argv(&["register", url])) else {
+        panic!("register with a URL is the registration");
+    };
+    assert_eq!(taken, url);
+    for words in [&["register"][..], &["register", url, "again"]] {
+        let refused = said(words);
+        assert_eq!(refused.code, REFUSED);
+        assert!(refused.text.contains("register takes one thing"));
+        assert!(refused.text.contains("usage:"), "a refusal shows the usage");
+    }
+}
+
+/// The usage names the verbs, and names the two things a box reads —
+/// because a foot arrives on a machine whose operator did not necessarily
+/// choose to install it.
 #[test]
 fn usage_names_the_verb_and_what_it_reads() {
     let text = usage();
     assert!(text.contains("thrall run"), "{text}");
+    assert!(text.contains("thrall register <url>"), "{text}");
+    assert!(text.contains("confirmation"), "{text}");
     assert!(text.contains("tools.json"), "{text}");
     assert!(text.contains("wire/workspaces/"), "{text}");
     assert!(text.contains("dialled again"), "{text}");

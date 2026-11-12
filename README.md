@@ -13,8 +13,7 @@ dials in to a server somewhere else. Its entire wire surface is three acts:
 
 That is the whole of it. A thrall asks nothing and acts on nothing. It cannot
 start a conversation, read a transcript, spawn an agent, or address any part of
-the server other than its own queue. It never listens on a port — the punch port an entry behind a NAT binds for
-its own simultaneous open is the one stated exception (`docs/DESIGN.md` §2); **the server
+the server other than its own queue. It never listens on a port; **the server
 never speaks first**.
 
 ## Why it is a separate program
@@ -81,14 +80,23 @@ process nothing was going to change. **Restarting the
 process is still this machine's own supervision** — a foot that cannot be a
 foot at all exits and says why.
 
-Two files, both put there by the operator's hand and neither ever written by
-thrall: `<data root>/tools.json` and one directory per channel under `<data
-root>/wire/workspaces/`, where the data root is `$XDG_DATA_HOME/thrall` or
+Two things under the data root: `<data root>/tools.json`, which the operator
+writes, and one directory per channel under `<data root>/wire/workspaces/`,
+which `thrall register` files. The data root is `$XDG_DATA_HOME/thrall` or
 `$HOME/.local/share/thrall`. A box with neither is a foot that refuses and says
-which file is missing. *The tool document* below is a complete one.
+which is missing. *The tool document* below is a complete one.
 
-Certificates arrive out of channel, by the operator's hand, and thrall mints
-nothing — there is no bootstrap flow and there must never be one.
+**A foot joins a server with `thrall register <url>`** (bl-bc2c; yog REMOTE
+§15): it claims an operator's one-time offer with a key it makes itself, files
+the channel the server answers, and waits for the operator to approve it —
+*Joining a server*, below. thrall makes a key and never a certificate: every
+leaf is signed by the operator's CA, and nothing serves until an operator has
+approved the row.
+
+**The server is dialled at a public address, from a list** (bl-bc2c; yog
+REMOTE §15.3). The hole-punched rendezvous and the DHT client behind it are
+gone — code, dependency and the two entry files alike — because the server now
+listens on a public port.
 
 thrall is published to crates.io. It was not, for as long as the decision of
 whether, when and as what it first ships was open: `Cargo.toml` carried
@@ -153,10 +161,9 @@ gate actually ran, rather than whatever a resolver picks today.
 **Nothing else is needed on the box at runtime** — no daemon, no service, no
 shared library, no state directory thrall creates for itself — beyond whatever
 the operator's own `tools.json` entries spawn. So the whole install is a binary
-plus the two files the operator writes by hand: *The tool document* below, and
-one channel directory under `<data root>/wire/workspaces/` holding the
-certificate a server's operator issued — and, for a server that cannot be
-dialled, the rendezvous pairing (*Reaching a server behind a NAT*, below).
+plus two things under the data root: *The tool document* below, which you
+write, and one channel directory under `<data root>/wire/workspaces/`, which
+`thrall register` files (*Joining a server*, below).
 
 The other route is **the image** (below), for a box that takes images rather
 than toolchains. Either way, *Deployment* at the end of this file is how a foot
@@ -166,30 +173,75 @@ releases — and it installs by exactly the command above, on the box, on a time
 `make install` is the contributor's route and not this one: it builds the
 working tree and puts that binary on this machine.
 
-## Reaching a server behind a NAT
+## Joining a server
 
-A channel directory holds four files — `ca.pem`, `client.pem`, `client.key`
-and `address` — and dials the address. A server behind a residential NAT with
-no port-forward cannot be dialled (yog `docs/REMOTE.md` §13), so its operator
-carries two more files into the same directory, exactly as they carry the
-certificate:
+A foot joins a server by claiming an **offer** — a one-time registration URL
+an operator mints from a seat that is already connected (yog `docs/REMOTE.md`
+§15). In the order it happens:
+
+1. On a connected seat the operator types `/offer <name> foot`. The seat shows
+   a URL, `https://<host>/yog/register/<code>`. It is good for ten minutes and
+   for one claim, and it carries no key and no certificate.
+2. On this box:
+
+   ```
+   thrall register https://<host>/yog/register/<code>
+   ```
+
+   thrall makes a P-256 key pair here — the private key never leaves this box
+   — and posts the public half to that URL over HTTPS, verified against the
+   public web's certificate roots. The server answers a certificate signed for
+   that key, its CA, and the list of addresses to dial.
+3. thrall files those as a channel directory, named for the workspace the
+   server states, and prints a six-character **confirmation word**:
+
+   ```
+   registered as shed in workspace home; the entry is <data root>/wire/workspaces/home
+   Confirmation word: 2LFTUR. On a connected seat, approve the row for shed that shows this word.
+   ```
+
+4. thrall dials the server once with the new certificate. The server refuses
+   an unapproved client everything, and that refused dial is what proves the
+   holder of the key is real. thrall says `waiting for approval` and exits 0.
+5. The operator runs `/offers` on the seat, finds the row showing the same
+   word, and types `/approve <name>`. From then on `thrall run` gets work.
+
+The word is the check that nobody stood between this box and the server: it is
+derived from the key this box made and the CA it was handed, and the server
+derives it from the key it signed and the CA it holds. If no row shows the word
+this box printed, do not approve anything — decline the row and mint again.
+
+What can go wrong, and what thrall says:
+
+| Case | What happens |
+|---|---|
+| The code is unknown, expired or already used | `thrall: this offer cannot be claimed: <host> did not accept it. …` Nothing is filed. Mint a new offer. |
+| The offer was minted without `foot` | `thrall: this offer was minted at the wrong grade: "operator" …` Nothing is filed; a foot only opens on a foot-grade certificate. The offer is spent — decline it and mint one at grade `foot`. |
+| A channel directory of that workspace name already exists | `… already exists, and an entry is never overwritten. …` Nothing is filed and the offer is spent. Move the old directory aside first, then mint again. |
+| The entry was filed but the server could not be dialled | Exit 1, naming the dial that failed and repeating the word. `thrall run` proves the offer with its first dial that lands. |
+
+**A channel directory holds four files**, whichever way it came to exist:
 
 | File | Holds |
 |---|---|
-| `rendezvous.pub` | the server's rendezvous public key, 32 bytes, hex |
-| `pairing.salt` | the pairing salt the two ends share, 32 bytes, hex |
+| `ca.pem` | the operator's CA — the only thing this channel trusts |
+| `client.pem` | this box's certificate, whose name is this client and whose grade is `foot` |
+| `client.key` | this box's private key, mode 0600 |
+| `address` | where the server is: one `host:port` per line, in the order to try them |
 
-Both or neither. With them, a dial that the address does not answer falls
-through: the foot reads the server's presence off the BitTorrent mainline DHT,
-writes a sealed call into the server's inbox there, and both ends punch a TCP
-connection toward each other. The connection is then **held** between asks
-rather than dialled per ask, the server's keepalive pings are discarded, two
-minutes of silence hangs it up, and a hang-up is dialled again through the same
-ladder — held connection, direct address, a re-call from the cached presence
-(a fresh call, no presence read), the full rendezvous. `address` stays required: it is the name the server's
-certificate is verified against, whichever way the connection was made. A
-channel without the two files never touches the DHT and never binds a port.
-`docs/DESIGN.md` §3.11 is the design; the protocol is REMOTE §13.
+**`address` is a list.** A dial tries each line in order and keeps the one
+that answered for the rest of the run — in memory only; the file is never
+rewritten. A file of one line is a list of one. The usual reason for a second
+line is a home router that will not route its own public name back inside: the
+operator states the LAN address second, and a foot at home falls through to
+it. Each endpoint's host is also the name the server's certificate is verified
+against when that endpoint answers.
+
+**The hand-carried pair still works.** An operator with no route to the
+registration door mints the pair on the server's box (`yog wire-certs
+WIRE_LEAF`) and copies the four files into a directory here. A directory that
+still holds `rendezvous.pub` or `pairing.salt` from before the server listened
+publicly works unchanged: thrall no longer reads either file.
 
 ## The tool document
 
@@ -463,10 +515,11 @@ per-application roots by definition.
 podman run --rm -v /path/to/provisioned/root:/state/thrall:Z thrall:0.0.1
 ```
 
-That directory is the operator's provisioned data root: `tools.json`, and one
-directory per channel under `wire/workspaces/`. Both are put there by hand,
-neither is ever written by thrall, and **neither is in the image** — a
-certificate baked into a layer is a certificate published to everyone who can
+That directory is this foot's data root: `tools.json`, which the operator
+writes, and one directory per channel under `wire/workspaces/`, which `thrall
+register` files there (run it with the same mount: `podman run --rm -v
+…:/state/thrall:Z thrall:0.0.1 register <url>`). **Neither is in the image** —
+a certificate baked into a layer is a certificate published to everyone who can
 pull it.
 
 There is no `VOLUME` instruction on purpose. A `VOLUME` would let an unmounted
@@ -482,8 +535,8 @@ $ echo $?
 
 ### What the image deliberately does not contain
 
-- **No certificates and no tool document.** Both are operator-provisioned, and
-  both are the reason there is a mount instead of a layer.
+- **No certificates and no tool document.** Both belong to one box and one
+  operator, and both are the reason there is a mount instead of a layer.
 - **No `cargo`, no compiler, no source, no `target/`.** The build stage is
   discarded whole; only the binary crosses.
 - **No supervisor, no restart wrapper, and no entrypoint script.** `thrall run`
@@ -492,9 +545,10 @@ $ echo $?
   restart policy belongs to this machine's own supervision, and putting a
   process-level retry loop in the image would take that decision away from the
   operator who has to live with it.
-- **No bootstrap of any kind.** thrall mints nothing (REMOTE §1.4, DESIGN
-  §3.3); an image that could provision itself would be exactly the flow that
-  must never exist.
+- **No identity.** The image holds no key and no certificate, and it cannot
+  join anything on its own: a channel exists only after an operator mints an
+  offer and approves the row this foot's `thrall register` produced (REMOTE
+  §15.1, DESIGN §3.3).
 
 Every line of that list is a claim about bytes, and `make image-scan` is what
 turns it from a promise into a check.

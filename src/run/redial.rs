@@ -80,11 +80,9 @@ pub(super) const PREDECESSOR: Duration = Duration::from_secs(32);
 /// this box's configuration and never a server, and asking it again would ask
 /// the same question. Everything after it is the server's, and that is the part
 /// that is asked again — **through the whole dial ladder each time** (DESIGN
-/// §3.11): a held connection that dropped, the direct address, a re-call
-/// from the presence the run has cached — one DHT walk, a call and a punch —
-/// and only then the full rendezvous. The wait between climbs is [`next`]'s
-/// and the ladder does not touch it. That is what makes a cellular flap cost
-/// a call and a punch window rather than a channel.
+/// §3.11): the endpoint that answered last, then every other one the entry
+/// states. The wait between climbs is [`next`]'s and the ladder does not
+/// touch it.
 pub(crate) fn redial(
     opened: Result<Channel, String>,
     set: &[Local],
@@ -96,9 +94,6 @@ pub(crate) fn redial(
         Ok(channel) => channel,
         Err(reason) => return reason,
     };
-    // The ladder's rungs are said into the same sink as this loop's own
-    // sentences, under the same name (`rendezvous::say`, bl-3958).
-    channel.speak_to(notice);
     let mut series = FIRST;
     // The one thing that crosses a redial, and it crosses forward rather than
     // being remembered: a capture the wire swallowed, posted by the next dial

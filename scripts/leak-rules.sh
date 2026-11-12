@@ -178,7 +178,7 @@ RULES=(private-key vendor-token credential-assignment ipv4-routable
 # exists at all, whatever is in it.
 #
 # THRALL'S OWN KEY MATERIAL IS ALREADY COVERED, by shape rather than by name.
-# A foot holds an operator-issued leaf and its key, carried to the box by hand
+# A foot holds an operator-issued leaf and its key, filed under its data root
 # (DESIGN §3.3), and `\.(pem|key|…)$` is exactly that pair — so a certificate
 # accidentally added to the repo is refused before there is any code to read
 # it. When the channel lands (bl-a4a5) and names a directory for entries and

@@ -57,9 +57,8 @@ fn a_box_with_no_tool_document_refuses_before_it_dials() {
 }
 
 /// **Then the channels.** A box that can offer something and has nowhere to
-/// offer it is told the shape of what is missing — never a command, because
-/// there is none: the material is minted where the CA is and carried here by
-/// hand.
+/// offer it is told the shape of what is missing, and the verb that files
+/// one.
 #[test]
 fn a_box_with_no_channel_is_told_the_shape_of_one() {
     let scratch = Scratch::new();
@@ -69,7 +68,7 @@ fn a_box_with_no_channel_is_told_the_shape_of_one() {
     assert!(said.text.contains("holds no channel"), "{}", said.text);
     assert!(said.text.contains("ca.pem"), "{}", said.text);
     assert!(said.text.contains("client.key"), "{}", said.text);
-    assert!(said.text.contains("thrall mints nothing"), "{}", said.text);
+    assert!(said.text.contains("thrall register <url>"), "{}", said.text);
     assert!(
         said.text
             .contains(&entries::dir(scratch.path()).display().to_string()),

@@ -20,7 +20,8 @@ ignore = []
 # guessed at. The list was `["MIT"]` while the graph was thrall alone; bl-a4a5
 # linked `rustls` (with `ring`) and `serde_json`, and every entry below is a
 # licence some crate in the resulting lockfile actually carries; bl-0a8b named
-# `ring` directly and added `socket2`, neither of which brought a new value. A speculative
+# `ring` directly and added `socket2`, neither of which brought a new value;
+# bl-bc2c dropped `socket2` and linked `webpki-roots`, which brought one. A speculative
 # allow-list is an allow-list nobody read, and it is worst on the day it
 # silently covers a crate no approval ever named — so widen this only with the
 # ball that links the crate, and re-derive it from the lockfile that ball
@@ -34,12 +35,18 @@ ignore = []
 #                   outright. These are the certificate-verification path.
 #   BSD-3-Clause    `subtle`, the constant-time primitives under `ring`.
 #   Unlicense       `memchr`, under `serde_json`.
+#   CDLA-Permissive-2.0   `webpki-roots` (bl-bc2c, operator approval
+#                   2026-11-11): the licence Mozilla's root list is
+#                   redistributed under. A permissive data licence — it asks
+#                   that the licence text travel with the data and nothing
+#                   else.
 allow = [
     "MIT",
     "Apache-2.0",
     "ISC",
     "BSD-3-Clause",
     "Unlicense",
+    "CDLA-Permissive-2.0",
 ]
 
 [bans]

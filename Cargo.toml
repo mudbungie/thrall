@@ -79,7 +79,10 @@ include = [
 # linked by no code and so no gate and no reviewer ever reads it.
 #
 # LINKED SO FAR: `rustls` and `serde_json`, both by bl-a4a5 (the mTLS channel);
-# `ring` and `socket2`, both by bl-0a8b (the punched wire, yog bl-0247).
+# `ring`, named by bl-0a8b and kept by bl-bc2c; `webpki-roots`, by bl-bc2c
+# (`thrall register`). `socket2` was linked by bl-0a8b for the punched wire and
+# LEFT with it in bl-bc2c — yog REMOTE §15 retired the punch, and a dependency
+# nothing links is one nobody reads.
 # `thiserror` is approved and still absent — every refusal on this surface is
 # one `String` a caller prints, so there is no error enum for it to derive yet.
 #
@@ -106,18 +109,22 @@ include = [
 #   ring — NAMED DIRECTLY since bl-0a8b, on the argument yog bl-df31 made for
 #     the server: it is the provider rustls above already links, so the manifest
 #     gained a line and the lockfile an edge — no crate, no licence, no
-#     advisory. The client rendezvous (yog REMOTE §13.2) signs BEP 44 items
-#     with ed25519, names a target by SHA-1, seals with ChaCha20-Poly1305 and
-#     derives the four pairing facts with HKDF, all of which `ring` ships.
-#   socket2 — `=0.6.5`, `default-features = false`, feature `all` (where
-#     `set_reuse_port` lives). The ONE new crate, and the one approved exception
-#     to the zero-new-dependencies line: operator ruling 2026-09-23, yog REMOTE
-#     §13.7 ruling 1. The punch (REMOTE §13.3) listens and connects from one
-#     port, which needs `SO_REUSEADDR` and `SO_REUSEPORT`, which `std` does not
-#     expose; a `setsockopt` in `src/sys.rs` was the other door and was refused
-#     because these calls run per connection at runtime, not once at the
-#     process edge. Pure Rust over the libc `std` already links; MIT OR
-#     Apache-2.0, no new licence value, no advisory.
+#     advisory. Since bl-bc2c its one tenant is `thrall register` (yog REMOTE
+#     §15.1): the P-256 key this box makes, as PKCS#8, and the SHA-256 the
+#     confirmation word is read off.
+#   webpki-roots — `"1"`, the ONE new crate of bl-bc2c and an approved
+#     exception to the zero-new-dependencies line: operator ruling 2026-11-11,
+#     with yog REMOTE §15. `thrall register` posts to a door whose certificate
+#     is the public web's (REMOTE §15.2), so verifying it needs the web's
+#     roots, and the alternatives are worse: reading the platform's store is a
+#     second crate and a per-OS code path, and skipping verification makes the
+#     first contact unauthenticated. It is data — Mozilla's root list as
+#     constants — over `rustls-pki-types`, which the graph already holds. A
+#     caret requirement and not an exact pin, on purpose: a root list must be
+#     able to move with the lockfile, which is how a distrusted root leaves.
+#     Its licence is CDLA-Permissive-2.0, the one new value in `deny.toml`.
+#     **It is the door's trust store and never the wire's**: the channel
+#     verifies the operator CA alone (`channel::tls`).
 #
 # DEFERRED, which is not the same as refused:
 #   clap — only if the verb surface outgrows a hand-rolled argv match. The
@@ -128,8 +135,8 @@ include = [
 # REFUSED, and both are refusals of a whole direction rather than of a crate:
 #   tokio — the wire is synchronous. House rule 8 (async is tokio-only) stays
 #     VACUOUS here; do not add tokio to satisfy a rule that matches nothing.
-#   rcgen — certificates arrive out of channel by the operator's hand
-#     (REMOTE §1.4, DESIGN §3.3). thrall mints nothing, so a certificate
+#   rcgen — a certificate is the operator CA's to sign (REMOTE §15.1, DESIGN
+#     §3.3). thrall makes a key and never a certificate, so a certificate
 #     library is a capability the design says this component must not have.
 #
 # `deny.toml` bans the TLS stacks that must never arrive (openssl-sys,
@@ -157,12 +164,13 @@ rustls = { version = "0.23", default-features = false, features = [
 # tool's `input_schema` is JSON Schema carried verbatim. Hand-rolling a parser
 # for a security boundary is worse than a dependency.
 serde_json = "1"
-# The rendezvous crypto (bl-0a8b): ed25519, SHA-1, ChaCha20-Poly1305, HKDF —
-# the provider rustls already selects, named so the client can call it.
+# The registration's key and word (bl-bc2c): a P-256 pair as PKCS#8, and
+# SHA-256 — the provider rustls already selects, named so `register` can call
+# it.
 ring = "0.17"
-# Source-port reuse for the punch (bl-0a8b): the one approved new crate, and
-# the approval's exact terms — see the approved set above.
-socket2 = { version = "=0.6.5", default-features = false, features = ["all"] }
+# The public web's roots, for the registration door's certificate and nothing
+# else (bl-bc2c) — see the approved set above.
+webpki-roots = "1"
 
 [[bin]]
 name = "thrall"
