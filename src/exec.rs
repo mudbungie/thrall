@@ -22,11 +22,12 @@
 //! bytes stop being bytes and nothing downstream carries an encoding case. A
 //! tool whose output is not UTF-8 loses exactly the bytes no `String` can name.
 //!
-//! **Two deadlines, measuring different things** (REMOTE §5.3). This box's own
-//! bound terminates the child and answers with a sentence; the asking side's
-//! longer patience stands behind it for the case where this whole process went
-//! away. Neither is a knob: a server that has not answered is down, and a tool
-//! that has not answered is working.
+//! **One bound, and which one is the server's edition** (REMOTE §5.3, §5.7;
+//! `stream`). To a server that reads a capture posted in pieces, the run is
+//! posted while it is produced and lives while its asker listens: a refused
+//! post stops the child, and there is no clock of this box's own. To an older
+//! server this box's [`DEADLINE`] terminates the child and answers with a
+//! sentence. Neither is a knob.
 //!
 //! **Containment honesty** (DESIGN §3.5): what thrall enforces locally is the
 //! operator's config — which names may run at all, with which argv and in which
@@ -48,34 +49,42 @@
 //! answer, which is the one thing this file's second paragraph says cannot
 //! happen.
 //!
-//! **A capture is bounded in size as well as in time** (bl-6028). The wire
-//! carries one frame and will not carry an unbounded one, so an output past
-//! [`CAPTURE_LIMIT`] is truncated here, where the bytes are, and the capture
-//! says what was dropped — the same in-band shape a deadline earns. A foot that
+//! **A post is bounded in size** (bl-6028). The wire carries one frame and
+//! will not carry an unbounded one, so [`CAPTURE_LIMIT`] bounds what one post
+//! holds. A run posted in pieces is read no faster than it is posted and loses
+//! nothing; a run that is one capture is truncated here, where the bytes are,
+//! and the capture says what was dropped — the same in-band shape a deadline
+//! earns. A foot that
 //! let the framing refuse the completion instead lost the invocation and the
 //! channel, for a fact it was holding in its own hand.
 //!
 //! **This file is the dispatch.** Which entry, whose directory, and the three
-//! facts that come back; running the child is `child`, and reading it without
-//! blocking is `pipes`.
+//! facts that come back; running the child is `child`, reading it without
+//! blocking is `pipes`, and what bounds it is `stream`.
 
 use std::time::Duration;
 
 use crate::config::{self, Local};
-use crate::invocation::{Capture, Invocation};
+use crate::invocation::{Capture, Invocation, Piece};
 
 /// One child, from the fork to the capture.
 mod child;
 /// The child's three pipes, pumped without blocking.
 mod pipes;
+/// What bounds a run, and where its text may be cut.
+mod stream;
 
-/// **This box's own bound on one tool.** It is not a knob: a tool that has not
-/// answered is working, and the asking side's longer patience is what covers
-/// the case where this whole process went away.
+pub use stream::CADENCE;
+
+/// **This box's own bound on one tool, for a server that takes one capture.**
+/// It is not a knob: a tool that has not answered is working, and the asking
+/// side's longer patience is what covers the case where this whole process
+/// went away. A run posted in pieces is not under it (`stream`).
 pub const DEADLINE: Duration = Duration::from_mins(2);
 
-/// **What one stream of a capture may grow to** (bl-6028), and the only thing
-/// about a tool's output this box enforces.
+/// **What one stream of one post may grow to** (bl-6028), and the only thing
+/// about a tool's output this box enforces. A run that is one capture is one
+/// post, so for it this is the run's bound too.
 ///
 /// A capture ends as one JSON frame, and the wire will not carry a frame past
 /// [`MAX_FRAME`](crate::channel::frame::MAX_FRAME) — so a foot that read a
@@ -103,6 +112,11 @@ pub const TIMED_OUT: i32 = 124;
 /// longer carries"* answered at the end that actually knows.
 pub const NO_SUCH_TOOL: i32 = 127;
 
+/// The verdict of a run stopped because nobody was listening to it — the
+/// shell's `128 + SIGTERM`. Nobody reads it either: the capture is dropped
+/// with the run, and this is what it says to whoever holds it meanwhile.
+pub const STOPPED: i32 = 143;
+
 /// What a child that a signal ended, and that this foot did not signal, earns.
 ///
 /// The shell's convention is `128 + N`, and `N` is not readable without a
@@ -112,14 +126,28 @@ pub const NO_SUCH_TOOL: i32 = 127;
 pub const SIGNALLED: i32 = 128;
 
 /// **The hand-off the loop takes** (`run::Handoff`): run one invocation against
-/// this box's set, under this box's own deadline.
-pub fn handoff(set: &[Local], invocation: &Invocation) -> Capture {
-    execute(set, invocation, DEADLINE)
+/// this box's set — posted as it goes when the loop hands down somewhere to
+/// post, under this box's own deadline when it does not.
+pub fn handoff(
+    set: &[Local],
+    invocation: &Invocation,
+    post: Option<&mut dyn FnMut(Piece) -> bool>,
+) -> Capture {
+    let within = if post.is_some() { CADENCE } else { DEADLINE };
+    execute(set, invocation, post, within)
 }
 
-/// [`handoff`] with the deadline named, so the suite can watch the cascade
-/// without waiting two minutes for it.
-pub fn execute(set: &[Local], invocation: &Invocation, deadline: Duration) -> Capture {
+/// [`handoff`] with the clock named, so the suite can watch the cascade and the
+/// cadence without waiting for either. `within` is the longest this box lets a
+/// child go on unremarked: with nowhere to post it is the deadline that stops
+/// the child, and with somewhere it is the cadence a silent child is posted
+/// for anyway.
+pub fn execute(
+    set: &[Local],
+    invocation: &Invocation,
+    post: Option<&mut dyn FnMut(Piece) -> bool>,
+    within: Duration,
+) -> Capture {
     let Some(local) = config::position(set, &invocation.tool).and_then(|at| set.get(at)) else {
         return refused(
             NO_SUCH_TOOL,
@@ -133,7 +161,7 @@ pub fn execute(set: &[Local], invocation: &Invocation, deadline: Duration) -> Ca
         Ok(cwd) => cwd,
         Err(capture) => return capture,
     };
-    match child::run(local, cwd.as_deref(), &invocation.input, deadline) {
+    match child::run(local, cwd.as_deref(), &invocation.input, post, within) {
         Ok(capture) => capture,
         Err(reason) => refused(NO_SUCH_TOOL, &reason),
     }

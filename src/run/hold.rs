@@ -49,8 +49,8 @@
 //! mailbox queue and never presence.
 //!
 //! **The execution itself is a hand-off, and it is not here** (bl-4cda). What
-//! this file owns is the conversation; what runs a command owns the deadlines,
-//! the containment and the transcode.
+//! this file owns is the conversation; what runs a command owns the bound,
+//! the containment and the transcode, and `held` owns the posts of one run.
 //!
 //! **What this file does NOT own is the channel's lifetime.** It answers one
 //! [`Ending`] and stops; whether that ending is dialled again is `redial`'s,
@@ -68,7 +68,7 @@ pub(crate) use ending::{Ending, Failed};
 
 use super::held::{self, Held};
 use super::{Handoff, Notice};
-use crate::channel::Channel;
+use crate::channel::{Channel, Failure, Line};
 use crate::config::{self, Local};
 use crate::gestures::{self, Reply};
 use crate::invocation::Invocation;
@@ -123,10 +123,12 @@ pub(crate) fn hold(
         };
         served = true;
         for invocation in work {
-            let capture = handoff(set, &invocation);
-            if let Err(failed) = held::answer(channel, &invocation, &capture) {
+            if let Err((failed, held)) = held::run(channel, set, handoff, &invocation) {
                 let ending = failed.at(Leg::Completion, served);
-                return Held::of(&invocation, capture).carried_by(ending);
+                return match held {
+                    Some(held) => held.carried_by(ending),
+                    None => ending,
+                };
             }
             match present(channel, &presenting) {
                 Err(failed) => return failed.at(Leg::Advertisement, served),
@@ -190,7 +192,22 @@ fn waited(channel: &mut Channel) -> Result<Vec<Invocation>, Failed> {
 /// frame the server deliberately wrote, where a peer that went away is a read
 /// error instead.
 pub(super) fn tell(channel: &mut Channel, request: &Value) -> Result<Reply, Failed> {
-    let stream = channel.ask(request).map_err(Failed::from)?;
+    said(channel.ask(request))
+}
+
+/// [`tell`], for a request of a run: over the connection that run holds
+/// (`Channel::post`), and read back by the same decoder.
+pub(super) fn tell_on(
+    channel: &mut Channel,
+    line: &mut Option<Line>,
+    request: &Value,
+) -> Result<Reply, Failed> {
+    said(channel.post(line, request))
+}
+
+/// One answered stream, as the reply it stands for.
+fn said(answer: Result<Vec<Value>, Failure>) -> Result<Reply, Failed> {
+    let stream = answer.map_err(Failed::from)?;
     let last = stream.last().ok_or_else(|| {
         Failed::Unusable("the server ended the stream without answering".to_owned())
     })?;

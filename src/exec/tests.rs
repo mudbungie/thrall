@@ -20,6 +20,9 @@ mod placement;
 /// contract.
 mod bounds;
 
+/// The streamed form: a run posted while it is produced.
+mod stream;
+
 /// One tool this box offers, running `script` under `/bin/sh`.
 fn tool(name: &str, script: &str) -> Local {
     Local {
@@ -55,7 +58,7 @@ fn brief() -> Duration {
 fn the_input_reaches_the_command_on_stdin_and_its_output_comes_back() {
     let set = [tool("Echo", "cat")];
     let input = json!({"command": "echo hi", "n": 7});
-    let got = execute(&set, &call("Echo", input.clone()), DEADLINE);
+    let got = execute(&set, &call("Echo", input.clone()), None, DEADLINE);
     assert_eq!(got.stdout, input.to_string());
     assert_eq!(got.stderr, "");
     assert_eq!(got.exit_code, 0);
@@ -65,7 +68,7 @@ fn the_input_reaches_the_command_on_stdin_and_its_output_comes_back() {
 #[test]
 fn stderr_and_a_failing_exit_code_are_carried_as_they_are() {
     let set = [tool("Fails", "printf out; printf err >&2; exit 3")];
-    let got = execute(&set, &call("Fails", json!({})), DEADLINE);
+    let got = execute(&set, &call("Fails", json!({})), None, DEADLINE);
     assert_eq!(
         got,
         Capture {
@@ -83,7 +86,7 @@ fn stderr_and_a_failing_exit_code_are_carried_as_they_are() {
 fn output_that_is_not_utf8_is_transcoded_once_and_lossily() {
     // Octal, because that is the escape POSIX `printf` actually has.
     let set = [tool("Binary", "printf '\\377\\376'")];
-    let got = execute(&set, &call("Binary", json!({})), DEADLINE);
+    let got = execute(&set, &call("Binary", json!({})), None, DEADLINE);
     assert_eq!(got.stdout, "\u{fffd}\u{fffd}");
     assert_eq!(got.exit_code, 0);
 }
@@ -95,7 +98,7 @@ fn output_that_is_not_utf8_is_transcoded_once_and_lossily() {
 #[test]
 fn a_name_this_box_does_not_carry_is_refused_as_a_capture() {
     let set = [tool("Echo", "cat")];
-    let got = execute(&set, &call("Write", json!({})), DEADLINE);
+    let got = execute(&set, &call("Write", json!({})), None, DEADLINE);
     assert_eq!(got.exit_code, NO_SUCH_TOOL);
     assert!(got.stdout.is_empty());
     assert!(
@@ -111,7 +114,7 @@ fn a_name_this_box_does_not_carry_is_refused_as_a_capture() {
 fn a_command_that_cannot_be_started_is_still_a_capture() {
     let mut local = tool("Missing", "");
     local.command = vec!["/nonexistent/thrall-test-tool".to_owned()];
-    let got = execute(&[local], &call("Missing", json!({})), DEADLINE);
+    let got = execute(&[local], &call("Missing", json!({})), None, DEADLINE);
     assert_eq!(got.exit_code, NO_SUCH_TOOL);
     assert!(
         got.stderr.contains("/nonexistent/thrall-test-tool"),
@@ -126,7 +129,7 @@ fn a_command_that_cannot_be_started_is_still_a_capture() {
 fn an_argv_with_no_program_in_it_names_nothing_to_run() {
     let mut local = tool("Empty", "");
     local.command = Vec::new();
-    let got = execute(&[local], &call("Empty", json!({})), DEADLINE);
+    let got = execute(&[local], &call("Empty", json!({})), None, DEADLINE);
     assert_eq!(got.exit_code, NO_SUCH_TOOL);
     assert!(got.stderr.contains("empty argv"), "{got:?}");
 }
@@ -137,7 +140,7 @@ fn an_argv_with_no_program_in_it_names_nothing_to_run() {
 #[test]
 fn a_tool_that_outruns_its_deadline_is_terminated_and_says_so() {
     let set = [tool("Slow", "sleep 30")];
-    let got = execute(&set, &call("Slow", json!({})), brief());
+    let got = execute(&set, &call("Slow", json!({})), None, brief());
     assert_eq!(got.exit_code, TIMED_OUT);
     assert!(got.stderr.contains("no answer within"), "{got:?}");
     assert!(got.stderr.contains("terminated"), "{got:?}");
@@ -153,7 +156,7 @@ fn a_tool_that_outruns_its_deadline_is_terminated_and_says_so() {
 #[test]
 fn a_tool_that_ignores_the_signal_is_killed_after_the_grace() {
     let set = [tool("Stubborn", "trap '' TERM; sleep 30")];
-    let got = execute(&set, &call("Stubborn", json!({})), brief());
+    let got = execute(&set, &call("Stubborn", json!({})), None, brief());
     assert_eq!(got.exit_code, TIMED_OUT);
     assert!(got.stderr.contains("none to the signal"), "{got:?}");
     assert!(got.stderr.contains("killed"), "{got:?}");
@@ -179,7 +182,7 @@ fn a_helper_the_tool_started_stops_with_the_tool() {
             outlived.display()
         ),
     )];
-    let got = execute(&set, &call("Forker", json!({})), brief());
+    let got = execute(&set, &call("Forker", json!({})), None, brief());
     assert_eq!(got.exit_code, TIMED_OUT, "{got:?}");
     assert!(started.exists(), "the helper never ran: {got:?}");
     // Past the helper's own wait, so a survivor has had its chance to write.
@@ -196,7 +199,7 @@ fn a_helper_the_tool_started_stops_with_the_tool() {
 #[test]
 fn a_child_a_signal_ended_says_a_signal_ended_it() {
     let set = [tool("Dies", "kill -9 $$")];
-    let got = execute(&set, &call("Dies", json!({})), DEADLINE);
+    let got = execute(&set, &call("Dies", json!({})), None, DEADLINE);
     assert_eq!(got.exit_code, SIGNALLED);
 }
 
@@ -207,7 +210,7 @@ fn a_child_a_signal_ended_says_a_signal_ended_it() {
 fn a_tool_that_ignores_its_input_still_answers() {
     let set = [tool("Deaf", "printf done")];
     let big = json!({"payload": "x".repeat(200_000)});
-    let got = execute(&set, &call("Deaf", big), DEADLINE);
+    let got = execute(&set, &call("Deaf", big), None, DEADLINE);
     assert_eq!(got.stdout, "done");
     assert_eq!(got.exit_code, 0);
 }
@@ -217,7 +220,7 @@ fn a_tool_that_ignores_its_input_still_answers() {
 #[test]
 fn a_tool_that_writes_more_than_a_pipe_holds_still_answers() {
     let set = [tool("Loud", "yes hello | head -c 300000")];
-    let got = execute(&set, &call("Loud", json!({})), DEADLINE);
+    let got = execute(&set, &call("Loud", json!({})), None, DEADLINE);
     assert_eq!(got.stdout.len(), 300_000);
     assert_eq!(got.exit_code, 0);
 }
@@ -228,7 +231,7 @@ fn a_tool_that_writes_more_than_a_pipe_holds_still_answers() {
 fn the_handoff_is_the_executor_under_this_box_s_own_bound() {
     let set = [tool("Echo", "cat")];
     assert_eq!(
-        handoff(&set, &call("Echo", json!({"a": 1}))),
-        execute(&set, &call("Echo", json!({"a": 1})), DEADLINE)
+        handoff(&set, &call("Echo", json!({"a": 1})), None),
+        execute(&set, &call("Echo", json!({"a": 1})), None, DEADLINE)
     );
 }

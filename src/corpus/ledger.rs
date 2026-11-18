@@ -11,11 +11,12 @@
 //! **[`FLOOR`] is what makes a stamp actionable.** It is the edition the
 //! current major was cut at: every path stamped at or below it is present on
 //! every server speaking this major, so a reader may require it — which is what
-//! every reader here does today. Every path stamped ABOVE it is optional to
-//! read, because a server of an older edition does not write it, and that is
-//! the one class this crate has no member of yet (its newest stamp is 8, ten
-//! editions under the floor). The replay in [`replay`](super::replay) is what
-//! keeps that true rather than accidental.
+//! every reader here does. Every path stamped ABOVE it is optional to read,
+//! because a server of an older edition does not write it — and optional to
+//! WRITE only once the server has stated an edition that reads it. That class
+//! has one member: `partial`, at 28, on the post and on its receipt (REMOTE
+//! §5.7). The replay in [`replay`](super::replay) holds the reading half, and
+//! `channel::hello::STREAMS` gates the writing half.
 //!
 //! **It is `.rs` rather than yog's `.json`, for [`corpus`](super)'s reason**: a
 //! vendored JSON file would have to be ruled into `Cargo.toml`'s `include`
@@ -60,11 +61,10 @@ pub(crate) struct Shape {
 /// states on the wire, and the two agreeing is a test rather than a tautology —
 /// the same discipline the protocol pin keeps (`corpus::tests`).
 ///
-/// **It is 8 rather than the server's 18, and that is honest.** An edition is a
-/// statement about what this end can READ, and a foot reads nothing stamped
-/// past 8: every field added since is on a seat-facing shape it never decodes.
-/// A field added at 14 to a shape this crate has no decoder for cannot make
-/// this crate newer.
+/// **It is the newest stamp on a shape a foot speaks, and never the
+/// server's.** An edition is a statement about what this end can spell, and a
+/// field added to a seat-facing shape this crate has no decoder for cannot
+/// make this crate newer.
 pub(crate) fn edition() -> u32 {
     SHAPES
         .iter()

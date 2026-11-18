@@ -17,9 +17,9 @@ use std::time::{Duration, Instant};
 use serde_json::Value;
 
 use super::pipes::Pipes;
-use super::{SIGNALLED, TIMED_OUT, captured};
+use super::{SIGNALLED, STOPPED, TIMED_OUT, captured};
 use crate::config::Local;
-use crate::invocation::Capture;
+use crate::invocation::{Capture, Piece};
 
 /// How long a child gets between being asked to stop and being stopped. Long
 /// enough for a tool to flush a file or drop a lock, short enough that the
@@ -43,7 +43,8 @@ pub(super) fn run(
     local: &Local,
     subject: Option<&std::path::Path>,
     input: &Value,
-    deadline: Duration,
+    post: Option<&mut dyn FnMut(Piece) -> bool>,
+    within: Duration,
 ) -> Result<Capture, String> {
     let (head, args) = local
         .command
@@ -60,8 +61,8 @@ pub(super) fn run(
     }
     let mut child = crate::spawn::spawn(&mut cmd).map_err(|e| unstarted(head, cwd, &e))?;
 
-    let mut pipes = Pipes::new(&mut child, input.to_string().into_bytes());
-    let (exit_code, note) = waited(&mut child, &mut pipes, deadline);
+    let mut pipes = Pipes::new(&mut child, input.to_string().into_bytes(), post.is_some());
+    let (exit_code, note) = waited(&mut child, &mut pipes, post, within);
     pipes.settle(Instant::now() + GRACE);
     // The tool's own stderr first, then this box's remarks about the run —
     // what would not fit, and what would not stop.
@@ -107,15 +108,40 @@ fn unstarted(head: &str, cwd: Option<&std::path::Path>, e: &std::io::Error) -> S
 /// clock has to be the thing that reads; and a tick that moved bytes goes round
 /// again without sleeping, so the poll interval bounds how late an *answer* is
 /// and never how fast output comes back.
-fn waited(child: &mut std::process::Child, pipes: &mut Pipes, deadline: Duration) -> (i32, String) {
-    let started = Instant::now();
+///
+/// **A listened run is posted before the child is looked at** (REMOTE §5.7):
+/// whenever a stream holds text, or the cadence has passed with none. So when
+/// the child is found gone, everything read before that moment has already
+/// been posted, and the capture carries only what the last read adds. A post
+/// answered `false` is the stop — the same cascade a deadline earns, and a
+/// capture nobody is left to read.
+fn waited(
+    child: &mut std::process::Child,
+    pipes: &mut Pipes,
+    mut post: Option<&mut dyn FnMut(Piece) -> bool>,
+    within: Duration,
+) -> (i32, String) {
+    let mut since = Instant::now();
     loop {
         let moved = pipes.pump();
+        if let Some(post) = post.as_mut()
+            && (pipes.pending() || since.elapsed() >= within)
+        {
+            if !post(pipes.cut()) {
+                let how = stopped(child, pipes);
+                return (STOPPED, format!("\nthrall: nobody is listening{how}\n"));
+            }
+            since = Instant::now();
+        }
         if let Ok(Some(ended)) = child.try_wait() {
             return (ended.code().unwrap_or(SIGNALLED), String::new());
         }
-        if started.elapsed() >= deadline {
-            return (TIMED_OUT, stopped(child, pipes, deadline));
+        if post.is_none() && since.elapsed() >= within {
+            let how = stopped(child, pipes);
+            return (
+                TIMED_OUT,
+                format!("\nthrall: no answer within {within:?}{how}\n"),
+            );
         }
         if !moved {
             std::thread::sleep(POLL);
@@ -128,7 +154,8 @@ fn waited(child: &mut std::process::Child, pipes: &mut Pipes, deadline: Duration
 /// (bl-a78e). A tool that traps `SIGTERM` to flush a file gets the grace; one
 /// that ignores it does not get to outlive its deadline. The sentence says both
 /// what happened and how long it was given, so an operator reading a transcript
-/// can tell a slow tool from a stuck one.
+/// can tell a slow tool from a stuck one — the caller's half names the bound
+/// that was overrun, and this half says how the group took being asked.
 ///
 /// **The grace is the child's, and only the child's.** The wait polls the tool
 /// this box was asked to run; a helper of its that ignores the ask cannot extend
@@ -143,7 +170,7 @@ fn waited(child: &mut std::process::Child, pipes: &mut Pipes, deadline: Duration
 /// hold, not this function's to re-check: a `Child::kill` here would be a second
 /// mechanism for a case the boundary excludes, and one whose effect no test
 /// could ever reach.
-fn stopped(child: &mut std::process::Child, pipes: &mut Pipes, deadline: Duration) -> String {
+fn stopped(child: &mut std::process::Child, pipes: &mut Pipes) -> &'static str {
     // The child leads its own group (`spawn::command`), so its id is the
     // group's — read here, before the wait below can reap it away.
     let group = child.id();
@@ -161,9 +188,8 @@ fn stopped(child: &mut std::process::Child, pipes: &mut Pipes, deadline: Duratio
     crate::sys::kill_group(group);
     let _ = child.wait();
     if answered {
-        return format!("\nthrall: no answer within {deadline:?}; the group was terminated\n");
+        "; the group was terminated"
+    } else {
+        ", and none to the signal; the group was killed"
     }
-    format!(
-        "\nthrall: no answer within {deadline:?}, and none to the signal; the group was killed\n"
-    )
 }

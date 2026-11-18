@@ -10,7 +10,7 @@
 use super::{ADVERTISE, ADVERTISED, COMPLETE, INVOCATIONS, PROTOCOL, QUEUED, REFUSAL, ROUTED};
 use crate::channel::hello;
 use crate::gestures::{self, Reply};
-use crate::invocation::{Capture, capture_of};
+use crate::invocation::{Capture, Piece, capture_of};
 use crate::json::str_of;
 use crate::tools;
 use serde_json::Value;
@@ -65,7 +65,7 @@ fn the_follow_class_read_round_trips() {
 /// capture in the spelling both ends share.
 #[test]
 fn the_completion_round_trips() {
-    let sent = frame(COMPLETE);
+    let sent = frame(COMPLETE[1]);
     let o = sent.as_object().expect("an object");
     let capture = capture_of(&o["capture"]).expect("a corpus capture");
     assert_eq!(
@@ -77,7 +77,18 @@ fn the_completion_round_trips() {
         }
     );
     let id = str_of(o, "invocation").expect("the handle");
-    assert_eq!(gestures::complete(&id, &capture).to_string(), COMPLETE);
+    assert_eq!(gestures::complete(&id, &capture).to_string(), COMPLETE[1]);
+}
+
+/// **The post that says the run is not over round-trips** (REMOTE §5.7,
+/// edition 28): the same op, `partial` where the other carries `capture`.
+#[test]
+fn the_partial_post_round_trips() {
+    let piece = Piece {
+        stdout: "hel".to_owned(),
+        stderr: String::new(),
+    };
+    assert_eq!(gestures::partial("inv-1", &piece).to_string(), COMPLETE[0]);
 }
 
 /// **The receipt at PROTOCOL 8**: `wrote` is read, both ways round, and it is
@@ -144,6 +155,14 @@ fn the_routed_receipt_tells_unfinished_from_finished_saying_nothing() {
     );
     assert_eq!(
         gestures::decode(&frame(ROUTED[1])),
+        Ok(Ok(Reply::Routed {
+            invocation: "inv-1".to_owned(),
+            capture: None
+        })),
+        "a partial's receipt is a run that is not over, and the key is not read"
+    );
+    assert_eq!(
+        gestures::decode(&frame(ROUTED[2])),
         Ok(Ok(Reply::Routed {
             invocation: "inv-2".to_owned(),
             capture: Some(Capture {

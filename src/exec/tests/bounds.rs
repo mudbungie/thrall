@@ -45,7 +45,7 @@ fn a_tool_that_leaves_a_helper_holding_the_pipes_still_answers() {
     let set = [tool("Daemon", &script)];
     let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
-        let _ = tx.send(execute(&set, &call("Daemon", json!({})), deadline));
+        let _ = tx.send(execute(&set, &call("Daemon", json!({})), None, deadline));
     });
     let got = rx
         .recv_timeout(DEADLINE)
@@ -69,7 +69,7 @@ fn output_past_this_box_s_limit_is_truncated_and_the_capture_names_the_drop() {
         "Loud",
         &format!("yes hello | head -c {over}; yes oops | head -c {over} >&2"),
     )];
-    let got = execute(&set, &call("Loud", json!({})), DEADLINE);
+    let got = execute(&set, &call("Loud", json!({})), None, DEADLINE);
     assert_eq!(got.exit_code, 0, "{}", got.stderr);
     assert_eq!(got.stdout.len(), CAPTURE_LIMIT);
     assert!(got.stderr.starts_with("oops"), "the tool's own bytes first");

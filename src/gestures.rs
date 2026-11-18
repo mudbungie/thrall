@@ -27,7 +27,9 @@
 
 use serde_json::{Value, json};
 
-use crate::invocation::{Capture, Invocation, capture_of, capture_value, invocation_of};
+use crate::invocation::{
+    Capture, Invocation, Piece, capture_of, capture_value, invocation_of, piece_value,
+};
 use crate::json::{bool_of, str_of};
 use crate::tools::{self, Tool};
 
@@ -49,6 +51,16 @@ pub fn invocations() -> Value {
 pub fn complete(invocation: &str, capture: &Capture) -> Value {
     json!({ "op": "complete", "invocation": invocation,
             "capture": capture_value(capture) })
+}
+
+/// **Say what one invocation has written so far, and that it is not over**
+/// (REMOTE §5.7). The same op as [`complete`], carrying `partial` where that
+/// carries `capture` — a capture is N ≥ 1 posts, and this is every post but the
+/// last. It is sent only to a server whose edition can read it
+/// ([`STREAMS`](crate::channel::hello::STREAMS)).
+pub fn partial(invocation: &str, piece: &Piece) -> Value {
+    json!({ "op": "complete", "invocation": invocation,
+            "partial": piece_value(piece) })
 }
 
 /// What a server can answer a foot. Three kinds, because there are three
@@ -75,6 +87,10 @@ pub enum Reply {
     /// One invocation's standing after the call — the handle, and the capture
     /// once there is one. It is a **re-read**, never an echo, which is why a
     /// foot reads its own completion's receipt rather than discarding it.
+    ///
+    /// The receipt of a `partial` post also carries an empty `partial` — the
+    /// lease fact (REMOTE §5.7). A foot has no use for being told it posted, so
+    /// the key is ignored here by §3.2's first rule and never decoded.
     Routed {
         invocation: String,
         capture: Option<Capture>,

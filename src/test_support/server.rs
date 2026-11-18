@@ -8,25 +8,20 @@
 //! client certificate the operator CA issued, a real version preface, and
 //! answers framed the way REMOTE §3 frames them.
 //!
-//! **It is scripted, one answer per connection**, because a foot dials per ask
-//! and holds a connection only while it is waiting. So a test says what the
-//! server answers the first dial, the second, and so on.
+//! **It is scripted, one entry per connection** ([`Dial`]), because a foot
+//! dials per ask and holds a connection only while it is waiting — or, for a
+//! run it posts in pieces, for that run (REMOTE §5.7). So a test says what the
+//! server does on the first dial, the second, and so on: answer the one
+//! request, answer each request of a run in turn, take the foot's frames and
+//! go AWAY with no answer and no TLS `close_notify` — the failure a roaming
+//! box actually hits, which a script of answers cannot produce because every
+//! answer ends in a terminator — or hang up before the handshake, which is a
+//! server that could not be reached at all.
 //!
-//! **An entry may also be a server that goes AWAY on that dial** — the `None`
-//! of [`Server::flapping`], which reads the foot's frames and then drops the
-//! stream where it stands, with no answer and no TLS `close_notify`. That is
-//! the failure a roaming box actually hits, and it is the one a script of
-//! answers cannot produce: every answer ends in a terminator, which is a
-//! server finishing rather than a server disappearing. It is what lets the
-//! redial (`run::redial`) be driven over a real wire — drop, dial again, and
-//! be answered on the next connection.
-//!
-//! **It states the FLOOR as its edition** (REMOTE §3.2). A server speaking
-//! this major is at the floor or above it by definition, so the floor is the
-//! least a real one can say and the ordinary case a foot meets. What a foot
-//! does with a higher one, and with none at all, is
-//! `channel::hello::tests`' — a value this end reads, not a value it needs a
-//! listener to produce.
+//! **It states the FLOOR as its edition unless a test says otherwise** (REMOTE
+//! §3.2). A server speaking this major is at the floor or above it by
+//! definition, so the floor is the least a real one can say;
+//! [`Server::streaming`] states the edition that reads a capture in pieces.
 //!
 //! **It states the server's protocol number, not this crate's** (bl-e0f0).
 //! Every fixture here dials at [`crate::corpus::PROTOCOL`], a literal copied
@@ -54,10 +49,33 @@ use rustls::{ServerConfig, ServerConnection, StreamOwned};
 use serde_json::{Value, json};
 
 use crate::channel::{frame, material, tls};
+use crate::corpus::ledger::FLOOR;
 
-/// How many frames a foot writes per connection: its preface, then its
-/// request.
-const FRAMES_IN: usize = 2;
+/// **What the server does with one connection.**
+#[derive(Clone)]
+pub(crate) enum Dial {
+    /// Answer each request on it in turn — one request's frames per entry,
+    /// then the terminator — and hang up after the last. One entry is the
+    /// ordinary ask; several are the posts of one run.
+    Answers(Vec<Vec<Value>>),
+    /// Take the foot's preface and its request, then drop the stream where it
+    /// stands.
+    Vanishes,
+    /// Hang up before the handshake: a server that cannot be reached.
+    Unreachable,
+}
+
+impl Dial {
+    /// One request, answered in one frame.
+    pub(crate) fn one(answer: Value) -> Self {
+        Self::Answers(vec![vec![answer]])
+    }
+
+    /// The posts of one run, each answered in one frame on one connection.
+    pub(crate) fn run(answers: Vec<Value>) -> Self {
+        Self::Answers(answers.into_iter().map(|answer| vec![answer]).collect())
+    }
+}
 
 /// A listener standing in for yog, and what it was told.
 ///
@@ -77,14 +95,15 @@ impl Server {
     /// `protocol` is what the server states as its version, so a test can make
     /// the two ends disagree without a second code path.
     pub(crate) fn start(dir: &Path, protocol: u32, script: Vec<Vec<Value>>) -> Self {
-        Self::scripted(dir, protocol, script.into_iter().map(Some).collect())
+        let script = script.into_iter().map(|frames| Dial::Answers(vec![frames]));
+        Self::scripted(dir, protocol, FLOOR, script.collect())
     }
 
     /// A server that states its version, takes what the foot says — and then
-    /// **goes away mid-conversation**, with no answer and no TLS
-    /// `close_notify`. One connection, and then the port is gone too.
+    /// **goes away mid-conversation**. One connection, and then the port is
+    /// gone too.
     pub(crate) fn vanishes(dir: &Path) -> Self {
-        Self::scripted(dir, crate::corpus::PROTOCOL, vec![None])
+        Self::scripted(dir, crate::corpus::PROTOCOL, FLOOR, vec![Dial::Vanishes])
     }
 
     /// **A server that drops some dials and answers others**: `None` is the
@@ -92,18 +111,39 @@ impl Server {
     /// A foot dials per ask, so this is how a test writes a wire that flaps
     /// under a conversation and comes back.
     pub(crate) fn flapping(dir: &Path, script: Vec<Option<Vec<Value>>>) -> Self {
-        Self::scripted(dir, crate::corpus::PROTOCOL, script)
+        let dial =
+            |answer: Option<Vec<Value>>| answer.map_or(Dial::Vanishes, |f| Dial::Answers(vec![f]));
+        let script = script.into_iter().map(dial).collect();
+        Self::scripted(dir, crate::corpus::PROTOCOL, FLOOR, script)
+    }
+
+    /// **A server that reads a capture posted in pieces** (REMOTE §5.7): it
+    /// states the edition `partial` is stamped at, and the script says what
+    /// each connection does.
+    pub(crate) fn streaming(dir: &Path, script: Vec<Dial>) -> Self {
+        Self::scripted(
+            dir,
+            crate::corpus::PROTOCOL,
+            crate::corpus::ledger::edition(),
+            script,
+        )
     }
 
     /// The one listener: serve one connection per script entry, in order.
-    fn scripted(dir: &Path, protocol: u32, script: Vec<Option<Vec<Value>>>) -> Self {
+    fn scripted(dir: &Path, protocol: u32, edition: u32, script: Vec<Dial>) -> Self {
         let config = server_config(dir);
         let (listener, seen) = bound(dir);
         let recorded = Arc::clone(&seen);
         std::thread::spawn(move || {
-            for answer in script {
+            for dial in script {
                 let (tcp, _) = listener.accept().expect("a dial");
-                serve(&config, tcp, protocol, answer.as_deref(), &recorded);
+                serve(
+                    &config,
+                    tcp,
+                    &json!({ "protocol": protocol, "edition": edition }),
+                    dial,
+                    &recorded,
+                );
             }
         });
         Self { seen }
@@ -128,10 +168,8 @@ fn bound(dir: &Path) -> (TcpListener, Arc<Mutex<Vec<Value>>>) {
     (listener, Arc::new(Mutex::new(Vec::new())))
 }
 
-/// One connection: state a version, record the two frames the foot writes —
-/// its own preface and its request — then answer and terminate. `None` is the
-/// server that goes away instead: nothing written, and the stream dropped where
-/// it stands.
+/// One connection: state a version, record the foot's preface and every
+/// request it writes, and answer each as the script says.
 ///
 /// Every write ignores its error. A test that makes thrall refuse mid-exchange
 /// — a version mismatch, an untrusted anchor — leaves this end writing into a
@@ -140,30 +178,39 @@ fn bound(dir: &Path) -> (TcpListener, Arc<Mutex<Vec<Value>>>) {
 fn serve(
     config: &Arc<ServerConfig>,
     tcp: TcpStream,
-    protocol: u32,
-    answer: Option<&[Value]>,
+    preface: &Value,
+    dial: Dial,
     seen: &Arc<Mutex<Vec<Value>>>,
 ) {
+    let answers = match dial {
+        Dial::Unreachable => return,
+        Dial::Vanishes => None,
+        Dial::Answers(answers) => Some(answers),
+    };
     let conn = ServerConnection::new(Arc::clone(config)).expect("a server connection");
     let mut tls = StreamOwned::new(conn, tcp);
-    let _ = frame::write_value(
-        &mut tls,
-        &json!({ "protocol": protocol, "edition": crate::corpus::ledger::FLOOR }),
-    );
-    for _ in 0..FRAMES_IN {
-        if let Ok(Some(said)) = frame::read_value(&mut tls) {
-            seen.lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .push(said);
-        }
-    }
-    let Some(answer) = answer else {
+    let _ = frame::write_value(&mut tls, preface);
+    hear(&mut tls, seen);
+    let Some(answers) = answers else {
+        hear(&mut tls, seen);
         return;
     };
-    for value in answer {
-        let _ = frame::write_value(&mut tls, value);
+    for answer in answers {
+        hear(&mut tls, seen);
+        for value in &answer {
+            let _ = frame::write_value(&mut tls, value);
+        }
+        let _ = frame::write_end(&mut tls);
     }
-    let _ = frame::write_end(&mut tls);
+}
+
+/// Read one frame the foot wrote — its preface or a request — and record it.
+fn hear(tls: &mut StreamOwned<ServerConnection, TcpStream>, seen: &Arc<Mutex<Vec<Value>>>) {
+    if let Ok(Some(said)) = frame::read_value(tls) {
+        seen.lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(said);
+    }
 }
 
 /// The server's end of the mTLS: present the server leaf, and require a client

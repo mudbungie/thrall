@@ -352,13 +352,18 @@ things locally, and it is not a sandbox:
   such file or directory"* about a command that was exactly right. The
   directory is looked at after the failure, where the look is free and cannot
   refuse a fork that would have worked.
-- **The deadline, over a process group**: the child is spawned as the leader of
+- **The bound, over a process group**: the child is spawned as the leader of
   a group of its own, that group is asked to stop with `SIGTERM`, the grace is
-  waited out on the child, and then the group is killed.
-- **The size of the answer** (bl-6028): each stream of a capture is carried up
-  to `exec::CAPTURE_LIMIT` and no further. It is a bound on what this box will
-  *answer with*, never on what the tool may write — the tool runs to its own
-  end and its exit code is its own.
+  waited out on the child, and then the group is killed. **Which bound it is
+  depends on the server's edition** (§3.12): to a server that reads a capture
+  in pieces the bound is the asker's listening — a refused post is the stop,
+  and no clock of this box's applies — and to an older one it is this box's
+  fixed two minutes (`exec::DEADLINE`).
+- **The size of a post** (bl-6028): each stream of one post is carried up to
+  `exec::CAPTURE_LIMIT` and no further. For a run that is one capture that is
+  a bound on what this box will *answer with*, never on what the tool may
+  write — the tool runs to its own end and its exit code is its own. A run
+  posted in pieces loses nothing to it (§3.12).
 
 Everything else is the box's. The child runs as this process's user, with this
 process's environment less the git scrub the spawn boundary performs — no
@@ -512,14 +517,17 @@ field PATH with the edition it appeared at and records a **floor** — the editi
 the major was cut at, 18. A path at or below the floor is present on every
 server of this major and a reader may require it; a path above it is optional to
 read, and its reader owes it a default that is *the fact before the field
-existed*. **Every path a foot decodes is at or under the floor** — its newest
-stamp is 8 — so every reader here still requires its fields, and
-`corpus::ledger::tests` is what says so out loud rather than leaving it a
-coincidence. The preface now carries `edition` beside `protocol`: this build
-states **8**, which is what it can READ rather than when it was built, and a
-peer that states none is read as the floor. The server's edition is decoded and
-dropped at `Channel::dial` — a foot reads no post-floor field, so there is
-nothing to grey and no absence to explain.
+existed*. **One addition past the floor sits on a foot's shapes: `partial`, at
+28, on `request/complete` and on its receipt `reply/routed`** (§3.12; REMOTE
+§5.7). Every other path a foot decodes is at or under the floor, and
+`corpus::ledger::tests` pins the post-floor list rather than leaving it a
+coincidence. The preface carries `edition` beside `protocol`: this build
+states **28**, the newest stamp on a shape it speaks rather than when it was
+built, and a peer that states none is read as the floor. The server's edition
+is kept by the channel at every dial, and one thing reads it: a foot writes
+`partial` only to a server that states 28 or more (`hello::STREAMS`). The
+receipt's `partial` is ignored, not decoded — a foot has no use for being told
+it posted.
 
 **The by-hand re-vendor comparison is a replay now.** Every re-vendor up to 18
 was paid for by reading the server's frames against this crate's, shape by shape
@@ -583,7 +591,8 @@ client holds a parked read. That covers the whole of an idle foot's life,
 because an idle foot is parked.
 
 It cannot cover the window this foot opens itself. §3.1's dial-in shape means
-one connection per ask, held only while waiting — so while a tool runs, this
+one connection per ask, held only while waiting — and the one a run's posts
+share (§3.12) is not a read — so while a tool runs, this
 box holds no parked read, the server cannot tell it apart from a machine that
 has gone away, and a set replaced in that window would stand until the process
 was restarted, with every later invocation refused for a tool that plainly
@@ -975,8 +984,66 @@ alternative name, anything else as a DNS name — so every host the operator
 lists must be on the server's certificate. An endpoint that names no server
 refuses when the channel opens, before anything is dialled.
 
-**Nothing is held.** A connection is one per ask (§3.7). The held connection
-existed only because a punch cost seconds; a dial costs milliseconds again.
+**Nothing is held between asks.** A connection is one per ask (§3.7). The held
+connection existed only because a punch cost seconds; a dial costs milliseconds
+again. The one exception is §3.12's: the posts of one run share a connection,
+for the length of that run.
+
+### 3.12 A capture is N posts, and a run lives while its asker listens (bl-769b)
+
+yog `docs/REMOTE.md` §5.7 is the authority; this is what thrall does about it.
+It amends three things this document used to say flatly: that a capture is one
+post, that a child has two minutes, and that the capture limit bounds a run.
+
+**The switch is the server's edition and nothing else.** Every dial reads the
+server's preface, and the channel keeps the edition it states
+(`Channel::streams`). At 28 or more — the stamp of `partial` — every run of
+every tool is posted in pieces. Below it, every run is one capture under the
+two-minute deadline and the per-run limit, exactly as before. There is no
+per-entry key and no flag: a switch would be a second form.
+
+**What a streamed run does, in order.**
+
+1. The loop hands the executor a place to post (`run::Handoff`'s third
+   argument). The executor pumps the child's pipes as it always did.
+2. Whenever either stream holds text, or ten seconds have passed with none
+   (`exec::CADENCE`), it posts `{op: complete, invocation, partial: {stdout,
+   stderr}}`. Text is cut where no character is split
+   (`exec::stream::boundary`): the head of an unfinished character stays
+   behind for the next post, so the posts concatenate to exactly what one
+   transcode of the whole would have produced.
+3. Every post of the run rides one connection (`channel::Line`,
+   `Channel::post`), opened by the first.
+4. When the child exits, the last post carries `capture`: the exit code and
+   only the text not yet posted.
+
+**What the answer to a post does** (`run::held::run`).
+
+| Answer | The child | The channel |
+|---|---|---|
+| Refused in band — nobody polled for thirty seconds, or the slot is gone | Stopped by the cascade (§3.5) | Reads on. The run is dropped and nothing is posted for it again. A refusal of the `capture` post is dropped the same way. **Never the end of the channel** — it is the asker's ordinary stop |
+| The wire, on a `partial` | Stopped: a run nobody can be told about has no asker | Dialled again (§3.8), carrying nothing |
+| The wire, on the `capture` post | Already exited | Dialled again, and the capture — the unposted remainder — is posted first on the next dial, as §3.8 always had it |
+| An answer no gesture can earn | Stopped | Over, as at any leg |
+
+**One dial is tried twice.** A run's first post opens its connection, and a
+ladder that cannot be climbed is climbed once more, with no wait
+(`channel::REACHES`). Nothing else is retried: a post is an append and states
+no offset, so one that was written and whose answer was lost may have landed,
+and sending it again would make the asker read that text twice.
+
+**The limit bounds a post.** A streamed run's pipes are read no faster than
+they are posted: a buffer at `exec::CAPTURE_LIMIT` stops being read until the
+next post empties it, the child waits on its own write, and nothing is dropped.
+The final read after the child exits is unpaced and keeps what fits, with the
+old sentence for anything past it — which takes a megabyte arriving between
+the last post and the exit.
+
+**What it costs, said plainly.** A streamed run has no deadline of this box's.
+A tool that hangs runs for as long as its asker keeps polling, and the party
+that stops it is the server refusing a post. A foot is still serial per
+channel (§2), so a long model call on this box is a tool call on this box
+waiting.
 
 ## 4. Module map
 
@@ -988,12 +1055,13 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/lib.rs` | Crate root. Module declarations and the crate's own statement of what it is. |
 | `src/cli.rs` | The command line as a pure function: arguments in, a `Verdict` (exit code + text) out. No process state is touched, which is what lets `main.rs` be the one coverage exclusion without excluding a decision. |
 | `src/main.rs` | The process entry and nothing else: argv in, stream selected by the code, exit. The single `tarpaulin.toml` exclusion. |
-| `src/channel.rs` | **The channel** (bl-a4a5): one wire to one server. There is an `ask` and there is nothing else — the shape of the file is the dial-in invariant. A connection is one per ask, held only while waiting; the entry's endpoints and the one kept for the run live here (§3.11). |
+| `src/channel.rs` | **The channel** (bl-a4a5): one wire to one server. There is an `ask`, and a `post` that is the same ask over the connection a run holds (§3.12) — the shape of the file is the dial-in invariant. A connection is one per ask, held only while waiting; the entry's endpoints, the one kept for the run and the server's edition live here (§3.11). |
+| `src/channel/line.rs` | **One open connection** (bl-769b, §3.12): the two prefaces, a request written, an answer read to its terminator, and the sentence a failure earns. Split from `channel.rs` on the seam between which server and this connection to it. |
 | `src/channel/failure.rs` | Why a channel could not carry a gesture, in the two classes that differ in what to do next — the wire, and version skew (split from `channel.rs` by bl-0a8b at the pre-split band). |
 | `src/channel/ladder.rs` | **The dial ladder** (§3.11, bl-bc2c): the endpoint that answered last, then every other the entry states, each one TCP connect and the mTLS handshake over it under a bound — stopping at the first that connects and verifies and saying which it was (bl-45e9). The registration door is reached through the same connect. |
 | `src/channel/frame.rs` | The framing: a big-endian `u32` length, then that many bytes of JSON; a zero-length frame terminates an answer (REMOTE §3). |
-| `src/channel/hello.rs` | The version preface, and this end's half of it — state the major and the edition beside it (REMOTE §3.2), confirm, refuse fail-closed naming both versions. The server's edition comes back from the confirmation, defaulted at the floor when it states none. The number itself is in no Rust file: the repo-root `PROTOCOL` file states it and `build.rs` compiles it into the constant this module re-exports (bl-c618), because the release gates that read it are other repositories fetching one path out of a tree they do not build. A foot never *admits*, because a foot is never dialled. It also draws §3.8's one distinction REMOTE does not: a preface that arrived and states a version this end cannot speak is skew, one that never arrived is the wire. |
-| `src/channel/hello/version.rs` | The three vendored numbers and nothing else (bl-6fcf): the major, the edition this build states, and the floor an absent one reads as. Split from the exchange because they are the SERVER's facts copied, and a re-vendor rewrites this file alone. |
+| `src/channel/hello.rs` | The version preface, and this end's half of it — state the major and the edition beside it (REMOTE §3.2), confirm, refuse fail-closed naming both versions. The server's edition comes back from the confirmation, defaulted at the floor when it states none, and the channel keeps it (§3.12). The number itself is in no Rust file: the repo-root `PROTOCOL` file states it and `build.rs` compiles it into the constant this module re-exports (bl-c618), because the release gates that read it are other repositories fetching one path out of a tree they do not build. A foot never *admits*, because a foot is never dialled. It also draws §3.8's one distinction REMOTE does not: a preface that arrived and states a version this end cannot speak is skew, one that never arrived is the wire. |
+| `src/channel/hello/version.rs` | The vendored numbers and nothing else (bl-6fcf): the major, the edition this build states, the floor an absent one reads as, and the edition a server must state before this foot streams to it (bl-769b). Split from the exchange because they are the SERVER's facts copied, and a re-vendor rewrites this file alone. |
 | `src/channel/tls.rs` | The rustls client configuration: the operator CA as anchors, this box's leaf as its identity, `ring` named rather than defaulted. |
 | `src/channel/leaf.rs` | The foot grade, read off this box's own certificate — a DER walk, because thrall links no certificate library. |
 | `src/channel/material.rs` | What an entry holds, and the three answers a directory can give: nothing, half, or a channel — the address read as a list, one endpoint per line (§3.11). It only reads; `register` is what files one. |
@@ -1006,11 +1074,12 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/run.rs` | **The loop**, and the three seams that are parameters: what runs a command (`Handoff`), where a channel says something while it is still serving (`Notice`, §3.7) and where it waits between dials (`Pause`, §3.8). All three are effects no test can read back, so the one implementation of each is `src/main.rs`'s — which is what lets the whole conversation be tested against a real server, a one-line executor and two recorders. This file itself is `fan`: every channel this box holds, one thread each — and `served`, which says a channel's terminal sentence in that channel's own thread rather than at the join (§3.9). |
 | `src/run/hold.rs` | **One channel's conversation** (split from `run.rs` by bl-916d): present, wait, hand off, answer, present again. |
 | `src/run/hold/ending.rs` | **How a channel ended, and who ended it** (split from `hold.rs` by bl-5d62): the `Ending`, the party that failed, and the leg it failed at — the classification of §3.8's table, kept apart from the conversation that produces it because they are two questions. |
-| `src/run/held.rs` | **The capture going back** (bl-f9d2): the ordinary post at the moment it is computed, and the one this process is still holding when that post fails on the wire — carried out with the ending and posted first on the next dial, ahead of the read that releases the server's lease (§3.8, REMOTE §5.6 ruling 1). |
+| `src/run/held.rs` | **The capture going back** (bl-f9d2): one invocation run and posted — once, or in pieces with a refused post dropping the run (bl-769b, §3.12) — and the one this process is still holding when that post fails on the wire — carried out with the ending and posted first on the next dial, ahead of the read that releases the server's lease (§3.8, REMOTE §5.6 ruling 1). |
 | `src/run/redial.rs` | **One channel's lifetime** (bl-916d): the endings worth another dial, the backoff that settles, and the sentence said in the meantime. It is a separate file because it is a separate question — what happened, against what to do about it — and because its whole decision is three numbers and one line of arithmetic, testable as values. |
-| `src/exec.rs` | **The executor's dispatch** (bl-4cda): which entry an invocation names, whose working directory it may run in (§3.4's `subject_cwd`), and the three facts that come back. Every outcome is a capture — a tool that ran, one that overran, a name this box does not carry, a command that would not start. |
+| `src/exec.rs` | **The executor's dispatch** (bl-4cda): which entry an invocation names, whose working directory it may run in (§3.4's `subject_cwd`), and the three facts that come back. Every outcome is a capture — a tool that ran, one that overran, one nobody was listening to, a name this box does not carry, a command that would not start. |
+| `src/exec/stream.rs` | **A run posted while it is produced** (bl-769b, §3.12): the cadence, and where a stream may be cut so no character is split. |
 | `src/exec/child.rs` | One child, from the fork to the capture: the spawn, the poll that is also the drain, and the cascade that stops a tool which will not stop itself. Split from `exec.rs` when the drain moved into the poll (bl-6c14) — the seam is *deciding what to run* against *running it*. |
-| `src/exec/pipes.rs` | The child's three pipes, pumped without blocking and read within a bound (bl-6c14, bl-6028; §3.5). A read answers with what the pipe holds now, so a write end a helper still holds cannot outlast the invocation — and the drains and the input feed stop being threads, because none of them can block any more. Past `exec::CAPTURE_LIMIT` it keeps reading and stops keeping, counting what it dropped so the capture can say so. |
+| `src/exec/pipes.rs` | The child's three pipes, pumped without blocking and read within a bound (bl-6c14, bl-6028; §3.5). A read answers with what the pipe holds now, so a write end a helper still holds cannot outlast the invocation — and the drains and the input feed stop being threads, because none of them can block any more. Past `exec::CAPTURE_LIMIT` it keeps reading and stops keeping, counting what it dropped so the capture can say so — unless the run is posted in pieces, when it stops reading until the next post has emptied the buffer (§3.12). |
 | `src/serve.rs` | What `thrall run` does: read the document, read the channels, serve until they stop. There is no success exit, so none is spelled. |
 | `src/paths.rs` | The one data root, named by `$XDG_DATA_HOME` or `$HOME` and by nothing of thrall's own. Neither set is a refusal, never a relative guess. |
 | `src/register.rs` | **`thrall register <url>`** (§3.3, bl-bc2c): the claim in the order it happens — read the URL, make a key, post the public half, judge the reply, file the entry, say the word, dial the wire once. Also `web_roots`, the one place `webpki-roots` is named. |

@@ -20,7 +20,7 @@ use super::{
 use crate::channel::Channel;
 use crate::channel::material::read_dir;
 use crate::config::Local;
-use crate::invocation::{Capture, Invocation};
+use crate::invocation::{Capture, Invocation, Piece};
 use crate::test_support::{Scratch, Waits};
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -34,9 +34,13 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 static RUNS: AtomicUsize = AtomicUsize::new(0);
 
 /// The executor of [`super::echo`], counted.
-fn counted(set: &[Local], invocation: &Invocation) -> Capture {
+fn counted(
+    set: &[Local],
+    invocation: &Invocation,
+    post: Option<&mut dyn FnMut(Piece) -> bool>,
+) -> Capture {
     RUNS.fetch_add(1, Ordering::Relaxed);
-    echo(set, invocation)
+    echo(set, invocation, post)
 }
 
 /// The channel standing at `dir`, opened the way an operator-provisioned box

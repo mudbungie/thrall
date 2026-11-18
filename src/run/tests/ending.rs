@@ -191,7 +191,8 @@ fn a_completion_the_wire_swallowed_is_dialled_again() {
                 tool: "Bash".to_owned(),
                 input: json!({"command": "echo hi"}),
                 cwd: None,
-            }
+            },
+            None
         ),
         "it is the capture this box computed, verbatim"
     );

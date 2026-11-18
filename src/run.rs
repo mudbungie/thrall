@@ -7,7 +7,8 @@
 //! - [`hold`] — **one channel's conversation**: present, wait, hand off,
 //!   answer, present again, and the [`Ending`](hold::Ending) that stopped it.
 //!   Beside it, [`held`] is the capture going back — posted as it is computed,
-//!   or carried to the next dial when the wire swallowed it (REMOTE §5.6).
+//!   in pieces to a server that reads them (REMOTE §5.7), or carried to the
+//!   next dial when the wire swallowed it (REMOTE §5.6).
 //! - [`redial`] — **one channel's lifetime**: an ending that is worth another
 //!   dial, the wait before it, and the sentence said in the meantime.
 //! - this file — **every channel this box holds**, one thread each, and the
@@ -27,7 +28,7 @@ use std::time::Duration;
 
 use crate::channel::entries::Entry;
 use crate::config::Local;
-use crate::invocation::{Capture, Invocation};
+use crate::invocation::{Capture, Invocation, Piece};
 
 /// The capture going back: posted as it is computed, or held to the next dial.
 pub(crate) mod held;
@@ -43,7 +44,12 @@ pub(crate) mod redial;
 /// per-invocation state between calls would be a foot with a world. It is
 /// `Send` and `Copy` for free, which is what lets [`fan`] hand the same
 /// executor to every channel without a lock or a clone.
-pub type Handoff = fn(&[Local], &Invocation) -> Capture;
+///
+/// **The third argument is where the run is posted while it is produced**
+/// (REMOTE §5.7), present when the server reads a capture in pieces. The
+/// capture that comes back is then only what was not yet posted — and when a
+/// post was answered `false`, a capture nobody is left to read.
+pub type Handoff = fn(&[Local], &Invocation, Option<&mut dyn FnMut(Piece) -> bool>) -> Capture;
 
 /// **Where a foot says something while it is still serving.**
 ///

@@ -32,24 +32,70 @@
 //! is not an answer: it says nothing about whether the slot is still there.
 
 use crate::channel::Channel;
+use crate::config::Local;
 use crate::gestures;
-use crate::invocation::{Capture, Invocation};
+use crate::invocation::{Capture, Invocation, Piece};
 
-use super::hold::{Ending, Failed, tell};
+use super::Handoff;
+use super::hold::{Ending, Failed, tell, tell_on};
 
-/// **Post one capture back**, at the moment it is computed.
+/// **Run one invocation and post what it produced** — once, or as it goes.
 ///
-/// **The receipt is read rather than discarded.** A server that refused the
-/// completion — an expired handle, a slot addressed to another machine — is
-/// saying that this foot and that server disagree about what is in flight, and
-/// a foot that kept answering into that would be posting captures nobody is
-/// waiting for.
-pub(super) fn answer(
+/// `Ok` is the channel reading on: the capture landed, or the run was dropped.
+/// `Err` is the gesture that ended the channel, and beside it the capture this
+/// box is left holding, when it finished one ([`Held`]).
+///
+/// **To a server that reads a capture in pieces, the run is posted while it is
+/// produced** (REMOTE §5.7): the executor is handed a post, every post of the
+/// run rides one connection, and the last carries the capture with only the
+/// text not yet posted. Three things follow from the server's answer to a
+/// post:
+///
+/// - **refused** — nobody is listening, or the slot is gone. The executor
+///   stops the child, the run is dropped and the channel reads on. A refusal
+///   here is the asker's ordinary stop and never an ending;
+/// - **the wire** — the child is stopped, because a run nobody can be told
+///   about has no asker, and the channel is dialled again. Unless it was the
+///   capture's own post: that one is held and posted first on the next dial,
+///   exactly as it always was;
+/// - **an answer no gesture can earn** — the channel is over, as at any leg.
+///
+/// **To an older server it is one post** and the receipt is read as before: a
+/// server that refused the completion is saying the two ends disagree about
+/// what is in flight, and that ends the channel.
+pub(super) fn run(
     channel: &mut Channel,
+    set: &[Local],
+    handoff: Handoff,
     invocation: &Invocation,
-    capture: &Capture,
-) -> Result<(), Failed> {
-    tell(channel, &gestures::complete(&invocation.id, capture)).map(|_| ())
+) -> Result<(), (Failed, Option<Held>)> {
+    if !channel.streams() {
+        let capture = handoff(set, invocation, None);
+        return tell(channel, &gestures::complete(&invocation.id, &capture))
+            .map(|_| ())
+            .map_err(|failed| (failed, Some(Held::of(invocation, capture))));
+    }
+    let mut line = None;
+    let mut stopped = None;
+    let mut post = |piece: Piece| {
+        let partial = gestures::partial(&invocation.id, &piece);
+        stopped = tell_on(channel, &mut line, &partial).err();
+        stopped.is_none()
+    };
+    let capture = handoff(set, invocation, Some(&mut post));
+    match stopped {
+        Some(Failed::Refused(_)) => return Ok(()),
+        Some(failed) => return Err((failed, None)),
+        None => {}
+    }
+    match tell_on(
+        channel,
+        &mut line,
+        &gestures::complete(&invocation.id, &capture),
+    ) {
+        Ok(_) | Err(Failed::Refused(_)) => Ok(()),
+        Err(failed) => Err((failed, Some(Held::of(invocation, capture)))),
+    }
 }
 
 /// **A capture the wire swallowed**, and the handle it answers.
@@ -67,7 +113,7 @@ pub(crate) struct Held {
 
 impl Held {
     /// What the foot is left holding when a completion fails on the wire.
-    pub(super) fn of(invocation: &Invocation, capture: Capture) -> Self {
+    fn of(invocation: &Invocation, capture: Capture) -> Self {
         Self {
             id: invocation.id.clone(),
             capture,

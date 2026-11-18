@@ -10,7 +10,7 @@
 use crate::channel::Channel;
 use crate::channel::material::read_dir;
 use crate::config::Local;
-use crate::invocation::{Capture, Invocation};
+use crate::invocation::{Capture, Invocation, Piece};
 use crate::run::hold::Ending;
 use crate::test_support::server::Server;
 use crate::test_support::{Scratch, aside, mint};
@@ -35,7 +35,11 @@ fn set() -> Vec<Local> {
 
 /// The stand-in executor: it answers with what it was handed, so the server's
 /// record of the completion is the evidence that both arguments arrived.
-fn echo(set: &[Local], invocation: &Invocation) -> Capture {
+fn echo(
+    set: &[Local],
+    invocation: &Invocation,
+    _: Option<&mut dyn FnMut(Piece) -> bool>,
+) -> Capture {
     Capture {
         stdout: invocation.tool.clone(),
         stderr: format!("{} tools", set.len()),
@@ -45,7 +49,7 @@ fn echo(set: &[Local], invocation: &Invocation) -> Capture {
 
 /// An executor that dies. Every path through `hold` answers a sentence, so
 /// this is the only way a channel's thread can end without one.
-fn boom(_: &[Local], _: &Invocation) -> Capture {
+fn boom(_: &[Local], _: &Invocation, _: Option<&mut dyn FnMut(Piece) -> bool>) -> Capture {
     panic!("an executor that died");
 }
 
@@ -158,11 +162,15 @@ mod disarm;
 mod ending;
 /// Every channel this box holds, at once.
 mod fan;
+/// Whether there was a server to post a run to.
+mod reach;
 /// One channel's lifetime: dropped, waited out, dialled again.
 mod redial;
 /// When a box says a channel has stopped.
 mod report;
 /// The version the two ends do not share: the ending no dial improves.
 mod skew;
+/// A capture posted in pieces, and what each answer to a post does.
+mod stream;
 /// The capture the wire swallowed, and the dial that posts it.
 mod swallowed;

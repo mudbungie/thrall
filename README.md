@@ -80,6 +80,18 @@ process nothing was going to change. **Restarting the
 process is still this machine's own supervision** — a foot that cannot be a
 foot at all exits and says why.
 
+**A capture is posted while the tool writes it** (bl-769b; yog REMOTE §5.7).
+To a server whose preface states edition 28 or more, every tool's output goes
+back as it is produced: a post whenever the child has written something, or
+every ten seconds if it has written nothing, over one connection per run, and
+a last post carrying the exit code with whatever was not yet sent. **The
+server refusing a post is the stop**: nobody has asked about the run for
+thirty seconds, so thrall terminates the child's process group, drops the run
+and waits for its next work. A streamed run has no two-minute deadline — it
+lives while its asker listens — and the megabyte limit bounds one post rather
+than the whole run. To a server of an older edition nothing changes: one post,
+two minutes, one megabyte per stream.
+
 Two things under the data root: `<data root>/tools.json`, which the operator
 writes, and one directory per channel under `<data root>/wire/workspaces/`,
 which `thrall register` files. The data root is `$XDG_DATA_HOME/thrall` or

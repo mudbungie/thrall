@@ -79,11 +79,16 @@ pub(crate) const ADVERTISE: [&str; 3] = [
 /// carries no field at all — a connection drains its own queue.
 pub(crate) const INVOCATIONS: &str = r#"{"op":"invocations"}"#;
 
-/// `corpus/request/complete.json`, edition 1.
-pub(crate) const COMPLETE: &str = r#"{"capture":{"exit_code":3,"stderr":"warned\n","stdout":"hello\n"},"invocation":"inv-1","op":"complete"}"#;
+/// `corpus/request/complete.json` — the post that says the run is not over
+/// (`partial`, **edition 28**, REMOTE §5.7), and the one that ends it
+/// (edition 1). The first is written only to a server at or past 28.
+pub(crate) const COMPLETE: [&str; 2] = [
+    r#"{"invocation":"inv-1","op":"complete","partial":{"stderr":"","stdout":"hel"}}"#,
+    r#"{"capture":{"exit_code":3,"stderr":"warned\n","stdout":"hello\n"},"invocation":"inv-1","op":"complete"}"#,
+];
 
-/// `corpus/reply/advertised.json`, **edition 8** — the newest stamp this foot
-/// vendors, and the bump this module was written for. `wrote` is required
+/// `corpus/reply/advertised.json`, **edition 8** — the bump this module was
+/// written for. `wrote` is required
 /// because 8 is under the floor, and `false` is the ordinary re-presentation.
 pub(crate) const ADVERTISED: [&str; 2] = [
     r#"{"kind":"advertised","ok":true,"wrote":false}"#,
@@ -99,9 +104,12 @@ pub(crate) const QUEUED: [&str; 3] = [
 ];
 
 /// `corpus/reply/routed.json`, edition 1 — the slot as it stands, with
-/// the capture absent while the work is still out.
-pub(crate) const ROUTED: [&str; 2] = [
+/// the capture absent while the work is still out — and, since **edition 28**,
+/// the `partial` a machine has posted for it (REMOTE §5.7), which a foot is
+/// answered and does not read.
+pub(crate) const ROUTED: [&str; 3] = [
     r#"{"invocation":"inv-1","kind":"routed","ok":true}"#,
+    r#"{"invocation":"inv-1","kind":"routed","ok":true,"partial":{"stderr":"","stdout":"hel"}}"#,
     r#"{"capture":{"exit_code":3,"stderr":"warned\n","stdout":"hello\n"},"invocation":"inv-2","kind":"routed","ok":true}"#,
 ];
 

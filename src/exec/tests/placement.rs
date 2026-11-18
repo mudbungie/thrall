@@ -14,7 +14,7 @@ fn a_tool_runs_where_the_operator_said_it_would() {
     let scratch = Scratch::new();
     let mut local = tool("Where", "pwd");
     local.cwd = Some(scratch.path().to_path_buf());
-    let got = execute(&[local], &call("Where", json!({})), DEADLINE);
+    let got = execute(&[local], &call("Where", json!({})), None, DEADLINE);
     assert_eq!(got.exit_code, 0, "{got:?}");
     assert!(
         got.stdout.trim().ends_with(
@@ -41,7 +41,7 @@ fn a_consenting_entry_runs_at_the_invocations_working_directory() {
     consenting.cwd = Some(scratch.path().join("elsewhere"));
     let mut asked = call("Pwd", json!({}));
     asked.cwd = Some(subject.display().to_string());
-    let got = execute(&[consenting], &asked, DEADLINE);
+    let got = execute(&[consenting], &asked, None, DEADLINE);
     assert_eq!(got.exit_code, 0, "{}", got.stderr);
     assert_eq!(
         got.stdout.trim_end(),
@@ -60,7 +60,7 @@ fn without_consent_a_carried_working_directory_is_refused_naming_the_key() {
     let scratch = Scratch::new();
     let mut asked = call("Echo", json!({}));
     asked.cwd = Some(scratch.path().display().to_string());
-    let got = execute(&[tool("Echo", "cat")], &asked, DEADLINE);
+    let got = execute(&[tool("Echo", "cat")], &asked, None, DEADLINE);
     assert_ne!(got.exit_code, 0);
     assert!(got.stderr.contains("does not consent"), "{}", got.stderr);
     assert!(
@@ -81,7 +81,7 @@ fn a_working_directory_this_box_does_not_hold_is_refused() {
     consenting.tool.subject_cwd = true;
     let mut asked = call("Pwd", json!({}));
     asked.cwd = Some(scratch.path().join("absent").display().to_string());
-    let got = execute(&[consenting], &asked, DEADLINE);
+    let got = execute(&[consenting], &asked, None, DEADLINE);
     assert_ne!(got.exit_code, 0);
     assert!(
         got.stderr.contains("is not a directory on this box"),
@@ -100,7 +100,7 @@ fn a_bad_entry_working_directory_is_not_reported_as_a_missing_command() {
     let absent = scratch.path().join("absent");
     let mut local = tool("Where", "pwd");
     local.cwd = Some(absent.clone());
-    let got = execute(&[local], &call("Where", json!({})), DEADLINE);
+    let got = execute(&[local], &call("Where", json!({})), None, DEADLINE);
     assert_eq!(got.exit_code, NO_SUCH_TOOL);
     assert!(
         got.stderr.contains(&format!(
@@ -126,7 +126,7 @@ fn a_relative_working_directory_on_the_invocation_is_refused() {
     consenting.tool.subject_cwd = true;
     let mut asked = call("Pwd", json!({}));
     asked.cwd = Some("relative/dir".to_owned());
-    let got = execute(&[consenting], &asked, DEADLINE);
+    let got = execute(&[consenting], &asked, None, DEADLINE);
     assert_eq!(got.exit_code, NO_SUCH_TOOL);
     assert!(
         got.stderr.contains("is not an absolute path"),

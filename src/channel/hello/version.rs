@@ -49,15 +49,21 @@ pub use protocol::PROTOCOL;
 /// copy of the server's shape ledger, written beside [`PROTOCOL`] in the
 /// preface so the peer can tell what this end can spell without a bump.
 ///
-/// **It is 8, ten under the [`FLOOR`], and that is the honest number.** An
-/// edition states what this end can READ, and a foot reads nothing stamped past
-/// 8 — every addition since is on a seat-facing shape it never decodes. Its one
-/// home is the vendored ledger (`corpus::ledger::edition`); this constant is
-/// the second statement of it, held equal there by a test for the reason
-/// [`PROTOCOL`] is. It is a plain declaration rather than a second
-/// `PROTOCOL`-shaped file because no gate fetches it: an edition holds no
-/// release (§3.2 — the holds fire only on a major).
-pub const EDITION: u32 = 8;
+/// **It is 28: the stamp of `partial` on `request/complete` and
+/// `reply/routed`** (REMOTE §5.7), the first addition past the [`FLOOR`] on a
+/// shape a foot speaks. Its one home is the vendored ledger
+/// (`corpus::ledger::edition`); this constant is the second statement of it,
+/// held equal there by a test for the reason [`PROTOCOL`] is. It is a plain
+/// declaration rather than a second `PROTOCOL`-shaped file because no gate
+/// fetches it: an edition holds no release (§3.2 — the holds fire only on a
+/// major).
+pub const EDITION: u32 = 28;
+
+/// **The edition a server must state before this foot streams to it** (REMOTE
+/// §5.7): the stamp of `request/complete`'s `partial`. A server below it would
+/// refuse a post carrying no `capture`, so to one this foot posts once, as it
+/// always did. Held equal to the ledger's stamp by a test (`corpus::ledger`).
+pub const STREAMS: u32 = 28;
 
 /// **The edition the current major was cut at** (REMOTE §3.2), and what a peer
 /// that states none is read as.

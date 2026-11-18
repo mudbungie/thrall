@@ -18,14 +18,14 @@
 //!   which is exactly the frame a server that coined a word would send. Free
 //!   text passes trivially; a vocabulary passes only through its catch-all.
 //!
-//! **What the replay can prove today, and what it cannot.** Every path this
-//! foot reads is stamped at or below the floor (`ledger::tests` holds that),
-//! so the projection deletes nothing and the replay is an identity — which
-//! would be a beat that never fails. Its other direction is the one that bites:
+//! **What the replay proves.** One post-floor path sits on a reply a foot
+//! reads — `partial` on `reply/routed`, edition 28 — so below 28 the
+//! projection deletes it and the decoder must read on, which it does because
+//! it never asked for the key. The other direction is the one that bites:
 //! [`tests`] projects a FIXTURE signature in which `wrote` arrived after the
 //! floor, and asserts the key is gone and the decoder refuses it — the red the
-//! day yog adds a post-floor field to a foot shape, and the reason this is a
-//! replay rather than a re-read.
+//! day yog adds a post-floor field a reader here REQUIRES, and the reason this
+//! is a replay rather than a re-read.
 
 use serde_json::Value;
 

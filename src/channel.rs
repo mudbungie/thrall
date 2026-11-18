@@ -6,7 +6,9 @@
 //! is no inbound direction. That is not a property of this file — it is the
 //! whole shape of it: there is a [`Channel::ask`] and there is nothing else.
 //!
-//! **One connection per ask, held only while waiting.** A foot's life is one
+//! **One connection per ask, held only while waiting — and one per RUN, for a
+//! run that is posted in pieces** (REMOTE §5.7; [`Channel::post`], [`Line`]).
+//! A foot's life is one
 //! follow-class read (`invocations`, bl-a2ea) whose answer takes as long as it
 //! takes, and a connection is held for exactly that. Between asks, and for the
 //! whole time it is executing something, it is *absent* — which is why the
@@ -34,7 +36,6 @@
 
 use std::net::{IpAddr, TcpStream};
 use std::sync::Arc;
-use std::time::Duration;
 
 use rustls::pki_types::ServerName;
 use rustls::{ClientConfig, ClientConnection, StreamOwned};
@@ -52,6 +53,8 @@ pub mod hello;
 mod ladder;
 /// The foot grade, read off this box's own leaf.
 pub mod leaf;
+/// One open connection, and the requests it carries.
+mod line;
 /// What an entry holds.
 pub mod material;
 /// The mTLS configuration.
@@ -59,19 +62,8 @@ pub mod tls;
 
 pub use failure::Failure;
 pub(crate) use ladder::connect;
+pub(crate) use line::Line;
 use material::Material;
-
-/// How long one read may wait before the channel is judged gone.
-///
-/// It is a bound on the **transport**, not on the wait: the server parks a
-/// follow-class read for its mailbox's own hold and then answers — with no work
-/// if there was none — so a foot waiting for hours is a *sequence* of answered
-/// reads, never one read held for hours. This has to sit comfortably above that
-/// hold, because a read timeout below it would turn the server's ordinary empty
-/// answer into a dead channel. It is a socket bound and not a clock, because
-/// rustls has no clean resume from a half-read record — a timeout is "the
-/// connection is gone", never a retry.
-const READ_TIMEOUT: Duration = Duration::from_mins(2);
 
 /// One endpoint of the entry's list: the `host:port` as stated, and the name
 /// its certificate is verified against.
@@ -91,7 +83,18 @@ pub struct Channel {
     /// run, never disk (REMOTE §15.3).
     kept: usize,
     client: String,
+    /// The edition the server stated on the last dial (REMOTE §3.2), and the
+    /// [`FLOOR`](hello::FLOOR) until one has: the least a server of this major
+    /// can be spelling.
+    edition: u32,
 }
+
+/// How many times a post that opens a run's connection climbs the ladder
+/// before the server is judged unreachable for it (REMOTE §5.7: *"a server it
+/// cannot reach for a post ends the child"*). Two, with no wait between: the
+/// wait belongs to `run::redial`, and a run whose asker is listening on a
+/// thirty-second clock has none to spend.
+const REACHES: usize = 2;
 
 impl Channel {
     /// Open the channel from provisioned material. **Nothing is dialled here**:
@@ -109,12 +112,19 @@ impl Channel {
             endpoints: m.address.iter().map(named).collect::<Result<_, String>>()?,
             kept: 0,
             client,
+            edition: hello::FLOOR,
         })
     }
 
     /// The client identity this channel presents — the leaf's own common name.
     pub fn client(&self) -> String {
         self.client.clone()
+    }
+
+    /// **Whether this server reads a capture posted in pieces** (REMOTE §5.7):
+    /// its edition, as last stated, is at or above the stamp of `partial`.
+    pub(crate) fn streams(&self) -> bool {
+        self.edition >= hello::STREAMS
     }
 
     /// Send one request and read its whole answer: every frame up to the
@@ -130,64 +140,68 @@ impl Channel {
     ///
     /// Nothing here retries inside one ask.
     pub fn ask(&mut self, request: &Value) -> Result<Vec<Value>, Failure> {
-        let (mut tls, address) = self.dial(request)?;
-        let mut stream = Vec::new();
-        loop {
-            match frame::read_value(&mut tls) {
-                Ok(Some(chunk)) => stream.push(chunk),
-                Ok(None) => return Ok(stream),
-                Err(e) => return Err(Failure::Wire(failed("receive", &address, &e))),
+        self.dial(request, 1)?.answer()
+    }
+
+    /// **One request of a run, over the connection that run holds** (REMOTE
+    /// §5.7: *"holds one connection for the posts of a run"*). `line` is the
+    /// run's: empty before its first post, which dials; kept open after every
+    /// answered one; and dropped with the run.
+    ///
+    /// **Only the dial is tried again, and only [`REACHES`] times.** A post is
+    /// an append and states no offset, so one that may have landed — written,
+    /// and then the answer lost — cannot be sent twice without the asker
+    /// reading that text twice. A ladder that could not be climbed has sent
+    /// nothing, and is the one failure a second attempt cannot duplicate.
+    pub(crate) fn post(
+        &mut self,
+        line: &mut Option<Line>,
+        request: &Value,
+    ) -> Result<Vec<Value>, Failure> {
+        let mut open = match line.take() {
+            Some(mut held) => {
+                held.send(request)?;
+                held
             }
-        }
+            None => self.dial(request, REACHES)?,
+        };
+        let stream = open.answer()?;
+        *line = Some(open);
+        Ok(stream)
     }
 
     /// Climb the ladder to a verified connection and send. The TLS handshake
     /// is the ladder's — an endpoint that cannot present the operator's CA is
     /// a rung passed over, not a failure of the dial — and the one frame read
     /// here is the server's version preface, so what this hands back is a
-    /// stream with a request on it and no *answer* yet read.
+    /// [`Line`] with a request on it and no *answer* yet read.
     ///
     /// **Both ends state a version before either reads** (REMOTE §3), and the
     /// request goes out in the same breath as this end's preface — so
     /// confirming the server's costs no round trip, and a mismatch refuses
     /// before a frame of the answer is decoded. **The server's EDITION comes
-    /// back from that confirmation and is dropped here** (REMOTE §3.2): a foot
-    /// reads no post-floor field, so nothing above consults it yet.
-    fn dial(&mut self, request: &Value) -> Result<(Tls, String), Failure> {
-        let (mut tls, kept) =
-            ladder::climb(&self.config, &self.endpoints, self.kept).map_err(Failure::Wire)?;
+    /// back from that confirmation and is kept** (REMOTE §3.2): it is what
+    /// [`Channel::streams`] answers from.
+    fn dial(&mut self, request: &Value, reaches: usize) -> Result<Line, Failure> {
+        let (tls, kept) = self.climb(reaches).map_err(Failure::Wire)?;
         self.kept = kept.at;
-        let address = kept.address;
-        let bounded = tls.sock.set_read_timeout(Some(READ_TIMEOUT));
-        bounded.map_err(|e| Failure::Wire(format!("connect {address}: {e}")))?;
-        hello::state(&mut tls).map_err(|e| Failure::Wire(failed("send", &address, &e)))?;
-        frame::write_value(&mut tls, request)
-            .map_err(|e| Failure::Wire(failed("send", &address, &e)))?;
-        hello::confirm(&mut tls)?;
-        Ok((tls, address))
+        let (line, edition) = Line::open(tls, kept.address, request)?;
+        self.edition = edition;
+        Ok(line)
     }
-}
 
-/// **A channel that failed, in this box's own words** (bl-52ba).
-///
-/// The sentence IS the product on this path: what a supervisor's log or an
-/// operator's terminal carries is the whole of what they get — and what
-/// they need from it is which server went away and whether anything is
-/// going to happen next. A library's own diagnosis answers neither: it
-/// names no address, and "peer closed connection without sending TLS
-/// close_notify" is a fact about TLS rather than about what to do. **It
-/// follows the sentence rather than replacing it**, because it is the right
-/// text for the one reader who wants it and the wrong text for the one who
-/// has to act. What this box will do next is `run::redial`'s to say in the
-/// same breath (bl-916d).
-///
-/// `leg` is the half that failed, so this reads like the connect refusals
-/// beside it: the act, the endpoint that was dialled, then what happened.
-fn failed(leg: &str, address: &str, e: &std::io::Error) -> String {
-    format!(
-        "{leg} {address}: the channel to the server failed. What the {leg} \
-         reported: {e}"
-    )
+    /// The ladder, climbed until it answers or `reaches` climbs have failed;
+    /// the sentence is the last climb's.
+    fn climb(&self, reaches: usize) -> Result<(Tls, ladder::Kept), String> {
+        let mut climbed = ladder::climb(&self.config, &self.endpoints, self.kept);
+        for _ in 1..reaches {
+            if climbed.is_ok() {
+                break;
+            }
+            climbed = ladder::climb(&self.config, &self.endpoints, self.kept);
+        }
+        climbed
+    }
 }
 
 /// The name to verify the server's certificate against, read off the address.

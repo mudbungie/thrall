@@ -28,25 +28,36 @@ fn the_floor_this_build_defaults_to_is_the_floor_it_vendored() {
     assert_eq!(hello::FLOOR, FLOOR);
 }
 
-/// **Every path this foot reads is at or below the floor**, which is why every
-/// reader here may require its fields — and this is the beat that says so out
-/// loud rather than leaving it a coincidence.
+/// **The one addition past the floor on a foot's shapes is the streamed
+/// form** (REMOTE §5.7): `partial`, on the post and on its receipt, and the
+/// edition this foot waits for before it writes one is that stamp.
 ///
-/// The day a re-vendor brings a foot-facing path stamped above the floor, this
-/// goes red first, and what it asks for is REMOTE §3.2 rule 2: that reader
-/// gives the key a default, and the default is the fact before the field
-/// existed.
+/// It is pinned as a list rather than as *"some paths"* because each new
+/// member is a decision: a post-floor key on a reply must be defaulted by its
+/// reader, and one on a request must be gated on the server's edition. A
+/// re-vendor that adds a seventh fails here and names it.
 #[test]
-fn no_path_a_foot_reads_is_stamped_above_the_floor() {
-    let above: Vec<&str> = SHAPES
+fn the_only_paths_stamped_above_the_floor_are_the_streamed_form_s() {
+    let above: Vec<(&str, &str, u32)> = SHAPES
         .iter()
-        .flat_map(|shape| shape.signature.iter())
-        .filter(|&&(_, since)| since > FLOOR)
-        .map(|&(entry, _)| entry)
+        .flat_map(|shape| {
+            shape
+                .signature
+                .iter()
+                .map(|&(entry, since)| (shape.name, entry, since))
+        })
+        .filter(|&(_, _, since)| since > FLOOR)
         .collect();
-    assert!(
-        above.is_empty(),
-        "post-floor paths a reader must now default rather than require: {above:?}"
+    let streamed = |shape| {
+        [
+            (shape, "/partial/stderr:string", hello::STREAMS),
+            (shape, "/partial/stdout:string", hello::STREAMS),
+            (shape, "/partial:object", hello::STREAMS),
+        ]
+    };
+    assert_eq!(
+        above,
+        [streamed("request/complete"), streamed("reply/routed")].concat()
     );
 }
 

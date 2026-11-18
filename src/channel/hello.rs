@@ -50,7 +50,7 @@ use super::{Failure, frame};
 /// The server's three numbers, vendored.
 mod version;
 
-pub use version::{EDITION, FLOOR, PROTOCOL};
+pub use version::{EDITION, FLOOR, PROTOCOL, STREAMS};
 
 /// The preface's first key: the major, compared for equality.
 const KEY: &str = "protocol";
@@ -81,11 +81,9 @@ pub fn state(w: &mut dyn Write) -> io::Result<()> {
 /// so nothing above here carries a case for it.
 ///
 /// **What it answers is the server's EDITION** (REMOTE §3.2): the fact that
-/// says which post-floor fields that server can spell. A foot reads no
-/// post-floor field today — every path in its vendored ledger is at or under
-/// the floor — so nothing above gates on the answer yet; it is decoded here
-/// rather than ignored because the defaulting is the rule, and a rule nothing
-/// returns is a rule nothing can test.
+/// says which post-floor fields that server can spell. The channel keeps it,
+/// and one thing gates on it: whether a capture may be posted in pieces
+/// ([`STREAMS`], REMOTE §5.7).
 pub fn confirm(r: &mut dyn Read) -> Result<u32, Failure> {
     let Some(preface) = arrived(r) else {
         return Err(Failure::Wire(mismatch(None)));

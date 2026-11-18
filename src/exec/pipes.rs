@@ -39,6 +39,8 @@ use std::os::fd::AsRawFd;
 use std::process::Child;
 use std::time::Instant;
 
+use crate::invocation::Piece;
+
 /// How much is moved per read. A pipe holds 64 KiB on Linux, so this empties a
 /// full one in a handful of calls and costs one page when it is empty.
 const CHUNK: usize = 16 * 1024;
@@ -51,6 +53,11 @@ struct Sink {
     pipe: Option<Box<dyn Read>>,
     bytes: Vec<u8>,
     dropped: usize,
+    /// **Read no faster than it is posted** (REMOTE §5.7). A run posted in
+    /// pieces empties `bytes` at every post, so a full buffer is a reason to
+    /// stop reading until the next one — the child waits on its own write, and
+    /// nothing is dropped. The limit then bounds a post and not the run.
+    paced: bool,
 }
 
 impl Sink {
@@ -66,9 +73,14 @@ impl Sink {
         let mut moved = false;
         let mut buf = [0u8; CHUNK];
         while let Some(pipe) = self.pipe.as_mut() {
-            match pipe.read(&mut buf) {
+            let room = super::CAPTURE_LIMIT.saturating_sub(self.bytes.len());
+            let want = if self.paced { CHUNK.min(room) } else { CHUNK };
+            if want == 0 {
+                break;
+            }
+            match pipe.read(buf.get_mut(..want).unwrap_or_default()) {
                 Ok(n) if n > 0 => {
-                    let room = n.min(super::CAPTURE_LIMIT.saturating_sub(self.bytes.len()));
+                    let room = n.min(room);
                     self.bytes
                         .extend_from_slice(buf.get(..room).unwrap_or_default());
                     self.dropped += n - room;
@@ -81,6 +93,16 @@ impl Sink {
             }
         }
         moved
+    }
+
+    /// **Everything read so far that ends on a character boundary**, as text,
+    /// and gone from the buffer (`stream::boundary`). What stays behind is at
+    /// most the head of one character the child has not finished writing.
+    fn cut(&mut self) -> String {
+        let at = super::stream::boundary(&self.bytes);
+        let text = String::from_utf8_lossy(self.bytes.get(..at).unwrap_or_default()).into_owned();
+        self.bytes.drain(..at);
+        text
     }
 
     /// The `thrall:` sentence naming what this stream lost, and nothing at all
@@ -114,13 +136,15 @@ impl Pipes {
     /// `payload` is the invocation's input, which goes down stdin as the loop
     /// runs; the pipe is **closed** the moment it is all written, because a
     /// tool that reads to end of file needs that close to be its end of file.
-    pub(crate) fn new(child: &mut Child, payload: Vec<u8>) -> Self {
+    ///
+    /// `paced` is whether the run is posted in pieces ([`Sink`]'s field).
+    pub(crate) fn new(child: &mut Child, payload: Vec<u8>, paced: bool) -> Self {
         Self {
             stdin: unblocked(child.stdin.take()),
             payload,
             written: 0,
-            out: sink("stdout", reading(child.stdout.take())),
-            err: sink("stderr", reading(child.stderr.take())),
+            out: sink("stdout", reading(child.stdout.take()), paced),
+            err: sink("stderr", reading(child.stderr.take()), paced),
         }
     }
 
@@ -139,8 +163,28 @@ impl Pipes {
     /// as fast as this can read it. The tool's own output is in the pipe
     /// already and comes back in the first pass; the wall is there so a
     /// stranger cannot extend an invocation that has ended.
+    ///
+    /// **It is never paced.** Nothing is posted between here and the capture,
+    /// so what the limit bounds from this point is the capture — by keeping
+    /// what fits and counting the rest, as it always did.
     pub(crate) fn settle(&mut self, until: Instant) {
+        self.out.paced = false;
+        self.err.paced = false;
         while self.pump() && Instant::now() < until {}
+    }
+
+    /// Whether either stream holds text a post could carry now.
+    pub(crate) fn pending(&self) -> bool {
+        super::stream::boundary(&self.out.bytes) > 0 || super::stream::boundary(&self.err.bytes) > 0
+    }
+
+    /// **One post's worth**: what both streams have yielded since the last,
+    /// cut where no character is split.
+    pub(crate) fn cut(&mut self) -> Piece {
+        Piece {
+            stdout: self.out.cut(),
+            stderr: self.err.cut(),
+        }
     }
 
     /// What the two pipes held, and what would not fit.
@@ -192,12 +236,13 @@ pub(crate) struct Drained {
 }
 
 /// One output pipe, named for the sentence it may have to write.
-fn sink(name: &'static str, pipe: Option<Box<dyn Read>>) -> Sink {
+fn sink(name: &'static str, pipe: Option<Box<dyn Read>>, paced: bool) -> Sink {
     Sink {
         name,
         pipe,
         bytes: Vec::new(),
         dropped: 0,
+        paced,
     }
 }
 
@@ -214,3 +259,6 @@ fn unblocked<T: AsRawFd>(pipe: Option<T>) -> Option<T> {
 fn reading<T: AsRawFd + Read + 'static>(pipe: Option<T>) -> Option<Box<dyn Read>> {
     unblocked(pipe).map(|pipe| Box::new(pipe) as Box<dyn Read>)
 }
+
+#[cfg(test)]
+mod tests;

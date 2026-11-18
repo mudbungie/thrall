@@ -52,6 +52,20 @@ pub struct Capture {
     pub exit_code: i32,
 }
 
+/// **Text on the two streams, with no verdict** (REMOTE §5.7): what one post
+/// appends while the run is still going. Either string may be empty, and two
+/// empty ones say only *still running*.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Piece {
+    pub stdout: String,
+    pub stderr: String,
+}
+
+/// A piece as JSON — the one spelling a `partial` takes.
+pub fn piece_value(piece: &Piece) -> Value {
+    json!({ "stdout": piece.stdout, "stderr": piece.stderr })
+}
+
 /// One queued invocation as JSON — the follow-class read's row, in the one
 /// spelling.
 pub fn invocation_value(invocation: &Invocation) -> Value {
