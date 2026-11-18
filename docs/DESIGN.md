@@ -236,7 +236,9 @@ reason: a reseed must not be a revocation.
 REMOTE §5.2's tool-host config is thrall's one operator-authored document. It
 is out of world, because it describes *this machine*.
 
-**A worked one ships** (`docs/tools.example.json`, bl-102b), rendered byte for
+**A worked one ships** (`docs/tools.example.json`, bl-102b; its fourth entry
+is `bz`, brazen's envelope mode, which makes a box serve model calls — yog
+REMOTE §5.7, bl-8ec8, and the README's recipe), rendered byte for
 byte in `README.md`, read by `config::read` in the suite, and **printed by the
 binary itself** — `thrall --example-tools` (bl-bb7d) — because until it did the
 file `thrall run` demands could not be written from the shipped documentation at

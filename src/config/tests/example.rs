@@ -58,8 +58,8 @@ fn the_shipped_example_is_a_document_this_foot_reads() {
         .expect("the example is a document thrall reads");
     assert_eq!(
         set.len(),
-        3,
-        "a plain entry, a consenting one, and a bridged one"
+        4,
+        "a plain entry, a consenting one, a bridged one, and model access"
     );
     assert!(!set[0].tool.subject_cwd, "the first entry is the plain one");
     assert!(
@@ -103,6 +103,57 @@ fn the_web_tool_is_an_ordinary_entry_whose_command_is_the_bridge() {
 /// the two things an operator has to know before pasting one: the runtime is
 /// theirs to install, and the description they are pasting was written by the
 /// server.
+/// **The `bz` entry is the one yog REMOTE §5.7 spells**, key for key: the
+/// input is a command line — `args`, and an optional `stdin` — and the command
+/// is brazen in its envelope mode. What it advertises is asserted as the frame
+/// a server is sent, because that is the half another repository reads.
+#[test]
+fn the_bz_entry_advertises_a_command_line_and_runs_brazen_s_envelope_mode() {
+    let set: Vec<Local> = read(Path::new(&root().join("docs").join("tools.example.json")))
+        .expect("the example is a document thrall reads");
+    let bz = &set[3];
+    assert_eq!(bz.command, ["bz", "--envelope"]);
+    assert_eq!(bz.cwd, None);
+    assert_eq!(
+        crate::tools::encode(&crate::config::advertisement(&set))[3],
+        serde_json::json!({
+            "name": "bz",
+            "description": "this box's model access",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "args": {"type": "array", "items": {"type": "string"}},
+                    "stdin": {"type": "string"}
+                },
+                "required": ["args"]
+            }
+        }),
+        "the local half crosses no wire, and the advertised half is §5.7's"
+    );
+}
+
+/// **The recipe and its two warnings are in the one place an operator reads.**
+/// The trust sentence is REMOTE §5.7's own, and the serial limit names its
+/// remedy; an entry pasted without either is a grant nobody understood.
+#[test]
+fn the_readme_says_what_serving_model_calls_takes_and_what_it_trusts() {
+    let readme = readme();
+    for said in [
+        "cargo install brazen",
+        "bz --login --provider <row>",
+        "Restart the foot",
+        "`<row>@<client>`",
+        "handed whole\nconversations and authors the model's output",
+        "trusting it with the conversation",
+        "second foot on the box under its own\nleaf",
+    ] {
+        assert!(
+            readme.contains(said),
+            "the model-access recipe no longer says {said:?}"
+        );
+    }
+}
+
 #[test]
 fn the_readme_says_the_web_tool_is_a_pinned_server() {
     let readme = readme();

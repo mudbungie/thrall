@@ -41,5 +41,18 @@
       "required": ["url"]
     },
     "command": ["/usr/local/bin/thrall", "mcp", "fetch", "--", "uvx", "mcp-server-fetch"]
+  },
+  {
+    "name": "bz",
+    "description": "this box's model access",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "args": { "type": "array", "items": { "type": "string" } },
+        "stdin": { "type": "string" }
+      },
+      "required": ["args"]
+    },
+    "command": ["bz", "--envelope"]
   }
 ]

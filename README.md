@@ -292,7 +292,8 @@ wire. So what this box offers and what it can actually run cannot drift.
 | `cwd` | local | where to run it, **absolute** or the document is refused. A `subject_cwd` invocation that names a directory outranks it |
 
 `docs/tools.example.json` is a complete document — one plain entry, one
-carrying `subject_cwd`, and one bridged MCP server — and it is the one below,
+carrying `subject_cwd`, one bridged MCP server, and the `bz` entry that serves
+model calls — and it is the one below,
 byte for byte: a test holds the two together, so the example that ships is an
 example the gate reads.
 
@@ -352,6 +353,19 @@ file; there is one document and three ways to read it.
       "required": ["url"]
     },
     "command": ["/usr/local/bin/thrall", "mcp", "fetch", "--", "uvx", "mcp-server-fetch"]
+  },
+  {
+    "name": "bz",
+    "description": "this box's model access",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "args": { "type": "array", "items": { "type": "string" } },
+        "stdin": { "type": "string" }
+      },
+      "required": ["args"]
+    },
+    "command": ["bz", "--envelope"]
   }
 ]
 ```
@@ -388,6 +402,48 @@ carries an Alpine floor and what can run on it is still the operator's problem
 (see "The image"). A web *search* server needs a credentialed provider; that
 one is your own pin, and the credential lives in the server's argv or in a
 wrapper script on this box — never in this document, and never on the wire.
+
+### Serving model calls: the `bz` entry
+
+The fourth entry makes this box a place a yog server can run **model
+inference** (yog REMOTE §5.7). `bz` is the brazen binary, the program that
+calls a model provider. Its envelope mode reads one JSON object on standard
+input — `{"args": [...], "stdin": "..."}` — and then behaves exactly as
+`bz <args>` fed that stdin, refusing every flag outside the set a far caller
+may send. So the entry's input **is** a `bz` command line, and thrall adds
+nothing to it: no wrapper, no key in this document, no special case. Deleting
+the entry deletes the capability.
+
+The recipe, on the box that will make the calls:
+
+1. **Install brazen**, so `bz` is on the `PATH` thrall runs under:
+   `cargo install brazen`. It needs a release that has `bz --envelope`
+   (`bz --help` lists it).
+2. **Sign in there**, as the user thrall runs as: `bz --login --provider <row>`.
+   Or leave it for later and sign in from a seat — the sign-in runs on this
+   box either way, and the credential is stored here and never leaves.
+   `bz --list-providers` shows which rows this box has and which are signed in.
+3. **Add the entry** above to `<data root>/tools.json`.
+4. **Restart the foot**, so it advertises the new set.
+5. **Name the row on the server**: in the workspace's `providers.yaml`, set a
+   role's `provider` to `<row>@<client>` — that row, on this machine, where
+   `<client>` is the name this box registered under. A bare `<row>` is still
+   the server's own brazen.
+
+**What you are trusting this box with.** A box named in a role is handed whole
+conversations and authors the model's output. On every turn routed to it, it
+receives the entire request — the system prompt, the full transcript including
+what other machines' tools returned, the tool definitions and the operator's
+messages — and it writes what comes back: the prose the operator reads, and the
+tool calls the server then routes to other machines. It also reports its own
+usage, so the spend figures for those turns are its word. Naming a machine in a
+role is trusting it with the conversation; editing the name out revokes it.
+
+**One call at a time.** A foot runs one invocation at a time per server, so two
+conversations routed to this box queue, and a tool call for this box waits
+behind a model call on it. The remedy is a second foot on the box under its own
+leaf — a second registration, under another client name — and that client
+named in the role.
 
 An **empty array is a legitimate document**: a foot that offers nothing, dials,
 presents the empty set and waits. An **absent file is not**, and thrall refuses
