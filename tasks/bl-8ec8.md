@@ -1,7 +1,8 @@
 +++
 title = "Example tool document and README carry the bz entry: this box serves model calls"
 created = 1794985626
-updated = 1794985626
+updated = 1794986345
+claimant = "Rabid-thrall"
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
 tags = ["inference"]
 
