@@ -61,6 +61,11 @@ permissions:
 jobs:
   tasks:
     runs-on: ubuntu-latest
+    # A job-level block replaces the top-level one whole, so the read is
+    # restated beside the one write: the alarm's issue (scripts/alarm.sh).
+    permissions:
+      contents: read
+      issues: write
     steps:
       # The scanner and its rule table, from the source ref.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -86,3 +91,16 @@ jobs:
       - name: Scan the task store
         working-directory: store
         run: "$GITHUB_WORKSPACE/scripts/leak-scan.sh"
+      # The alarm (bl-1770; scripts/alarm.sh holds the reasoning): the first red
+      # run of a streak opens one issue that mentions the owner, later red runs
+      # find it open and say nothing, and the next green run closes it.
+      - name: Alarm, red
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/alarm.sh red
+      - name: Alarm, green
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/alarm.sh green

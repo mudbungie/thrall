@@ -60,6 +60,8 @@ jobs:
       contents: write
       # Dispatching ci.yml and release-plz.yml.
       actions: write
+      # The alarm's one issue per red streak (scripts/alarm.sh).
+      issues: write
     env:
       # Present: pushes trigger workflows and no dispatch is needed. Absent:
       # the default token pushes and release-plz.yml is dispatched (5).
@@ -133,3 +135,16 @@ jobs:
           if [ -z "$PAT" ]; then
             gh workflow run release-plz.yml --ref main
           fi
+      # The alarm (bl-1770; scripts/alarm.sh holds the reasoning): the first red
+      # run of a streak opens one issue that mentions the owner, later red runs
+      # find it open and say nothing, and the next green run closes it.
+      - name: Alarm, red
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/alarm.sh red
+      - name: Alarm, green
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/alarm.sh green

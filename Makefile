@@ -1,7 +1,7 @@
 .PHONY: all build release test coverage lint fmt fmt-check check ci \
         line-cap leak-scan protocol-gate rules-audit deny advisories mend-advisories install-hooks install uninstall \
         image image-scan mac-artifact clean \
-        deploy deploy-local deploy-status deploy-selftest
+        deploy deploy-local deploy-status deploy-selftest alarm-selftest
 
 # The build authority. Every gate step has ONE home here, and every caller
 # calls the same targets — the pre-commit hook, a hand-run `make check`, and
@@ -58,6 +58,7 @@ coverage:
 lint:
 	$(MAKE) line-cap
 	$(MAKE) deploy-selftest
+	$(MAKE) alarm-selftest
 	$(MAKE) protocol-gate
 	$(MAKE) leak-scan
 	cargo clippy --all-targets -- -D warnings
@@ -314,6 +315,12 @@ deploy-status:
 # the head of `lint`.
 deploy-selftest:
 	@scripts/deploy/reconcile-selftest.sh
+
+# The unattended runs' alarm, in the gate (bl-1770): it drives the real
+# `scripts/alarm.sh` under a fake `gh`, both directions — a red streak opens
+# exactly one issue, and nothing is written when there is nothing to say.
+alarm-selftest:
+	@scripts/alarm-selftest.sh
 
 install: release
 	@mkdir -p "$(INSTALL_BIN)"

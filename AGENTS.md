@@ -23,7 +23,7 @@ third answer.
 ## The gate
 
 `make check` is the complete gate: `fmt-check → lint → coverage`, where `lint`
-is `line-cap → deploy-selftest → protocol-gate → leak-scan → clippy -D warnings
+is `line-cap → deploy-selftest → alarm-selftest → protocol-gate → leak-scan → clippy -D warnings
 → rules-audit → cargo deny check bans licenses sources`. The pre-commit hook (`.githooks/pre-commit`)
 does not run them on this machine — this laptop does not compile in a gate
 (ops bl-1f80, `~/ops/remote-builds.md` "Phase 2"). It refuses direct commits to
@@ -49,6 +49,12 @@ so `make deny` judges bans, licences and sources, and
 finding it runs `make mend-advisories`, proves the lockfile move with
 `ci.yml` on a branch, fast-forwards `main` and re-judges the release. A
 gate failure on `deny` is about the tree, never about the calendar.
+
+**A red scheduled run tells the owner once per streak** (bl-1770): every
+scheduled workflow ends in `scripts/alarm.sh red|green`, where the open issue
+titled `unattended run red: <workflow>` is the whole state — the first red run
+opens it with a mention, later red runs say nothing, the next green run closes
+it — and `make alarm-selftest` proves it under a fake `gh` in `lint`.
 
 CI runs on every pull request, and on `main` as the workflow `release-plz.yml`
 CALLS inside its own run — which is where a release is gated (bl-bbb3, and that
