@@ -35,10 +35,12 @@ name: Advisories
 #
 # WHAT A FAILED RUN MEANS. The fast-forward refuses when `main` moved while
 # the gate ran; the next day's run begins again from the new `main`, so the
-# refusal costs a day and no hand. A red `ci.yml` on the branch means the
-# bump broke something real, and that IS a hand's — the lockfile move that
-# cannot pass the gate is a change somebody must read. Both leave `main`
-# untouched: nothing lands here that the gate did not pass.
+# refusal costs a day and no hand — and so that exit is GREEN (bl-a049): the run
+# says nothing landed and ends successfully, and no alarm issue opens. A red
+# `ci.yml` on the branch means the bump broke something real, and that IS a
+# hand's — the lockfile move that cannot pass the gate is a change somebody
+# must read. Both leave `main` untouched: nothing lands here that the gate
+# did not pass.
 #
 # Every action is pinned to a full commit SHA with its tag in the trailing
 # comment (`release-plz.yml`'s discipline): this job writes to `main`.
@@ -128,9 +130,11 @@ jobs:
           done
           [ -n "$run" ] || { echo "ci.yml never started on $branch" >&2; exit 1; }
           gh run watch "$run" --exit-status
+          # The one forgiven failure (bl-a049): the run is green with nothing
+          # landed, and the trap still deletes the branch.
           git push origin "$branch:main" || {
             echo "main moved while the gate ran: nothing landed; the next run begins from the new main" >&2
-            exit 1
+            exit 0
           }
           if [ -z "$PAT" ]; then
             gh workflow run release-plz.yml --ref main
