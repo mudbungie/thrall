@@ -11,6 +11,7 @@ use super::{
 };
 use crate::channel::entries::Entry;
 use crate::test_support::{Notices, Scratch, Waits, unwaited};
+use serde_json::json;
 use std::time::Duration;
 
 /// **The series doubles and it stops**, so a box whose network is not coming
@@ -142,6 +143,27 @@ fn an_ending_that_is_over_stops_the_channel_with_no_wait() {
         redial(entry_at(scratch.path()).open(), &set(), echo, &sink, &pause),
         "a rival holds this set"
     );
+    assert_eq!(waits.heard(), Vec::<Duration>::new());
+    assert_eq!(notices.heard(), Vec::<String>::new());
+}
+
+/// **A superseded channel is not dialled again** (REMOTE §5.1, edition 29):
+/// no wait, no notice of a redial, and the sentence it stopped on is the one
+/// the process reports.
+#[test]
+fn a_superseded_channel_stops_with_no_wait_and_no_redial() {
+    let scratch = Scratch::new();
+    let _server = flapping_at(
+        scratch.path(),
+        vec![
+            Some(advertised()),
+            Some(json!({"ok": true, "kind": "invocations", "rows": [], "superseded": true})),
+        ],
+    );
+    let (waits, pause) = Waits::new();
+    let (notices, sink) = Notices::new();
+    let said = redial(entry_at(scratch.path()).open(), &set(), echo, &sink, &pause);
+    assert!(said.contains("newer activation"), "{said}");
     assert_eq!(waits.heard(), Vec::<Duration>::new());
     assert_eq!(notices.heard(), Vec::<String>::new());
 }

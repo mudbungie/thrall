@@ -61,7 +61,10 @@ pub(super) const FIRST: Duration = Duration::from_secs(1);
 /// is not coming back for hours.
 pub(super) const CAP: Duration = Duration::from_secs(64);
 
-/// **How long a vanished predecessor's claim can still stand.** REMOTE §5.1
+/// **How long a vanished predecessor's claim can still stand — on a server
+/// older than edition 29.** A newer one ends the predecessor's read at this
+/// foot's own advertisement (REMOTE §5.1), so the refusal this waits out is
+/// never met there. REMOTE §5.1
 /// states it as a contract rather than an accident — *"Its life is the hold and
 /// not the connection's ... `Mailbox::take` drops the claim on the way out,
 /// before the caller writes the answer, so a peer that vanished without a FIN

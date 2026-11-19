@@ -96,11 +96,14 @@ pub(crate) const ADVERTISED: [&str; 2] = [
 ];
 
 /// `corpus/reply/invocations.json`, edition 2 — nothing queued, one
-/// ordinary row, and one carrying the worktree lane's `cwd`.
-pub(crate) const QUEUED: [&str; 3] = [
+/// ordinary row, and one carrying the worktree lane's `cwd` — and, since
+/// **edition 29**, the read a newer activation of this certificate ended
+/// (REMOTE §5.1): no rows, and the one key that says why.
+pub(crate) const QUEUED: [&str; 4] = [
     r#"{"kind":"invocations","ok":true,"rows":[]}"#,
     r#"{"kind":"invocations","ok":true,"rows":[{"input":{"command":"ls -l","timeout":30},"invocation":"inv-1","tool":"Bash"}]}"#,
     r#"{"kind":"invocations","ok":true,"rows":[{"cwd":"/w/home/agents/c-1","input":{"command":"printf made > out.txt"},"invocation":"inv-2","tool":"bash"}]}"#,
+    r#"{"kind":"invocations","ok":true,"rows":[],"superseded":true}"#,
 ];
 
 /// `corpus/reply/routed.json`, edition 1 — the slot as it stands, with

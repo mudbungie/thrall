@@ -70,7 +70,13 @@ mode settles to a slow cadence rather than burning a core. Two refusals are
 told apart and never collapsed: the server declining this box's *read* is its
 own predecessor's connection still dying, which frees within one hold's width
 and is waited past; the server declining what this box *offers* is another
-connection serving under its name, and that ends the channel. **And a protocol
+connection serving under its name, and that ends the channel. **A restart
+meets neither** on a server at edition 29 or later (yog `docs/REMOTE.md` §5.1):
+this box's advertisement is a new activation, the server ends whatever read its
+certificate still holds, and the restarted foot — tool document edited or not —
+is serving at once. A foot that is *still running* when that happens is
+answered `superseded`, and it stops that channel for good and says why rather
+than take the queue back from the process that replaced it. **And a protocol
 version the two ends do not share is neither of those**: it is a fact about the
 two binaries rather than this server's reading of this box, the wire admits no
 negotiation, and the refusal names the only remedy there is — upgrade the older

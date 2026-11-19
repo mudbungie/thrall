@@ -32,7 +32,8 @@ pub(crate) enum Ending {
         /// redial it is no longer a sentence anything returns.
         said: String,
         /// Whether it was the one-reader refusal: the claim a vanished
-        /// predecessor of *this box* still holds. Its life is one hold's width
+        /// predecessor of *this box* still holds, on a server too old to end
+        /// it at this box's advertisement (edition 29, REMOTE §5.1). Its life is one hold's width
         /// and not the connection's (REMOTE §5.1), so it is the one wait whose
         /// length is known in advance.
         predecessor: bool,
@@ -68,6 +69,23 @@ pub(crate) enum Failed {
     /// would ask the same question.
     Unusable(String),
 }
+
+/// **What a foot says when it has been superseded** (REMOTE §5.1, edition 29):
+/// the server ended this foot's read because a newer activation of its
+/// certificate advertised. It is not a gesture that failed — the read was
+/// answered — so it is no [`Failed`] and meets no leg: it is the one answer
+/// that says *stop*, because the next dial would open with an advertisement,
+/// which would end the read that replaced this one, and two processes would
+/// take one queue from each other in turn.
+///
+/// The sentence is the whole of what an operator needs: this channel stopped
+/// on purpose, it will not take the queue back, and which of the two readings
+/// is theirs is theirs to know.
+pub(crate) const SUPERSEDED: &str = "a newer activation of this box's certificate advertised to \
+    this server and took this machine's queue, so this channel has stopped and will not dial \
+    again — dialling would take the queue back from whatever replaced it. If this box's foot \
+    was just restarted, the new process is the one serving and nothing is wrong. If it was not, \
+    another process is presenting this certificate: stop it, then restart this one";
 
 /// Which gesture was in flight, which is the whole of what decides a refusal.
 pub(super) enum Leg {

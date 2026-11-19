@@ -14,6 +14,7 @@
 //! textual. A foot that decided its own lifetime by reading the server's prose
 //! would be a foot the far end could rewrite by rewording.
 
+use super::super::hold::ending::SUPERSEDED;
 use super::super::hold::{Ending, hold};
 use super::{advertised, aside, echo, ops, refusal, row, set, wired, work};
 use crate::channel::Channel;
@@ -220,4 +221,29 @@ fn a_completion_the_server_refused_carries_nothing() {
         ["advertise", "invocations", "complete"],
         "the capture was posted once and then dropped"
     );
+}
+
+/// **A foot told it was superseded stops, and does not take the queue back**
+/// (REMOTE §5.1, edition 29). The server ended this read because a newer
+/// activation of this box's certificate advertised. Dialling again would open
+/// with an advertisement of this foot's own, which would end the read that
+/// replaced it — so the channel is over, with the sentence that says so, at
+/// the first read or after any number served.
+#[test]
+fn a_superseded_read_is_over_and_names_the_newer_activation() {
+    let superseded = || json!({"ok": true, "kind": "invocations", "rows": [], "superseded": true});
+    for script in [
+        vec![advertised(), superseded()],
+        vec![advertised(), work(vec![]), superseded()],
+    ] {
+        let asked = script.len();
+        let (_scratch, server, mut channel) = wired(script);
+        let Ending::Over(said) = hold(&mut channel, &set(), echo, &aside(), None) else {
+            panic!("a superseded foot does not dial again");
+        };
+        assert_eq!(said, SUPERSEDED);
+        assert!(said.contains("newer activation"), "{said}");
+        assert!(said.contains("will not dial again"), "{said}");
+        assert_eq!(ops(&server).len(), asked, "and it asked nothing more");
+    }
 }

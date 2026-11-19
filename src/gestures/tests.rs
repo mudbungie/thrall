@@ -195,3 +195,16 @@ fn a_kind_no_foot_gesture_can_earn_is_refused_by_name() {
     let refusal = decode(&json!({"ok": true, "kind": "board", "rows": []})).expect_err("refused");
     assert_eq!(refusal, "reply: unusable kind \"board\"");
 }
+
+/// **A read a newer activation ended is its own answer** (REMOTE §5.1, edition
+/// 29) — and only `true` says so: the key rides only when true, so a `false`
+/// or a server too old to write it is the ordinary empty hold.
+#[test]
+fn a_superseded_read_is_told_apart_from_an_empty_hold() {
+    let answer = |superseded: serde_json::Value| {
+        decode(&json!({"ok": true, "kind": "invocations", "rows": [],
+                       "superseded": superseded}))
+    };
+    assert_eq!(answer(json!(true)), Ok(Ok(Reply::Superseded)));
+    assert_eq!(answer(json!(false)), Ok(Ok(Reply::Invocations(vec![]))));
+}

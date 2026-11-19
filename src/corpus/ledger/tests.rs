@@ -28,16 +28,20 @@ fn the_floor_this_build_defaults_to_is_the_floor_it_vendored() {
     assert_eq!(hello::FLOOR, FLOOR);
 }
 
-/// **The one addition past the floor on a foot's shapes is the streamed
+/// **The first addition past the floor on a foot's shapes is the streamed
 /// form** (REMOTE §5.7): `partial`, on the post and on its receipt, and the
 /// edition this foot waits for before it writes one is that stamp.
 ///
 /// It is pinned as a list rather than as *"some paths"* because each new
 /// member is a decision: a post-floor key on a reply must be defaulted by its
 /// reader, and one on a request must be gated on the server's edition. A
-/// re-vendor that adds a seventh fails here and names it.
+/// re-vendor that adds an eighth fails here and names it.
+///
+/// **The seventh is `superseded`, on the read's answer** (REMOTE §5.1, edition
+/// 29) — a reply key, so its reader defaults it: absent is an ordinary hold
+/// (`gestures::decode`).
 #[test]
-fn the_only_paths_stamped_above_the_floor_are_the_streamed_form_s() {
+fn the_only_paths_stamped_above_the_floor_are_the_streamed_form_s_and_superseded() {
     let above: Vec<(&str, &str, u32)> = SHAPES
         .iter()
         .flat_map(|shape| {
@@ -55,9 +59,15 @@ fn the_only_paths_stamped_above_the_floor_are_the_streamed_form_s() {
             (shape, "/partial:object", hello::STREAMS),
         ]
     };
+    let superseded = [("reply/invocations", "/superseded:bool", hello::EDITION)];
     assert_eq!(
         above,
-        [streamed("request/complete"), streamed("reply/routed")].concat()
+        [
+            streamed("request/complete").as_slice(),
+            &superseded,
+            &streamed("reply/routed"),
+        ]
+        .concat()
     );
 }
 

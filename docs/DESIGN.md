@@ -662,6 +662,7 @@ prose would be a foot the far end could rewrite by rewording.
 |---|---|---|
 | The wire | any | dial again |
 | The server refused | the `invocations` read | dial again, past one hold's width |
+| The server answered `superseded` | the `invocations` read | over |
 | The server refused | `advertise`, `complete` | over |
 | An answer no foot gesture can earn | any | over |
 | The two ends speak different versions | any | over |
@@ -682,6 +683,40 @@ bl-2d78's answer: the server declines a set that would replace a *serving*
 machine's own, so a refusal there is another connection holding this machine's
 read with a different set in force. Dialling again would hand it the box by
 pretending otherwise.
+
+**Since yog bl-96e0 neither refusal is what a restart meets, and a third
+answer is** (bl-1f02; REMOTE §5.1, edition 29). The server now reads an
+accepted advertisement as a new activation of its certificate: it ends
+whatever read that certificate holds and grants the next one. So a restarted
+foot — tool document edited or not — is serving in the time it takes to dial
+twice, and a redial after a drop takes its own queue back the same way,
+because every channel opens with the advertisement. The advertisement is no
+longer refused for a parked read, and the refused read is what a foot meets
+only from a server older than edition 29, where everything above still holds.
+
+**The read that was ended is answered `superseded`, and a foot that hears it
+stops that channel for good.** It is the `invocations` reply with no rows and
+`superseded: true`; when the process it was parked for is dead, nobody reads
+it. A foot that does read it is a process that is *still alive* while another
+process bearing its certificate has advertised — and the one thing it must not
+do is what every other ending on the read does. Dialling again opens with an
+advertisement, which ends the read that replaced this one, which answers
+*that* process `superseded`: two processes taking one queue from each other in
+turn, each run in flight ended in doubt on the way. So the channel is over,
+with a sentence that names both readings (`run::hold::ending::SUPERSEDED`) —
+a restart, where nothing is wrong, or a second holder of the certificate,
+which is the operator's to stop. It is drawn from the answer's own key and
+never from prose, and it is no leg's refusal: the read was answered.
+
+**What that costs, named.** A process whose every channel has stopped exits,
+and a supervisor that restarts it makes a new activation, which takes the
+queue back. Two supervised processes bearing one certificate therefore still
+alternate — at the supervisor's cadence, each exit naming why, until the
+unit's own start limit stops one (`scripts/deploy/thrall.service`: five in
+five minutes). Before, the newcomer was refused and the first kept serving.
+The ruling that a restart must serve at once is what makes the last
+activation win, and one certificate on two boxes was never a supported state;
+it is now a loud one at both ends rather than at one.
 
 **A version the two ends do not share is a fourth party, and it is over
 wherever it is met** (bl-5d62). The three rows above are the wire, which has no

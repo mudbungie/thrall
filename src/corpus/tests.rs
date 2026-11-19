@@ -117,8 +117,8 @@ fn the_receipt_the_server_sent_before_the_bump_is_refused() {
     );
 }
 
-/// Every queued row decodes — the empty answer, an ordinary row, and the one
-/// carrying the worktree lane's `cwd`.
+/// Every queued row decodes — the empty answer, an ordinary row, the one
+/// carrying the worktree lane's `cwd`, and the read a newer activation ended.
 #[test]
 fn every_queued_row_decodes() {
     let rows: Vec<Reply> = QUEUED
@@ -140,6 +140,7 @@ fn every_queued_row_decodes() {
         panic!("invocations");
     };
     assert_eq!(lane[0].cwd.as_deref(), Some("/w/home/agents/c-1"));
+    assert_eq!(rows[3], Reply::Superseded, "edition 29's one key");
 }
 
 /// The slot as it stands: the capture **absent** while the work is still out,

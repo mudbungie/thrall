@@ -81,6 +81,7 @@ pub(crate) const SHAPES: [Shape; 7] = [
             ("/rows/[]/tool:string", 2),
             ("/rows/[]:object", 2),
             ("/rows:array", 2),
+            ("/superseded:bool", 29),
             (":object", 2),
         ],
     },

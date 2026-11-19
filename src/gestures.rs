@@ -84,6 +84,16 @@ pub enum Reply {
     /// This machine's work, which is ordinarily empty: the server holds the
     /// read for its own bound and then answers with what it has.
     Invocations(Vec<Invocation>),
+    /// **This read was ended by a newer activation of this box's certificate**
+    /// (REMOTE §5.1, edition 29): the `invocations` answer carrying
+    /// `superseded: true`. Another process advertised under this name and the
+    /// queue is its now. It is an answer of its own here, though it wears the
+    /// read's kind on the wire, because what a foot does next is the opposite
+    /// of what it does with an empty hold.
+    ///
+    /// The key rides only when true, so a server older than 29 — which never
+    /// writes it — is read as it always was.
+    Superseded,
     /// One invocation's standing after the call — the handle, and the capture
     /// once there is one. It is a **re-read**, never an echo, which is why a
     /// foot reads its own completion's receipt rather than discarding it.
@@ -119,6 +129,7 @@ pub fn decode(v: &Value) -> Result<Result<Reply, String>, String> {
         "advertised" => bool_of(o, "wrote")
             .map(|wrote| Reply::Advertised { wrote })
             .map_err(|e| format!("reply: {e}")),
+        "invocations" if o.get("superseded") == Some(&Value::Bool(true)) => Ok(Reply::Superseded),
         "invocations" => rows(o).map(Reply::Invocations),
         "routed" => routed(o),
         other => Err(format!("reply: unusable kind {other:?}")),

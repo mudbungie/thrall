@@ -63,8 +63,8 @@ pub(crate) mod ending;
 
 use serde_json::Value;
 
-use ending::Leg;
 pub(crate) use ending::{Ending, Failed};
+use ending::{Leg, SUPERSEDED};
 
 use super::held::{self, Held};
 use super::{Handoff, Notice};
@@ -118,7 +118,8 @@ pub(crate) fn hold(
     }
     loop {
         let work = match waited(channel) {
-            Ok(work) => work,
+            Ok(Some(work)) => work,
+            Ok(None) => return Ending::Over(SUPERSEDED.to_owned()),
             Err(failed) => return failed.at(Leg::Read, served),
         };
         served = true;
@@ -167,9 +168,12 @@ fn present(channel: &mut Channel, presenting: &Value) -> Result<bool, Failed> {
 
 /// **The follow-class read**: this machine's next work, or the empty answer of
 /// a hold that ended quietly. Both are ordinary; only a channel failure is not.
-fn waited(channel: &mut Channel) -> Result<Vec<Invocation>, Failed> {
+/// `None` is the third answer: a newer activation of this box's certificate
+/// took this machine's queue (REMOTE §5.1), and this channel is over.
+fn waited(channel: &mut Channel) -> Result<Option<Vec<Invocation>>, Failed> {
     match tell(channel, &gestures::invocations())? {
-        Reply::Invocations(rows) => Ok(rows),
+        Reply::Invocations(rows) => Ok(Some(rows)),
+        Reply::Superseded => Ok(None),
         other => Err(Failed::Unusable(format!(
             "the server answered {other:?}, not this machine's work"
         ))),
