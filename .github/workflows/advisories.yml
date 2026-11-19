@@ -36,7 +36,8 @@ name: Advisories
 # WHAT A FAILED RUN MEANS. The fast-forward refuses when `main` moved while
 # the gate ran; the next day's run begins again from the new `main`, so the
 # refusal costs a day and no hand — and so that exit is GREEN (bl-a049): the run
-# says nothing landed and ends successfully, and no alarm issue opens. A red
+# says nothing landed and ends successfully, and no alarm issue opens. A push
+# refused while `main` did NOT move (bl-a8f2) has some other cause: red, a hand's. A red
 # `ci.yml` on the branch means the bump broke something real, and that IS a
 # hand's — the lockfile move that cannot pass the gate is a change somebody
 # must read. Both leave `main` untouched: nothing lands here that the gate
@@ -130,9 +131,16 @@ jobs:
           done
           [ -n "$run" ] || { echo "ci.yml never started on $branch" >&2; exit 1; }
           gh run watch "$run" --exit-status
-          # The one forgiven failure (bl-a049): the run is green with nothing
-          # landed, and the trap still deletes the branch.
+          # The one forgiven failure: a push refused BECAUSE main moved is green
+          # with nothing landed, and the trap still deletes the branch. Main's
+          # tip still inside the branch means main did not move (bl-a8f2), so the
+          # refusal has some other cause and stays red.
           git push origin "$branch:main" || {
+            git fetch -q origin main
+            if git merge-base --is-ancestor FETCH_HEAD "$branch"; then
+              echo "the push to main was refused and main did not move: this is a hand's" >&2
+              exit 1
+            fi
             echo "main moved while the gate ran: nothing landed; the next run begins from the new main" >&2
             exit 0
           }
