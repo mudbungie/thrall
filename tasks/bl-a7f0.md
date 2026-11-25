@@ -1,7 +1,7 @@
 +++
 title = "Push, not poll: hold one pushing invocations read open (holding on every reconnect), run every pushed job at once with no limit, ignore heartbeats, gate on server edition 32 (yog REMOTE 5.8)"
 created = 1795581368
-updated = 1795581982
+updated = 1795582319
 claimant = "Rabid"
 priority = 2
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
@@ -65,3 +65,7 @@ The rule this ball implements, verbatim (REMOTE §5.8.1):
 To do: keep one pushing read open always; start every pushed job at once on its own thread with no limit; post each job's result on its own connection; send holding on every (re)connect; ignore heartbeats; gate on the server's edition (>= 32), keeping today's serial loop below it; hold no backlog. Delete the re-advertisement after each hand-off and its restored notice for a pushing channel (REMOTE §5.8 makes it unnecessary: the read is never closed while working). Re-vendor the corpus ledger at edition 32.
 
 Tests owed: a job pushed while another runs starts at once; reconnect sends the full holding list; a heartbeat frame is not treated as work or as the end; four quiet intervals reconnect; superseded stops; an edition-31 server gets the serial loop.
+
+---
+
+Implemented and gated green on work/bl-a7f0 (3b5fe55, 333 tests, 100% coverage). Held before close: REMOTE 5.8 names one way an id leaves holding (its final complete answered), but a run can also end with no final post — a partial refused (5.7 ends the slot in doubt) or a partial the wire swallowed (5.7: the child is stopped). The branch unlists those too (DESIGN 3.13 states it); waiting on a ruling whether 5.8 should say so.
