@@ -1,7 +1,8 @@
 +++
 title = "Push, not poll: hold one pushing invocations read open (holding on every reconnect), run every pushed job at once with no limit, ignore heartbeats, gate on server edition 32 (yog REMOTE 5.8)"
 created = 1795581368
-updated = 1795581368
+updated = 1795581982
+claimant = "Rabid"
 priority = 2
 root_commit = "32be9f81c8ae1d50610ed025db0de83568b6736b"
 tags = ["feature"]
