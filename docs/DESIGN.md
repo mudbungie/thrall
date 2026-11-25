@@ -113,14 +113,15 @@ to add and would dissolve the reason thrall exists.
   are not a certificate says what the file should have held and cites
   `material::REMEDY`, rather than passing on the PEM reader's *"no items
   found"*.
-- **It runs one invocation at a time, per channel.** Serial, which is what
-  makes a busy foot *absent* at the far end — and why presence is not the
-  routing predicate there. **Per channel** is the whole of the qualification and
-  it is not a loosening: a box holding two entries is two trust relationships
-  with two servers, and queueing one behind the other would make this foot
-  absent from one of them for reasons that server's operator cannot see. Each
-  channel is a thread with its own connection, its own identity and its own
-  serial loop; they share no state (`run::fan`).
+- **It runs every job it is pushed at once, and holds no backlog** (§3.13,
+  yog REMOTE §5.8). To a server that pushes, there is no limit and no queue on
+  this box: what it has not started is still the server's. To an older server
+  it runs one invocation at a time, per channel, as it always did — which is
+  what makes a busy foot *absent* there. **Channels never wait on each other**:
+  a box holding two entries is two trust relationships with two servers, and
+  queueing one behind the other would make this foot absent from one of them
+  for reasons that server's operator cannot see. Each channel is a thread with
+  its own connections and its own identity; they share no state (`run::fan`).
 
 ## 3. Inherited invariants
 
@@ -600,7 +601,10 @@ has gone away, and a set replaced in that window would stand until the process
 was restarted, with every later invocation refused for a tool that plainly
 exists.
 
-**So the set is asserted again at the end of every hand-off** (bl-2d78). The
+**So, to a server that does not push, the set is asserted again at the end of
+every hand-off** (bl-2d78). A pushing channel never opens the window — its read
+is open while it works — and must not advertise while that read is open, so it
+advertises once per connection, before the read (§3.13). The
 window is bounded by one tool's runtime instead of by the process lifetime, and
 an idle foot pays nothing: no hand-off ends, so nothing is said. The server
 writes only when the set differs, so the ordinary re-assertion is a comparison
@@ -1060,7 +1064,7 @@ per-entry key and no flag: a switch would be a second form.
 |---|---|---|
 | Refused in band — nobody polled for thirty seconds, or the slot is gone | Stopped by the cascade (§3.5) | Reads on. The run is dropped and nothing is posted for it again. A refusal of the `capture` post is dropped the same way. **Never the end of the channel** — it is the asker's ordinary stop |
 | The wire, on a `partial` | Stopped: a run nobody can be told about has no asker | Dialled again (§3.8), carrying nothing |
-| The wire, on the `capture` post | Already exited | Dialled again, and the capture — the unposted remainder — is posted first on the next dial, as §3.8 always had it |
+| The wire, on the `capture` post | Already exited | Dialled again, and the capture — the unposted remainder — is posted first on the next dial, as §3.8 always had it. A pushed job (§3.13) posts it again itself, on its own connection, after the redial's waits, until it is answered or the channel is over |
 | An answer no gesture can earn | Stopped | Over, as at any leg |
 
 **One dial is tried twice.** A run's first post opens its connection, and a
@@ -1078,9 +1082,82 @@ the last post and the exit.
 
 **What it costs, said plainly.** A streamed run has no deadline of this box's.
 A tool that hangs runs for as long as its asker keeps polling, and the party
-that stops it is the server refusing a post. A foot is still serial per
-channel (§2), so a long model call on this box is a tool call on this box
-waiting.
+that stops it is the server refusing a post. To a server that does not push,
+a foot is still serial per channel (§2), so a long model call there is a tool
+call waiting; to one that pushes, nothing waits (§3.13).
+
+### 3.13 Push, not poll (bl-a7f0; yog REMOTE §5.8)
+
+yog `docs/REMOTE.md` §5.8 is the authority; this is what thrall does about it.
+
+**The switch is the server's edition.** Every dial reads it (§3.12); at 32 or
+more — the stamp of `holding` — the channel pushes (`Channel::pushes`). Below
+it the loop is the serial one, byte for byte. It is one loop
+(`run::hold`): a serial read is a read that ends after its one frame, and an
+empty serial answer is read past exactly as a heartbeat is. Only two things
+differ, and both turn on the one predicate: which read is sent and how its
+answer is read (`run::hold::read`), and whether a job runs here, in turn, with
+the set asserted again after it — or on a thread of its own.
+
+**What a pushing channel does, in order.**
+
+1. It dials and advertises. Its own read is not open, so nothing is
+   superseded.
+2. It opens one read stating `holding` — every job it is running, computed
+   from the job threads at that moment (`run::pushed`), the empty list
+   included — and keeps that connection open.
+3. Each frame with a row starts that job at once on its own thread, unless the
+   id is already running. There is no limit and nothing is queued here.
+4. Each job is `run::held::run` on a clone of the channel: its posts ride a
+   connection of its own, never the read's.
+5. An empty frame is a heartbeat and is read past. The channel's read bound
+   (`channel::line::READ_TIMEOUT`, two minutes) is exactly four heartbeat
+   intervals, so a quiet read fails on the socket and is the wire: the redial
+   dials again (§3.8), advertises, and re-opens the read with `holding`.
+6. A `superseded` frame ends the channel as it always did (§3.8), and the
+   channel then **waits for every job it started** before it reports itself
+   over, so a process whose channels have all stopped never exits with a job
+   unposted.
+
+**When an id leaves `holding`: when its job's thread ends.** That is when its
+final post was answered — landed or refused — and also when the run was
+dropped on a `partial` that could not be posted: refused (the server ended the
+slot in doubt, REMOTE §5.7) or swallowed by the wire (the executor stopped the
+child, §3.12). REMOTE §5.8 names only the first; the other two end the run with
+no final post to answer, and an id held for a run that no longer exists would
+be listed forever. Unlisting it is safe either way: the server has already
+ended a refused slot, and answers a posted-for slot that is no longer listed
+in doubt. A final post the wire swallowed keeps its id listed and is posted
+again by its job until it is answered (REMOTE §5.6 ruling 1's note) — or until
+the channel is over, which drops it as the serial loop's `Over` does.
+
+**The hazards, and their answers.**
+
+- **Locks.** None: the list is the read thread's own vector of job handles, a
+  job hands back only that its thread ended (`JoinHandle::is_finished`), and
+  the one cross-thread flag — the channel is over — is an atomic. `src/state.rs`
+  stays unbuilt.
+- **Many children at once.** Every child is still forked at `src/spawn.rs`;
+  `std` opens its pipes close-on-exec, and this program writes no executable,
+  so the fork-to-exec window (no-bare-fork's ETXTBSY) has nothing of its own to
+  leak in production. The suite's fork lock is unchanged.
+- **Two jobs on one working directory** run at once. That is the asker's
+  choice, made at the server; this foot neither serializes nor refuses it.
+- **A job finishing while the read reconnects.** The old read's connection is
+  dropped before the next list is computed (REMOTE §5.8.2's order), and either
+  outcome is safe: listed and finished is ignored, unlisted and finished has
+  nothing left to hand out.
+- **The process killed with jobs running.** Children lead their own process
+  groups (§3.5) and are not signalled by this process's death, exactly as a
+  serial foot's one child is not; the next process lists nothing, and the
+  server hands unposted work out again and answers posted work in doubt
+  (REMOTE §5.8.2).
+
+**Re-advertising after a config change is a restart.** The set is read once,
+when the process starts (`serve`). A changed document takes a new process,
+which advertises before it reads — ending the old process's read as
+superseded, which the old one obeys after its jobs finish. Nothing here
+advertises over an open pushing read.
 
 ## 4. Module map
 
@@ -1109,7 +1186,9 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/gestures.rs` | **The foot set** (bl-a2ea): `advertise`, `invocations`, `complete`, and the answers they can earn. The enumeration is the enforcement thrall can keep — there is no spelling here for a fourth verb. |
 | `src/invocation.rs` | What crosses the routing leg: the invocation a foot is handed and the capture it hands back, each in one strict spelling. |
 | `src/run.rs` | **The loop**, and the three seams that are parameters: what runs a command (`Handoff`), where a channel says something while it is still serving (`Notice`, §3.7) and where it waits between dials (`Pause`, §3.8). All three are effects no test can read back, so the one implementation of each is `src/main.rs`'s — which is what lets the whole conversation be tested against a real server, a one-line executor and two recorders. This file itself is `fan`: every channel this box holds, one thread each — and `served`, which says a channel's terminal sentence in that channel's own thread rather than at the join (§3.9). |
-| `src/run/hold.rs` | **One channel's conversation** (split from `run.rs` by bl-916d): present, wait, hand off, answer, present again. |
+| `src/run/hold.rs` | **One channel's conversation** (split from `run.rs` by bl-916d): present, wait, hand off, answer, present again — or, to a server that pushes, present once and start each pushed job (§3.13). One loop for both. |
+| `src/run/hold/read.rs` | **The read, in its two forms** (bl-a7f0, §3.13): answered once and the connection dropped before any of it runs, or held open and read a frame at a time. |
+| `src/run/pushed.rs` | **The jobs a pushing read has handed this channel** (bl-a7f0, §3.13): each on its own thread and its own connection, `holding` read off the threads still running, a swallowed final post posted again, and the wait for them all when the channel is over. |
 | `src/run/hold/ending.rs` | **How a channel ended, and who ended it** (split from `hold.rs` by bl-5d62): the `Ending`, the party that failed, and the leg it failed at — the classification of §3.8's table, kept apart from the conversation that produces it because they are two questions. |
 | `src/run/held.rs` | **The capture going back** (bl-f9d2): one invocation run and posted — once, or in pieces with a refused post dropping the run (bl-769b, §3.12) — and the one this process is still holding when that post fails on the wire — carried out with the ending and posted first on the next dial, ahead of the read that releases the server's lease (§3.8, REMOTE §5.6 ruling 1). |
 | `src/run/redial.rs` | **One channel's lifetime** (bl-916d): the endings worth another dial, the backoff that settles, and the sentence said in the meantime. It is a separate file because it is a separate question — what happened, against what to do about it — and because its whole decision is three numbers and one line of arithmetic, testable as values. |
@@ -1126,7 +1205,7 @@ it. Rows below the line are unbuilt; each names the ball that will build it.
 | `src/register/claim.rs` | The door's reply read as a claim, and the claim filed as an entry: a directory made once and never overwritten, the key at 0600. |
 | `src/spawn.rs` | **The spawn boundary.** Every child process is built AND forked here — nowhere else builds a `Command`, and nowhere else spends one. It decides three things a spawn site could forget: the git-environment scrub, the **process group** the child is born leading (bl-a78e, §3.5), and the fork lock the suite needs. **Founded by bl-a4a5**, before it had a production tenant, which is the point of the row: a boundary rule that arrives after the first spawn site is a rule that has to be argued with. |
 | `src/sys.rs` | **The confined `unsafe` file**, and it holds two things, both raw process effects `std` does not wrap. Signalling a process GROUP, which `std` has no spelling for at all (`Child::kill` is `SIGKILL` to one process, and there is no `Child::terminate`); the sign guard did not move when the group arrived (§3.5) — the negation is this file's, the callers pass a positive id. And putting a pipe into non-blocking mode (bl-6c14), which `std` spells for sockets and for nothing else — a `ChildStdout` has no `set_nonblocking`, and borrowing the socket one by wrapping the descriptor in a `UnixStream` would read the pipe with `recv(2)`, which a pipe refuses. Both are declared rather than depended on: `kill(2)` and `fcntl(2)` are in the libc `std` already links, so neither costs a crate, a build script or a lockfile line. |
-| `src/state.rs` | **The lock chokepoint.** Every `Mutex`/`RwLock` in the crate. Unbuilt, and it stayed that way: the only cross-thread hand-offs thrall has are a `JoinHandle`'s own answer (the pipes a child writes, the sentence a channel ends with), which need no lock. The suite's fork lock is **not** a tenant — a test's serialization lock is scaffolding, and the rule's own text sends it to `src/test_support.rs`. |
+| `src/state.rs` | **The lock chokepoint.** Every `Mutex`/`RwLock` in the crate. Unbuilt, and it stayed that way: the only cross-thread hand-offs thrall has are a `JoinHandle`'s own answer (the pipes a child writes, the sentence a channel ends with, whether a pushed job is still running) and one atomic flag (§3.13), which need no lock. The suite's fork lock is **not** a tenant — a test's serialization lock is scaffolding, and the rule's own text sends it to `src/test_support.rs`. |
 | `src/corpus.rs` | `cfg(test)` only. **The server's conformance corpus, vendored as literal text** (REMOTE §3, bl-e0f0): the protocol number and the frames of every shape a foot speaks, copied from yog rather than derived from anything here. `corpus/tests.rs` pays what §3 says a client owes them — decode every frame, and round-trip every request byte for byte. It is the crate's one statement of what the FAR end says, which is why the stand-in server reads its version from here and not from the pin it is testing. |
 | `src/corpus/ledger.rs` | `cfg(test)` only. **The server's shape ledger, vendored** (REMOTE §3.2, bl-6fcf, §3.6): the floor, the deprecation list, and the reads a replay walks a signature by. What a stamp is FOR lives here; what the stamps ARE is the file below. |
 | `src/corpus/ledger/shapes.rs` | `cfg(test)` only. The seven shapes a foot speaks, every field path stamped with the edition it appeared at, copied key for key out of `corpus/shapes.json`. A file of data, so a re-vendor's diff is the whole file and reads as one. |
@@ -1343,7 +1422,7 @@ Contract and tests are bl-b6ab's body.
 ### 6.4 Lifetime: the server's is contained in the invocation's
 
 Per invocation: spawn, handshake, one call, tear down (bl-d5d6's second
-question). The serial-per-channel rule (§2) is untouched because nothing
+question). The per-channel rule (§2) is untouched because nothing
 outlives the call; §2's *it holds no world* stays true because there is no
 resident connection to be state; and every failure — would not start, no
 handshake, died mid-call — is one observable, a non-zero exit with a sentence.

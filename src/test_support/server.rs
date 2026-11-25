@@ -40,6 +40,7 @@
 
 use std::net::{TcpListener, TcpStream};
 use std::path::Path;
+use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use rustls::pki_types::pem::PemObject;
@@ -63,6 +64,10 @@ pub(crate) enum Dial {
     Vanishes,
     /// Hang up before the handshake: a server that cannot be reached.
     Unreachable,
+    /// **A read held open** (REMOTE §5.8): take the request, then write what
+    /// the test sends, as it sends it — `Some` a frame, `None` the terminator
+    /// — and go away without one when the test drops its end.
+    Held(Arc<Mutex<Receiver<Option<Value>>>>),
 }
 
 impl Dial {
@@ -117,33 +122,35 @@ impl Server {
         Self::scripted(dir, crate::corpus::PROTOCOL, FLOOR, script)
     }
 
-    /// **A server that reads a capture posted in pieces** (REMOTE §5.7): it
-    /// states the edition `partial` is stamped at, and the script says what
-    /// each connection does.
+    /// **A server that reads a capture posted in pieces** (REMOTE §5.7) and
+    /// does not push: it states 31, the last edition before `holding`, and the
+    /// script says what each connection does.
     pub(crate) fn streaming(dir: &Path, script: Vec<Dial>) -> Self {
-        Self::scripted(
-            dir,
-            crate::corpus::PROTOCOL,
-            crate::corpus::ledger::edition(),
-            script,
-        )
+        let edition = crate::channel::hello::PUSHES - 1;
+        Self::scripted(dir, crate::corpus::PROTOCOL, edition, script)
     }
 
-    /// The one listener: serve one connection per script entry, in order.
+    /// **A server that pushes** (REMOTE §5.8): it states the edition this
+    /// vendored ledger is at, which is past `holding`'s stamp.
+    pub(crate) fn pushing(dir: &Path, script: Vec<Dial>) -> Self {
+        let edition = crate::corpus::ledger::edition();
+        Self::scripted(dir, crate::corpus::PROTOCOL, edition, script)
+    }
+
+    /// The one listener: serve one connection per script entry, in the order
+    /// they are dialled — each on a thread of its own, because a pushing foot
+    /// holds its read open while its jobs dial to post.
     fn scripted(dir: &Path, protocol: u32, edition: u32, script: Vec<Dial>) -> Self {
         let config = server_config(dir);
         let (listener, seen) = bound(dir);
         let recorded = Arc::clone(&seen);
+        let preface = json!({ "protocol": protocol, "edition": edition });
         std::thread::spawn(move || {
             for dial in script {
                 let (tcp, _) = listener.accept().expect("a dial");
-                serve(
-                    &config,
-                    tcp,
-                    &json!({ "protocol": protocol, "edition": edition }),
-                    dial,
-                    &recorded,
-                );
+                let (config, preface, seen) =
+                    (Arc::clone(&config), preface.clone(), Arc::clone(&recorded));
+                std::thread::spawn(move || serve(&config, tcp, &preface, dial, &seen));
             }
         });
         Self { seen }
@@ -182,18 +189,17 @@ fn serve(
     dial: Dial,
     seen: &Arc<Mutex<Vec<Value>>>,
 ) {
-    let answers = match dial {
-        Dial::Unreachable => return,
-        Dial::Vanishes => None,
-        Dial::Answers(answers) => Some(answers),
-    };
+    if matches!(dial, Dial::Unreachable) {
+        return;
+    }
     let conn = ServerConnection::new(Arc::clone(config)).expect("a server connection");
     let mut tls = StreamOwned::new(conn, tcp);
     let _ = frame::write_value(&mut tls, preface);
     hear(&mut tls, seen);
-    let Some(answers) = answers else {
-        hear(&mut tls, seen);
-        return;
+    let answers = match dial {
+        Dial::Answers(answers) => answers,
+        Dial::Held(said) => return held(&mut tls, &said, seen),
+        Dial::Vanishes | Dial::Unreachable => return hear(&mut tls, seen),
     };
     for answer in answers {
         hear(&mut tls, seen);
@@ -201,6 +207,23 @@ fn serve(
             let _ = frame::write_value(&mut tls, value);
         }
         let _ = frame::write_end(&mut tls);
+    }
+}
+
+/// A read held open: hear its request, then write what the test sends until
+/// the test lets go — and then go away, as a server whose socket died does.
+fn held(
+    tls: &mut StreamOwned<ServerConnection, TcpStream>,
+    said: &Mutex<Receiver<Option<Value>>>,
+    seen: &Arc<Mutex<Vec<Value>>>,
+) {
+    hear(tls, seen);
+    let said = said.lock().unwrap_or_else(PoisonError::into_inner);
+    while let Ok(next) = said.recv() {
+        let _ = match next {
+            Some(value) => frame::write_value(tls, &value),
+            None => frame::write_end(tls),
+        };
     }
 }
 

@@ -43,6 +43,7 @@
 use std::time::Duration;
 
 use super::hold::{Ending, hold};
+use super::pushed::Pushed;
 use super::{Handoff, Notice, Pause};
 use crate::channel::Channel;
 use crate::config::Local;
@@ -104,9 +105,17 @@ pub(crate) fn redial(
     // one, it is this loop's stack and nowhere else, and it goes no further
     // than the next channel's first act.
     let mut held = None;
+    // The other thing that crosses, and only to a server that pushes (REMOTE
+    // §5.8): the jobs still running, whose ids the next read states as
+    // `holding`. They are threads, not memory — a job that has finished is
+    // gone from the list — and the channel waits for them before it is over.
+    let mut pushed = Pushed::new(notice, pause);
     loop {
-        match hold(&mut channel, set, handoff, notice, held.take()) {
-            Ending::Over(said) => return said,
+        match hold(&mut channel, set, handoff, notice, held.take(), &mut pushed) {
+            Ending::Over(said) => {
+                pushed.settle();
+                return said;
+            }
             Ending::Again {
                 said,
                 predecessor,

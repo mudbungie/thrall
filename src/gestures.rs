@@ -40,10 +40,20 @@ pub fn advertise(set: &[Tool]) -> Value {
 }
 
 /// **Wait for this machine's next work** (REMOTE §5.3): the follow-class read,
-/// and where a foot spends nearly all of its life. It carries no field at all —
-/// a connection drains its own queue.
-pub fn invocations() -> Value {
-    json!({ "op": "invocations" })
+/// and where a foot spends nearly all of its life. It names no client — a
+/// connection drains its own queue.
+///
+/// **`holding` is the one optional key, and its presence is the whole
+/// signal** (REMOTE §5.8): `Some` is a pushing read stating every job this host
+/// has taken whose final post the server has not answered — possibly none —
+/// and `None` is the serial read, written byte for byte as before. It is
+/// `Some` only to a server at or past
+/// [`PUSHES`](crate::channel::hello::PUSHES).
+pub fn invocations(holding: Option<&[String]>) -> Value {
+    match holding {
+        None => json!({ "op": "invocations" }),
+        Some(ids) => json!({ "op": "invocations", "holding": ids }),
+    }
 }
 
 /// **Answer exactly one invocation** (REMOTE §5.3), quoting the handle it was

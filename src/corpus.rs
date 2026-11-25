@@ -75,9 +75,14 @@ pub(crate) const ADVERTISE: [&str; 3] = [
     r#"{"op":"advertise","tools":[{"description":"run a command","input_schema":{"properties":{"command":{"minLength":1,"type":"string"}},"required":["command"],"type":"object"},"name":"Bash","subject_cwd":true}]}"#,
 ];
 
-/// `corpus/request/invocations.json`, edition 1. The follow-class read
-/// carries no field at all — a connection drains its own queue.
-pub(crate) const INVOCATIONS: &str = r#"{"op":"invocations"}"#;
+/// `corpus/request/invocations.json` — the serial read, edition 1, which
+/// carries no field at all (a connection drains its own queue); and the
+/// pushing read, **edition 32** (REMOTE §5.8), which states what this host
+/// holds. The second is written only to a server at or past 32.
+pub(crate) const INVOCATIONS: [&str; 2] = [
+    r#"{"op":"invocations"}"#,
+    r#"{"holding":["inv-7"],"op":"invocations"}"#,
+];
 
 /// `corpus/request/complete.json` — the post that says the run is not over
 /// (`partial`, **edition 28**, REMOTE §5.7), and the one that ends it

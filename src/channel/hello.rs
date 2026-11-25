@@ -50,7 +50,7 @@ use super::{Failure, frame};
 /// The server's three numbers, vendored.
 mod version;
 
-pub use version::{EDITION, FLOOR, PROTOCOL, STREAMS};
+pub use version::{EDITION, FLOOR, PROTOCOL, PUSHES, STREAMS};
 
 /// The preface's first key: the major, compared for equality.
 const KEY: &str = "protocol";

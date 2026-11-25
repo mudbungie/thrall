@@ -15,7 +15,8 @@
 use super::super::held::Held;
 use super::super::hold::{Ending, hold};
 use super::{
-    advertised, aside, echo, entry_at, flapping_at, gesture, ops, receipt, refusal, row, set, work,
+    advertised, aside, echo, entry_at, flapping_at, gesture, idle, ops, receipt, refusal, row, set,
+    work,
 };
 use crate::channel::Channel;
 use crate::channel::material::read_dir;
@@ -186,12 +187,19 @@ fn a_re_post_the_wire_swallowed_again_is_still_held() {
         ],
     );
     let mut channel = channel_at(scratch.path());
-    let Ending::Again { held, .. } = hold(&mut channel, &set(), echo, &aside(), None) else {
+    let Ending::Again { held, .. } = hold(&mut channel, &set(), echo, &aside(), None, &mut idle())
+    else {
         panic!("a dropped completion must be worth another dial");
     };
     let carried = held.expect("the capture the wire swallowed");
-    let Ending::Again { held, .. } = hold(&mut channel, &set(), echo, &aside(), Some(carried))
-    else {
+    let Ending::Again { held, .. } = hold(
+        &mut channel,
+        &set(),
+        echo,
+        &aside(),
+        Some(carried),
+        &mut idle(),
+    ) else {
         panic!("a dropped re-post must be worth another dial");
     };
     let carried = held.expect("a wire failure is not an answer");
@@ -207,8 +215,14 @@ fn a_re_post_the_wire_swallowed_again_is_still_held() {
         },
         "the same capture, unchanged by a second drop"
     );
-    let Ending::Again { held, .. } = hold(&mut channel, &set(), echo, &aside(), Some(carried))
-    else {
+    let Ending::Again { held, .. } = hold(
+        &mut channel,
+        &set(),
+        echo,
+        &aside(),
+        Some(carried),
+        &mut idle(),
+    ) else {
         panic!("the refused read is this box's own predecessor");
     };
     assert!(

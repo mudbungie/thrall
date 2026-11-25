@@ -17,7 +17,7 @@
 
 use super::super::hold::{Ending, hold};
 use super::super::redial::redial;
-use super::{advertised, aside, echo, entry_at, set};
+use super::{advertised, aside, echo, entry_at, idle, set};
 use crate::channel::Channel;
 use crate::channel::material::read_dir;
 use crate::test_support::server::Server;
@@ -48,7 +48,7 @@ fn a_version_the_two_ends_do_not_share_is_over_and_not_the_wire() {
         .expect("readable")
         .expect("provisioned");
     let mut channel = Channel::open(&held).expect("opened");
-    let Ending::Over(said) = hold(&mut channel, &set(), echo, &aside(), None) else {
+    let Ending::Over(said) = hold(&mut channel, &set(), echo, &aside(), None, &mut idle()) else {
         panic!("a version this foot cannot speak is not worth another dial");
     };
     assert!(

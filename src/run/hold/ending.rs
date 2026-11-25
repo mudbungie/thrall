@@ -121,6 +121,14 @@ impl Failed {
             (Self::Refused(said) | Self::Unusable(said), _) => Ending::Over(said),
         }
     }
+
+    /// **The sentence, whoever failed** — for a pushed job, whose failure
+    /// ends no channel and so meets no leg: it is only said (`run::pushed`).
+    pub(crate) fn said(self) -> String {
+        match self {
+            Self::Wire(said) | Self::Refused(said) | Self::Unusable(said) => said,
+        }
+    }
 }
 
 impl From<Failure> for Failed {

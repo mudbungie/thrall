@@ -5,7 +5,9 @@
 //! has a lifetime that is not its conversation:
 //!
 //! - [`hold`] — **one channel's conversation**: present, wait, hand off,
-//!   answer, present again, and the [`Ending`](hold::Ending) that stopped it.
+//!   answer, present again, and the [`Ending`](hold::Ending) that stopped it —
+//!   or, to a server that pushes (REMOTE §5.8), present once and hold one read
+//!   open, starting every job it is handed on a thread of its own ([`pushed`]).
 //!   Beside it, [`held`] is the capture going back — posted as it is computed,
 //!   in pieces to a server that reads them (REMOTE §5.7), or carried to the
 //!   next dial when the wire swallowed it (REMOTE §5.6).
@@ -34,6 +36,8 @@ use crate::invocation::{Capture, Invocation, Piece};
 pub(crate) mod held;
 /// One channel's conversation, and how it ended.
 pub(crate) mod hold;
+/// The jobs a pushing read has handed this host, each on its own thread.
+pub(crate) mod pushed;
 /// One channel's lifetime: the ending that is dialled again, and the wait.
 pub(crate) mod redial;
 
@@ -79,9 +83,10 @@ pub type Pause = Arc<dyn Fn(Duration) + Send + Sync>;
 /// **Every channel this box holds, served at once** — one thread each, and the
 /// sentence that stopped each one, in the order they were filed.
 ///
-/// Serial stays serial **per channel**: two servers are two conversations, and
-/// a foot that queued one behind the other would be absent from one of them for
-/// reasons the other's operator cannot see. Channels share nothing here — not a
+/// Channels never wait on each other: two servers are two conversations, and a
+/// foot that queued one behind the other would be absent from one of them for
+/// reasons the other's operator cannot see. Within one channel, jobs run one at
+/// a time to an older server and all at once to one that pushes (REMOTE §5.8). Channels share nothing here — not a
 /// connection, not an identity, not a lock — exactly as their material shares
 /// nothing (`channel::entries`).
 ///

@@ -2,8 +2,18 @@
 //! §5.1, §5.3).
 //!
 //! ```text
-//! advertise → { invocations → hand off → complete → advertise } until something fails
+//! serial:  advertise → { invocations → hand off → complete → advertise } until something fails
+//! pushing: advertise → invocations{holding} → { a frame → start the job } until something fails
 //! ```
+//!
+//! **One loop, and the server's edition picks the read** (REMOTE §5.8). At 32
+//! or more the read states `holding` and stays open, a frame per job, and each
+//! job is started on its own thread ([`Pushed`]) and posts on its own
+//! connection; an empty frame is a heartbeat and is read past. Below 32 the
+//! read is answered once, every job in it runs here in turn, and the read is
+//! asked again. The loop is the same loop: a serial read is a pushing read that
+//! ends after its one frame, and an empty serial answer is read past exactly as
+//! a heartbeat is.
 //!
 //! **Nothing in it is thrall speaking unprompted.** Every leg is a reply to
 //! something this end asked for: the advertisement is an act it sends, the work
@@ -11,8 +21,8 @@
 //! another act. The server never speaks first (REMOTE §3), and the shape of
 //! this file is that invariant rather than a consequence of it.
 //!
-//! **The advertisement is presented once per channel and again after every
-//! hand-off** (bl-2d78, yog bl-1462). A foot dials per ask (`channel`), so "on
+//! **The advertisement is presented once per channel and — on a serial channel
+//! only — again after every hand-off** (bl-2d78, yog bl-1462). A foot dials per ask (`channel`), so "on
 //! every connect" in the protocol's own words means each time it takes up a
 //! channel — and the far end writes the set only when it differs from what is
 //! stored, so a re-presentation of an unchanged set costs a comparison and no
@@ -26,7 +36,11 @@
 //! it is **absent** while it executes, and a set blanked in that window would
 //! stand until the process restarted, with every later invocation refused for a
 //! tool that plainly exists. Re-asserting at the end of each hand-off bounds
-//! that window to one tool's runtime instead of forever.
+//! that window to one tool's runtime instead of forever. **A pushing channel
+//! never opens that window**: its read is open while it works, and it must not
+//! advertise while it is (REMOTE §5.8: an accepted advertisement ends that read
+//! as superseded, which this foot would obey). So it advertises once per
+//! connection, before the read, and never again on it.
 //!
 //! **And since PROTOCOL 8 it also buys knowing** (yog bl-66d4). The receipt
 //! carries `wrote`: false when the server compared, true when it changed the
@@ -42,11 +56,11 @@
 //! holds across one too, and DESIGN §3.8 says why nothing is remembered over
 //! the gap.
 //!
-//! **The loop is serial, and that is what makes a busy foot absent** (REMOTE
-//! §5's presence amendment). It runs one invocation at a time and holds a
-//! connection only while it is waiting, so the far end sees it vanish for as
-//! long as a tool takes — which is why the server's routing predicate is the
-//! mailbox queue and never presence.
+//! **To an older server the loop is serial, and that is what makes a busy foot
+//! absent** (REMOTE §5's presence amendment). It runs one invocation at a time
+//! and holds a connection only while it is waiting, so the far end sees it
+//! vanish for as long as a tool takes. A pushing foot is never absent: its read
+//! is open for as long as it is up.
 //!
 //! **The execution itself is a hand-off, and it is not here** (bl-4cda). What
 //! this file owns is the conversation; what runs a command owns the bound,
@@ -60,6 +74,8 @@
 /// How a channel ended, and who ended it: the classification the loop below
 /// hands back, kept apart from the conversation that produces it.
 pub(crate) mod ending;
+/// The read, in its two forms: answered once, or a frame at a time.
+mod read;
 
 use serde_json::Value;
 
@@ -67,11 +83,11 @@ pub(crate) use ending::{Ending, Failed};
 use ending::{Leg, SUPERSEDED};
 
 use super::held::{self, Held};
+use super::pushed::Pushed;
 use super::{Handoff, Notice};
 use crate::channel::{Channel, Failure, Line};
 use crate::config::{self, Local};
 use crate::gestures::{self, Reply};
-use crate::invocation::Invocation;
 
 /// **What this machine says when a re-assertion actually wrote.**
 ///
@@ -104,6 +120,7 @@ pub(crate) fn hold(
     handoff: Handoff,
     notice: &Notice,
     held: Option<Held>,
+    pushed: &mut Pushed,
 ) -> Ending {
     let presenting = gestures::advertise(&config::advertisement(set));
     let mut served = false;
@@ -117,24 +134,35 @@ pub(crate) fn hold(
         return ending;
     }
     loop {
-        let work = match waited(channel) {
-            Ok(Some(work)) => work,
-            Ok(None) => return Ending::Over(SUPERSEDED.to_owned()),
-            Err(failed) => return failed.at(Leg::Read, served),
-        };
-        served = true;
-        for invocation in work {
-            if let Err((failed, held)) = held::run(channel, set, handoff, &invocation) {
-                let ending = failed.at(Leg::Completion, served);
-                return match held {
-                    Some(held) => held.carried_by(ending),
-                    None => ending,
-                };
-            }
-            match present(channel, &presenting) {
-                Err(failed) => return failed.at(Leg::Advertisement, served),
-                Ok(true) => notice(DISARMED),
-                Ok(false) => {}
+        // The advertisement's dial told this foot the server's edition, so
+        // the read is chosen after it — and `holding` is computed after the
+        // last read's connection was dropped, which is the order REMOTE
+        // §5.8.2 needs for a frame racing a reconnect.
+        let pushing = channel.pushes();
+        for frame in read::frames(channel, pushing.then(|| pushed.holding())) {
+            let work = match frame {
+                Ok(Some(work)) => work,
+                Ok(None) => return Ending::Over(SUPERSEDED.to_owned()),
+                Err(failed) => return failed.at(Leg::Read, served),
+            };
+            served = true;
+            for invocation in work {
+                if pushing {
+                    pushed.start(channel, set, handoff, invocation);
+                    continue;
+                }
+                if let Err((failed, held)) = held::run(channel, set, handoff, &invocation) {
+                    let ending = failed.at(Leg::Completion, served);
+                    return match held {
+                        Some(held) => held.carried_by(ending),
+                        None => ending,
+                    };
+                }
+                match present(channel, &presenting) {
+                    Err(failed) => return failed.at(Leg::Advertisement, served),
+                    Ok(true) => notice(DISARMED),
+                    Ok(false) => {}
+                }
             }
         }
     }
@@ -162,20 +190,6 @@ fn present(channel: &mut Channel, presenting: &Value) -> Result<bool, Failed> {
         Reply::Advertised { wrote } => Ok(wrote),
         other => Err(Failed::Unusable(format!(
             "the server answered {other:?}, not that the advertisement landed"
-        ))),
-    }
-}
-
-/// **The follow-class read**: this machine's next work, or the empty answer of
-/// a hold that ended quietly. Both are ordinary; only a channel failure is not.
-/// `None` is the third answer: a newer activation of this box's certificate
-/// took this machine's queue (REMOTE §5.1), and this channel is over.
-fn waited(channel: &mut Channel) -> Result<Option<Vec<Invocation>>, Failed> {
-    match tell(channel, &gestures::invocations())? {
-        Reply::Invocations(rows) => Ok(Some(rows)),
-        Reply::Superseded => Ok(None),
-        other => Err(Failed::Unusable(format!(
-            "the server answered {other:?}, not this machine's work"
         ))),
     }
 }
@@ -215,7 +229,13 @@ fn said(answer: Result<Vec<Value>, Failure>) -> Result<Reply, Failed> {
     let last = stream.last().ok_or_else(|| {
         Failed::Unusable("the server ended the stream without answering".to_owned())
     })?;
-    match gestures::decode(last) {
+    decoded(last)
+}
+
+/// One frame, as the reply it stands for — the server's refusal and an answer
+/// no gesture can earn kept apart as the two parties they are.
+fn decoded(frame: &Value) -> Result<Reply, Failed> {
+    match gestures::decode(frame) {
         Ok(Ok(reply)) => Ok(reply),
         Ok(Err(refusal)) => Err(Failed::Refused(refusal)),
         Err(unusable) => Err(Failed::Unusable(unusable)),

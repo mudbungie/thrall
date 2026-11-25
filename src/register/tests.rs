@@ -143,7 +143,7 @@ fn a_claimed_offer_is_filed_shows_its_word_and_proves_itself_on_the_wire() {
     );
     let said = server.expect("the wire").heard();
     assert_eq!(said.len(), 2, "one dial: a preface and one request");
-    assert_eq!(said.last(), Some(&crate::gestures::invocations()));
+    assert_eq!(said.last(), Some(&crate::gestures::invocations(None)));
 }
 
 /// **A wire that cannot be reached leaves a filed entry and says so**: the

@@ -5,10 +5,10 @@
 #
 # The chokepoint does not exist yet, and naming it now is the point: a rule
 # that waits for the first lock lets the first lock choose where locks live.
-# The row is in docs/DESIGN.md §4. thrall may end up holding very little — it
-# runs ONE invocation at a time (DESIGN §2), so the serial loop is not obviously
-# shared state — and a chokepoint that stays empty is a fine outcome. What it
-# must never be is many files.
+# The row is in docs/DESIGN.md §4. thrall may end up holding very little — even
+# running every pushed job at once (DESIGN §3.13) it shares only job handles
+# and one atomic flag — and a chokepoint that stays empty is a fine outcome.
+# What it must never be is many files.
 #
 # WHAT THE CONFINEMENT BUYS: shared mutable state is where a program's races
 # live, and the only cheap defence is that the whole inventory of it reads as

@@ -12,8 +12,9 @@ use crate::channel::material::read_dir;
 use crate::config::Local;
 use crate::invocation::{Capture, Invocation, Piece};
 use crate::run::hold::Ending;
+use crate::run::pushed::Pushed;
 use crate::test_support::server::Server;
-use crate::test_support::{Scratch, aside, mint};
+use crate::test_support::{Scratch, aside, mint, unwaited};
 use crate::tools::Tool;
 use serde_json::{Value, json};
 use std::path::Path;
@@ -51,6 +52,12 @@ fn echo(
 /// this is the only way a channel's thread can end without one.
 fn boom(_: &[Local], _: &Invocation, _: Option<&mut dyn FnMut(Piece) -> bool>) -> Capture {
     panic!("an executor that died");
+}
+
+/// No pushed job running, and nowhere a job would say anything — what every
+/// conversation with a server that does not push is handed.
+fn idle() -> Pushed {
+    Pushed::new(&aside(), &unwaited())
 }
 
 /// The ordinary receipt: the server compared and found the set in force
@@ -162,6 +169,10 @@ mod disarm;
 mod ending;
 /// Every channel this box holds, at once.
 mod fan;
+/// A pushed job's own life: started once, posted, carried, waited for.
+mod jobs;
+/// Pushed work: one read held open, every job at once (REMOTE §5.8).
+mod push;
 /// Whether there was a server to post a run to.
 mod reach;
 /// One channel's lifetime: dropped, waited out, dialled again.

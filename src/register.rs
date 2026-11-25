@@ -132,7 +132,7 @@ fn proved(dir: &Path, address: Vec<String>, word: &str) -> Result<String, String
     };
     let mut channel = Channel::open(&entry)
         .map_err(|why| format!("the entry was filed and will not open: {why}"))?;
-    match channel.ask(&crate::gestures::invocations()) {
+    match channel.ask(&crate::gestures::invocations(None)) {
         Ok(_) => Ok(WAITING.to_owned()),
         Err(Failure::Wire(said) | Failure::Skew(said)) => Err(format!(
             "the entry is filed, but the server has not seen this foot yet: \

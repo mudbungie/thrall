@@ -445,9 +445,12 @@ tool calls the server then routes to other machines. It also reports its own
 usage, so the spend figures for those turns are its word. Naming a machine in a
 role is trusting it with the conversation; editing the name out revokes it.
 
-**One call at a time.** A foot runs one invocation at a time per server, so two
-conversations routed to this box queue, and a tool call for this box waits
-behind a model call on it. The remedy is a second foot on the box under its own
+**Every call at once, to a server that pushes.** Against a server at edition
+32 or later a foot runs every call it is handed at the same time, with no
+limit, so two conversations routed to this box do not queue (DESIGN §3.13).
+Against an older server it runs one invocation at a time per server, so a tool
+call for this box waits behind a model call on it; the remedy there is a
+second foot on the box under its own
 leaf — a second registration, under another client name — and that client
 named in the role.
 

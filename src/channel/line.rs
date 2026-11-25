@@ -18,7 +18,11 @@ use serde_json::Value;
 
 use super::{Failure, Tls, frame, hello};
 
-/// How long one read may wait before the channel is judged gone.
+/// How long one read may wait before the channel is judged gone — and, on a
+/// pushing read (REMOTE §5.8), **four heartbeat intervals**: the server writes
+/// a frame at least every thirty seconds there, so two minutes with none is
+/// the dead connection §5.8 tells a host to reconnect from. One bound, met by
+/// both reads, because both are the same socket going quiet.
 ///
 /// It is a bound on the **transport**, not on the wait: the server parks a
 /// follow-class read for its mailbox's own hold and then answers — with no work
@@ -28,7 +32,7 @@ use super::{Failure, Tls, frame, hello};
 /// answer into a dead channel. It is a socket bound and not a clock, because
 /// rustls has no clean resume from a half-read record — a timeout is "the
 /// connection is gone", never a retry.
-const READ_TIMEOUT: Duration = Duration::from_mins(2);
+pub(super) const READ_TIMEOUT: Duration = Duration::from_mins(2);
 
 /// One verified connection to the server, past both prefaces.
 pub(crate) struct Line {
@@ -41,9 +45,16 @@ impl Line {
     /// Take up a connection the ladder climbed to: bound its reads, state
     /// this end's version, send `request` in the same breath, and confirm the
     /// server's. What comes back beside the line is the server's EDITION.
-    pub(super) fn open(tls: Tls, address: String, request: &Value) -> Result<(Self, u32), Failure> {
+    /// `quiet` is the channel's read bound — [`READ_TIMEOUT`] outside the
+    /// suite.
+    pub(super) fn open(
+        tls: Tls,
+        address: String,
+        request: &Value,
+        quiet: Duration,
+    ) -> Result<(Self, u32), Failure> {
         let mut line = Self { tls, address };
-        let bounded = line.tls.sock.set_read_timeout(Some(READ_TIMEOUT));
+        let bounded = line.tls.sock.set_read_timeout(Some(quiet));
         bounded.map_err(|e| Failure::Wire(format!("connect {}: {e}", line.address)))?;
         hello::state(&mut line.tls).map_err(|e| line.failed("send", &e))?;
         line.send(request)?;
@@ -60,13 +71,17 @@ impl Line {
     /// terminator.
     pub(super) fn answer(&mut self) -> Result<Vec<Value>, Failure> {
         let mut stream = Vec::new();
-        loop {
-            match frame::read_value(&mut self.tls) {
-                Ok(Some(chunk)) => stream.push(chunk),
-                Ok(None) => return Ok(stream),
-                Err(e) => return Err(self.failed("receive", &e)),
-            }
+        while let Some(chunk) = self.frame()? {
+            stream.push(chunk);
         }
+        Ok(stream)
+    }
+
+    /// **The next frame of the answer, as it arrives** — `None` at the
+    /// terminator. A pushing read (REMOTE §5.8) is read this way, one job per
+    /// frame, because its answer has no end to wait for.
+    pub(crate) fn frame(&mut self) -> Result<Option<Value>, Failure> {
+        frame::read_value(&mut self.tls).map_err(|e| self.failed("receive", &e))
     }
 
     /// **A channel that failed, in this box's own words** (bl-52ba).

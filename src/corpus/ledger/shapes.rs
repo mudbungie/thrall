@@ -57,7 +57,12 @@ pub(crate) const SHAPES: [Shape; 7] = [
     },
     Shape {
         name: "request/invocations",
-        signature: &[("/op:string", 1), (":object", 1)],
+        signature: &[
+            ("/holding/[]:string", 32),
+            ("/holding:array", 32),
+            ("/op:string", 1),
+            (":object", 1),
+        ],
     },
     Shape {
         name: "reply/advertised",

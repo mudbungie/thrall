@@ -53,11 +53,16 @@ fn every_advertisement_round_trips() {
     }
 }
 
-/// The follow-class read carries no field, so there is nothing to decode and
-/// the whole of the round trip is the spelling.
+/// The follow-class read round-trips in both forms: the serial one carries no
+/// field, and the pushing one carries the ids this host holds (REMOTE §5.8).
 #[test]
 fn the_follow_class_read_round_trips() {
-    assert_eq!(gestures::invocations().to_string(), INVOCATIONS);
+    assert_eq!(gestures::invocations(None).to_string(), INVOCATIONS[0]);
+    let holding = ["inv-7".to_owned()];
+    assert_eq!(
+        gestures::invocations(Some(&holding)).to_string(),
+        INVOCATIONS[1]
+    );
 }
 
 /// **The completion round-trips**, which is the one request this foot builds

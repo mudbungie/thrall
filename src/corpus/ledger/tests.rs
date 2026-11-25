@@ -39,9 +39,11 @@ fn the_floor_this_build_defaults_to_is_the_floor_it_vendored() {
 ///
 /// **The seventh is `superseded`, on the read's answer** (REMOTE §5.1, edition
 /// 29) — a reply key, so its reader defaults it: absent is an ordinary hold
-/// (`gestures::decode`).
+/// (`gestures::decode`). **The eighth and ninth are `holding`, on the read
+/// itself** (REMOTE §5.8, edition 32) — a request key, so it is gated on the
+/// server's edition ([`hello::PUSHES`]).
 #[test]
-fn the_only_paths_stamped_above_the_floor_are_the_streamed_form_s_and_superseded() {
+fn the_only_paths_stamped_above_the_floor_are_streaming_superseded_and_holding() {
     let above: Vec<(&str, &str, u32)> = SHAPES
         .iter()
         .flat_map(|shape| {
@@ -59,11 +61,16 @@ fn the_only_paths_stamped_above_the_floor_are_the_streamed_form_s_and_superseded
             (shape, "/partial:object", hello::STREAMS),
         ]
     };
-    let superseded = [("reply/invocations", "/superseded:bool", hello::EDITION)];
+    let superseded = [("reply/invocations", "/superseded:bool", 29)];
+    let holding = [
+        ("request/invocations", "/holding/[]:string", hello::PUSHES),
+        ("request/invocations", "/holding:array", hello::PUSHES),
+    ];
     assert_eq!(
         above,
         [
             streamed("request/complete").as_slice(),
+            &holding,
             &superseded,
             &streamed("reply/routed"),
         ]

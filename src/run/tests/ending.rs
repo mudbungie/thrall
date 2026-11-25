@@ -16,7 +16,7 @@
 
 use super::super::hold::ending::SUPERSEDED;
 use super::super::hold::{Ending, hold};
-use super::{advertised, aside, echo, ops, refusal, row, set, wired, work};
+use super::{advertised, aside, echo, idle, ops, refusal, row, set, wired, work};
 use crate::channel::Channel;
 use crate::channel::material::read_dir;
 use crate::invocation::Invocation;
@@ -35,7 +35,7 @@ fn a_refused_read_is_this_box_s_own_predecessor_and_is_dialled_again() {
     let refused = "client \"foot-1\" already holds a read on this server";
     let (_scratch, server, mut channel) = wired(vec![advertised(), refusal(refused)]);
     assert_eq!(
-        hold(&mut channel, &set(), echo, &aside(), None),
+        hold(&mut channel, &set(), echo, &aside(), None, &mut idle()),
         Ending::Again {
             said: refused.to_owned(),
             predecessor: true,
@@ -56,7 +56,7 @@ fn a_refused_advertisement_is_over_and_not_a_predecessor() {
     let refused = "this box's set is held by a serving connection";
     let (_scratch, _server, mut channel) = wired(vec![refusal(refused)]);
     assert_eq!(
-        hold(&mut channel, &set(), echo, &aside(), None),
+        hold(&mut channel, &set(), echo, &aside(), None, &mut idle()),
         Ending::Over(refused.to_owned())
     );
 }
@@ -72,7 +72,7 @@ fn a_refused_completion_is_over() {
         refusal(refused),
     ]);
     assert_eq!(
-        hold(&mut channel, &set(), echo, &aside(), None),
+        hold(&mut channel, &set(), echo, &aside(), None, &mut idle()),
         Ending::Over(refused.to_owned())
     );
 }
@@ -82,7 +82,7 @@ fn a_refused_completion_is_over() {
 #[test]
 fn an_unusable_answer_is_over() {
     let (_scratch, _server, mut channel) = wired(vec![advertised(), advertised()]);
-    let Ending::Over(said) = hold(&mut channel, &set(), echo, &aside(), None) else {
+    let Ending::Over(said) = hold(&mut channel, &set(), echo, &aside(), None, &mut idle()) else {
         panic!("an unusable answer must end the channel");
     };
     assert!(said.contains("not this machine's work"), "{said}");
@@ -106,7 +106,7 @@ fn a_wire_that_goes_away_is_dialled_again() {
         predecessor,
         served,
         ..
-    } = hold(&mut channel, &set(), echo, &aside(), None)
+    } = hold(&mut channel, &set(), echo, &aside(), None, &mut idle())
     else {
         panic!("a dropped wire must be worth another dial");
     };
@@ -130,7 +130,9 @@ fn an_answered_read_marks_the_channel_as_having_served() {
         .expect("readable")
         .expect("provisioned");
     let mut channel = Channel::open(&held).expect("opened");
-    let Ending::Again { served, .. } = hold(&mut channel, &set(), echo, &aside(), None) else {
+    let Ending::Again { served, .. } =
+        hold(&mut channel, &set(), echo, &aside(), None, &mut idle())
+    else {
         panic!("a dropped wire must be worth another dial");
     };
     assert!(served, "the server answered a read before the wire dropped");
@@ -149,7 +151,7 @@ fn a_stream_that_answered_nothing_is_over() {
         .expect("provisioned");
     let mut channel = Channel::open(&held).expect("opened");
     assert_eq!(
-        hold(&mut channel, &set(), echo, &aside(), None),
+        hold(&mut channel, &set(), echo, &aside(), None, &mut idle()),
         Ending::Over("the server ended the stream without answering".to_owned())
     );
 }
@@ -176,7 +178,7 @@ fn a_completion_the_wire_swallowed_is_dialled_again() {
     let mut channel = Channel::open(&held).expect("opened");
     let Ending::Again {
         predecessor, held, ..
-    } = hold(&mut channel, &set(), echo, &aside(), None)
+    } = hold(&mut channel, &set(), echo, &aside(), None, &mut idle())
     else {
         panic!("a dropped completion must be worth another dial");
     };
@@ -213,7 +215,7 @@ fn a_completion_the_server_refused_carries_nothing() {
         refusal(refused),
     ]);
     assert_eq!(
-        hold(&mut channel, &set(), echo, &aside(), None),
+        hold(&mut channel, &set(), echo, &aside(), None, &mut idle()),
         Ending::Over(refused.to_owned())
     );
     assert_eq!(
@@ -238,7 +240,8 @@ fn a_superseded_read_is_over_and_names_the_newer_activation() {
     ] {
         let asked = script.len();
         let (_scratch, server, mut channel) = wired(script);
-        let Ending::Over(said) = hold(&mut channel, &set(), echo, &aside(), None) else {
+        let Ending::Over(said) = hold(&mut channel, &set(), echo, &aside(), None, &mut idle())
+        else {
             panic!("a superseded foot does not dial again");
         };
         assert_eq!(said, SUPERSEDED);

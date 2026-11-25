@@ -8,7 +8,7 @@
 //! read back what a running foot would have written to stderr.
 
 use super::super::hold::hold;
-use super::{advertised, echo, receipt, refusal, restored, row, said, set, wired, work};
+use super::{advertised, echo, idle, receipt, refusal, restored, row, said, set, wired, work};
 use crate::test_support::Notices;
 
 /// **A re-assertion that WROTE is a disarming, and it is said out loud.** The
@@ -28,7 +28,10 @@ fn a_re_assertion_that_wrote_says_the_box_was_disarmed() {
         restored(),
         refusal("stop"),
     ]);
-    assert_eq!(said(hold(&mut channel, &set(), echo, &sink, None)), "stop");
+    assert_eq!(
+        said(hold(&mut channel, &set(), echo, &sink, None, &mut idle())),
+        "stop"
+    );
     let said = notices.heard();
     assert_eq!(said.len(), 1, "{said:?}");
     assert!(said[0].contains("was not the set in force"), "{said:?}");
@@ -53,7 +56,10 @@ fn a_disarming_is_said_and_the_channel_goes_on() {
         work(vec![]),
         refusal("stop"),
     ]);
-    assert_eq!(said(hold(&mut channel, &set(), echo, &sink, None)), "stop");
+    assert_eq!(
+        said(hold(&mut channel, &set(), echo, &sink, None, &mut idle())),
+        "stop"
+    );
     assert_eq!(
         super::ops(&server),
         [
@@ -82,7 +88,10 @@ fn a_re_assertion_that_compared_is_silent() {
         advertised(),
         refusal("stop"),
     ]);
-    assert_eq!(said(hold(&mut channel, &set(), echo, &sink, None)), "stop");
+    assert_eq!(
+        said(hold(&mut channel, &set(), echo, &sink, None, &mut idle())),
+        "stop"
+    );
     assert_eq!(notices.heard(), Vec::<String>::new());
 }
 
@@ -95,7 +104,10 @@ fn a_re_assertion_that_compared_is_silent() {
 fn a_write_on_the_first_presentation_is_ordinary_and_silent() {
     let (notices, sink) = Notices::new();
     let (_scratch, _server, mut channel) = wired(vec![restored(), refusal("stop")]);
-    assert_eq!(said(hold(&mut channel, &set(), echo, &sink, None)), "stop");
+    assert_eq!(
+        said(hold(&mut channel, &set(), echo, &sink, None, &mut idle())),
+        "stop"
+    );
     assert_eq!(notices.heard(), Vec::<String>::new());
 }
 
@@ -113,6 +125,7 @@ fn an_answer_that_is_not_the_receipt_ends_the_channel() {
         echo,
         &crate::test_support::aside(),
         None,
+        &mut idle(),
     ));
     assert!(said.contains("not that the advertisement landed"), "{said}");
     assert!(said.contains("Invocations"), "{said}");

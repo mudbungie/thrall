@@ -73,7 +73,11 @@ type Endpoint = (String, ServerName<'static>);
 type Tls = StreamOwned<ClientConnection, TcpStream>;
 
 /// A foot's end of one wire.
-#[derive(Debug)]
+///
+/// **It is `Clone` so a pushed job can post on a connection of its own**
+/// (REMOTE §5.8): a clone is the same server, the same identity and the same
+/// edition, and shares no connection with the read it was cloned beside.
+#[derive(Debug, Clone)]
 pub struct Channel {
     config: Arc<ClientConfig>,
     /// The endpoints the entry states, in its order, each with the name its
@@ -87,6 +91,9 @@ pub struct Channel {
     /// [`FLOOR`](hello::FLOOR) until one has: the least a server of this major
     /// can be spelling.
     edition: u32,
+    /// How long one read waits for a frame before the wire is judged gone
+    /// ([`line::READ_TIMEOUT`]; the suite shortens it).
+    quiet: std::time::Duration,
 }
 
 /// How many times a post that opens a run's connection climbs the ladder
@@ -113,7 +120,15 @@ impl Channel {
             kept: 0,
             client,
             edition: hello::FLOOR,
+            quiet: line::READ_TIMEOUT,
         })
+    }
+
+    /// The same channel with a shorter read bound, so the suite can meet a
+    /// quiet pushing read without waiting two minutes for it.
+    #[cfg(test)]
+    pub(crate) fn hushed(self, quiet: std::time::Duration) -> Self {
+        Self { quiet, ..self }
     }
 
     /// The client identity this channel presents — the leaf's own common name.
@@ -125,6 +140,12 @@ impl Channel {
     /// its edition, as last stated, is at or above the stamp of `partial`.
     pub(crate) fn streams(&self) -> bool {
         self.edition >= hello::STREAMS
+    }
+
+    /// **Whether this server pushes work over one open read** (REMOTE §5.8):
+    /// its edition, as last stated, is at or above the stamp of `holding`.
+    pub(crate) fn pushes(&self) -> bool {
+        self.edition >= hello::PUSHES
     }
 
     /// Send one request and read its whole answer: every frame up to the
@@ -141,6 +162,14 @@ impl Channel {
     /// Nothing here retries inside one ask.
     pub fn ask(&mut self, request: &Value) -> Result<Vec<Value>, Failure> {
         self.dial(request, 1)?.answer()
+    }
+
+    /// **Send one request and hand back the connection its answer arrives
+    /// on**, read a frame at a time ([`Line::frame`]) — the pushing read
+    /// (REMOTE §5.8), whose answer is a frame per job and never ends on its
+    /// own. Dropping the line closes the read.
+    pub(crate) fn listen(&mut self, request: &Value) -> Result<Line, Failure> {
+        self.dial(request, 1)
     }
 
     /// **One request of a run, over the connection that run holds** (REMOTE
@@ -185,7 +214,7 @@ impl Channel {
     fn dial(&mut self, request: &Value, reaches: usize) -> Result<Line, Failure> {
         let (tls, kept) = self.climb(reaches).map_err(Failure::Wire)?;
         self.kept = kept.at;
-        let (line, edition) = Line::open(tls, kept.address, request)?;
+        let (line, edition) = Line::open(tls, kept.address, request, self.quiet)?;
         self.edition = edition;
         Ok(line)
     }

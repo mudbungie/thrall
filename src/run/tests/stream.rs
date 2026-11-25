@@ -8,7 +8,9 @@
 
 use super::super::held::Held;
 use super::super::hold::{Ending, hold};
-use super::{advertised, aside, gesture, ops, receipt, refusal, row, said, server_at, set, work};
+use super::{
+    advertised, aside, gesture, idle, ops, receipt, refusal, row, said, server_at, set, work,
+};
 use crate::channel::Channel;
 use crate::channel::material::read_dir;
 use crate::config::Local;
@@ -93,7 +95,14 @@ fn a_run_is_posted_in_pieces_over_one_connection() {
     let script = [handed(), vec![run], stop()].concat();
     let (_scratch, server, mut channel) = streaming(script);
     assert_eq!(
-        said(hold(&mut channel, &set(), chatty, &aside(), None)),
+        said(hold(
+            &mut channel,
+            &set(),
+            chatty,
+            &aside(),
+            None,
+            &mut idle()
+        )),
         "stop"
     );
     assert_eq!(
@@ -143,7 +152,14 @@ fn an_older_edition_gets_one_post() {
         .expect("provisioned");
     let mut channel = Channel::open(&held).expect("opened");
     assert_eq!(
-        said(hold(&mut channel, &set(), chatty, &aside(), None)),
+        said(hold(
+            &mut channel,
+            &set(),
+            chatty,
+            &aside(),
+            None,
+            &mut idle()
+        )),
         "stop"
     );
     assert_eq!(
@@ -179,7 +195,14 @@ fn a_refused_post_drops_the_run_and_the_channel_takes_its_next_invocation() {
     .concat();
     let (_scratch, server, mut channel) = streaming(script);
     assert_eq!(
-        said(hold(&mut channel, &set(), chatty, &aside(), None)),
+        said(hold(
+            &mut channel,
+            &set(),
+            chatty,
+            &aside(),
+            None,
+            &mut idle()
+        )),
         "stop",
         "the refusal ended nothing: it is the asker's ordinary stop"
     );
@@ -211,7 +234,14 @@ fn a_refused_capture_post_is_dropped_and_the_channel_reads_on() {
     ]);
     let (_scratch, server, mut channel) = streaming([handed(), vec![run], stop()].concat());
     assert_eq!(
-        said(hold(&mut channel, &set(), chatty, &aside(), None)),
+        said(hold(
+            &mut channel,
+            &set(),
+            chatty,
+            &aside(),
+            None,
+            &mut idle()
+        )),
         "stop"
     );
     assert_eq!(ops(&server).len(), 7, "it presented and read again");
@@ -222,7 +252,7 @@ fn a_post_the_wire_swallowed_ends_the_run_and_the_channel_is_dialled_again() {
     let (_scratch, _server, mut channel) = streaming([handed(), vec![Dial::Vanishes]].concat());
     let Ending::Again {
         held, predecessor, ..
-    } = hold(&mut channel, &set(), chatty, &aside(), None)
+    } = hold(&mut channel, &set(), chatty, &aside(), None, &mut idle())
     else {
         panic!("a wire that dropped is worth another dial");
     };
@@ -237,7 +267,9 @@ fn a_post_the_wire_swallowed_ends_the_run_and_the_channel_is_dialled_again() {
 fn the_capture_s_own_post_swallowed_is_held_with_only_what_was_not_posted() {
     let run = Dial::run(vec![posted("i-1"), posted("i-1")]);
     let (_scratch, _server, mut channel) = streaming([handed(), vec![run]].concat());
-    let Ending::Again { held, .. } = hold(&mut channel, &set(), chatty, &aside(), None) else {
+    let Ending::Again { held, .. } =
+        hold(&mut channel, &set(), chatty, &aside(), None, &mut idle())
+    else {
         panic!("a dropped completion must be worth another dial");
     };
     assert_eq!(
@@ -254,7 +286,7 @@ fn the_capture_s_own_post_swallowed_is_held_with_only_what_was_not_posted() {
 fn an_answer_no_gesture_can_earn_ends_the_channel_in_the_middle_of_a_run() {
     let board = Dial::one(json!({"ok": true, "kind": "board"}));
     let (_scratch, _server, mut channel) = streaming([handed(), vec![board]].concat());
-    let ending = hold(&mut channel, &set(), chatty, &aside(), None);
+    let ending = hold(&mut channel, &set(), chatty, &aside(), None, &mut idle());
     assert_eq!(
         ending,
         Ending::Over("reply: unusable kind \"board\"".to_owned())

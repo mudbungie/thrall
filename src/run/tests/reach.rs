@@ -7,7 +7,7 @@
 
 use super::super::hold::{Ending, hold};
 use super::stream::{chatty, handed, partial, posted, stop, streaming};
-use super::{aside, gesture, ops, receipt, refusal, said, set};
+use super::{aside, gesture, idle, ops, receipt, refusal, said, set};
 use crate::config::Local;
 use crate::test_support::server::Dial;
 use crate::tools::Tool;
@@ -20,7 +20,14 @@ fn a_server_that_could_not_be_reached_for_a_run_s_first_post_is_dialled_once_mor
     let script = [handed(), vec![Dial::Unreachable, run], stop()].concat();
     let (_scratch, server, mut channel) = streaming(script);
     assert_eq!(
-        said(hold(&mut channel, &set(), chatty, &aside(), None)),
+        said(hold(
+            &mut channel,
+            &set(),
+            chatty,
+            &aside(),
+            None,
+            &mut idle()
+        )),
         "stop"
     );
     assert_eq!(
@@ -34,7 +41,9 @@ fn a_server_that_could_not_be_reached_for_a_run_s_first_post_is_dialled_once_mor
 fn a_server_unreachable_twice_ends_the_run_and_the_channel_is_dialled_again() {
     let script = [handed(), vec![Dial::Unreachable, Dial::Unreachable]].concat();
     let (_scratch, server, mut channel) = streaming(script);
-    let Ending::Again { held, .. } = hold(&mut channel, &set(), chatty, &aside(), None) else {
+    let Ending::Again { held, .. } =
+        hold(&mut channel, &set(), chatty, &aside(), None, &mut idle())
+    else {
         panic!("a server that cannot be reached is worth another dial");
     };
     assert_eq!(held, None);
@@ -66,7 +75,14 @@ fn a_refused_post_stops_a_real_child_and_the_channel_reads_on() {
     let refused = Dial::one(refusal("nobody is listening for \"i-1\""));
     let (_scratch, server, mut channel) = streaming([handed(), vec![refused], stop()].concat());
     let asked = Instant::now();
-    let ending = hold(&mut channel, &[slow], crate::exec::handoff, &aside(), None);
+    let ending = hold(
+        &mut channel,
+        &[slow],
+        crate::exec::handoff,
+        &aside(),
+        None,
+        &mut idle(),
+    );
     assert_eq!(said(ending), "stop");
     assert!(
         asked.elapsed() < Duration::from_secs(20),

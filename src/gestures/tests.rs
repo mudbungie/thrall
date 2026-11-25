@@ -45,10 +45,16 @@ fn advertise_can_say_nothing_is_offered() {
     assert_eq!(advertise(&[]), json!({"op": "advertise", "tools": []}));
 }
 
-/// The read carries no field at all — a connection drains its own queue.
+/// The serial read carries no field at all — a connection drains its own
+/// queue — and the pushing read carries only what this host holds, the empty
+/// list included (REMOTE §5.8).
 #[test]
 fn invocations_asks_for_this_machine_s_work_and_nothing_else() {
-    assert_eq!(invocations(), json!({"op": "invocations"}));
+    assert_eq!(invocations(None), json!({"op": "invocations"}));
+    assert_eq!(
+        invocations(Some(&[])),
+        json!({"op": "invocations", "holding": []})
+    );
 }
 
 /// A completion quotes the handle it is answering and carries the capture in
@@ -69,7 +75,7 @@ fn complete_answers_one_handle_with_one_capture() {
 /// no encoder here at all.
 #[test]
 fn the_only_ops_this_crate_can_spell_are_the_foot_set() {
-    let spoken: Vec<String> = [advertise(&[]), invocations(), complete("i-1", &ran())]
+    let spoken: Vec<String> = [advertise(&[]), invocations(None), complete("i-1", &ran())]
         .iter()
         .map(|g| g["op"].as_str().unwrap_or_default().to_owned())
         .collect();
